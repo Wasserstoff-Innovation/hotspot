@@ -1,0 +1,114 @@
+import type { AccountsOverviewTile } from './accountsOverviewTilesLogic'
+
+// PostHog's Salesforce instance origin; append a record id to deep-link to that record (account or opportunity).
+export const SALESFORCE_ORIGIN = 'https://posthog.my.salesforce.com'
+
+export const ACCOUNTS_OVERVIEW_THRESHOLD_OPERATORS = ['>', '>=', '<', '<=', '=', '!='] as const
+export type AccountsOverviewThresholdOperator = (typeof ACCOUNTS_OVERVIEW_THRESHOLD_OPERATORS)[number]
+
+export const NUMERIC_FIELD_TYPES = new Set(['integer', 'float', 'decimal'])
+
+export const MAX_ACCOUNTS_OVERVIEW_TILES = 5
+
+export const DEFAULT_TILES: AccountsOverviewTile[] = [
+    { id: 'default-accounts', label: 'Accounts', metric: { type: 'count' } },
+]
+
+// Overview tiles used to be persisted per-team in localStorage; they now live in saved views
+// (`properties.tiles`). We no longer WRITE this key — `accountsOverviewTilesLogic` only reads any
+// pre-existing value once on mount (to seed the working state) and emits an
+// `OverviewTilesLocalStorageRead` tombstone. Once that event stops firing, no browser still carries
+// a legacy value and this read path (plus the prefix) can be deleted.
+const overviewTilesTeamId = window.POSTHOG_APP_CONTEXT?.current_team?.id
+export const ACCOUNTS_OVERVIEW_LEGACY_TILES_PREFIX = `${overviewTilesTeamId}_customer_analytics_accounts_overview__`
+
+// Canonical analytics event names for the accounts list. Every `posthog.capture`
+// in this directory must reference these — a mistyped string silently forks a new
+// event in PostHog and breaks reporting without any error. Keep in sync with the
+// analytics table in AGENTS.md.
+export const AccountsEvents = {
+    ListViewed: 'customer analytics accounts list viewed',
+    FilterChanged: 'customer analytics accounts filter changed',
+    Searched: 'customer analytics accounts searched',
+    Refreshed: 'customer analytics accounts refreshed',
+    Sorted: 'customer analytics accounts sorted',
+    ColumnResized: 'customer analytics accounts column resized',
+    AccountOpened: 'customer analytics accounts account opened',
+    ColumnsSaved: 'customer analytics accounts columns saved',
+    OverviewTilesEdited: 'customer analytics accounts overview tiles edited',
+    OverviewTilesLocalStorageRead: 'customer analytics accounts overview tiles localstorage read',
+    ViewSaved: 'customer analytics accounts view saved',
+    ViewUpdated: 'customer analytics accounts view updated',
+    ViewSelected: 'customer analytics accounts view selected',
+    ViewDeleted: 'customer analytics accounts view deleted',
+    RoleAssigned: 'customer analytics account role assigned',
+    RelationshipDeleted: 'customer analytics accounts relationship deleted',
+    TagsUpdated: 'customer analytics account tags updated',
+    CustomPropertyUpdated: 'customer analytics account custom property updated',
+    AccountPropertyEditorOpened: 'customer analytics account property editor opened',
+    PropertiesWidgetConfigured: 'customer analytics account properties widget configured',
+    AccountPropertySaveFailed: 'customer analytics account property save failed',
+    PinnedPropertiesSaved: 'customer analytics account pinned properties saved',
+    LinkClicked: 'customer analytics account link clicked',
+    NoteClicked: 'customer analytics account note clicked',
+    NoteCreated: 'customer analytics accounts note created',
+    NotesSearched: 'customer analytics accounts notes searched',
+    NotesSorted: 'customer analytics accounts notes sorted',
+    TabViewed: 'customer analytics account tab viewed',
+    UsageIntervalChanged: 'customer analytics account usage interval changed',
+    UsageSeriesToggled: 'customer analytics account usage series toggled',
+    UsageSeriesBulkToggled: 'customer analytics account usage series bulk toggled',
+    RelatedUserClicked: 'customer analytics account related user clicked',
+    RelatedUsersSearched: 'customer analytics account related users searched',
+    RelatedUsersFiltered: 'customer analytics account related users filtered',
+    RelatedUsersSorted: 'customer analytics account related users sorted',
+    RelatedUserEmailsCopied: 'customer analytics account related user emails copied',
+    RelatedUserAdminOpened: 'customer analytics account related user admin opened',
+    RelatedUsersTableChanged: 'customer analytics account related users table changed',
+    OpportunityClicked: 'customer analytics account opportunity clicked',
+    SummaryCadenceChanged: 'customer analytics account summary cadence changed',
+    SummaryExpanded: 'customer analytics account summary expanded',
+    SummariesPageChanged: 'customer analytics account summaries page changed',
+    SupportTicketClicked: 'customer analytics account support ticket clicked',
+    MeetingMatchingSaved: 'customer analytics account meeting matching saved',
+    MeetingsSearched: 'customer analytics account meetings searched',
+    MeetingAttendeeClicked: 'customer analytics account meeting attendee clicked',
+    GongCallOpened: 'customer analytics account gong call opened',
+    ReplaysViewed: 'customer analytics account replays viewed',
+    ReplaysFilterChanged: 'customer analytics account replays filter changed',
+    ReplaysRecordingOpened: 'customer analytics account replay opened',
+    ReplaysLoadMore: 'customer analytics account replays load more',
+    ReplaysLoadFailed: 'customer analytics account replays load failed',
+    ReplaysRetried: 'customer analytics account replays retried',
+    AccountEditorOpened: 'customer analytics account editor opened',
+    AccountEdited: 'customer analytics account edited',
+    EventStreamModalOpened: 'customer analytics account event stream modal opened',
+    EventStreamMembershipToggled: 'customer analytics account event stream toggled',
+    EventStreamConfigSaved: 'customer analytics event stream config saved',
+    EventStreamTestMessageSent: 'customer analytics event stream test message sent',
+    TaskDigestOpened: 'customer analytics task digest opened',
+    TaskDigestPreferencesSaved: 'customer analytics task digest preferences saved',
+    NotesTabViewed: 'customer analytics notes tab viewed',
+    NotesTabSearched: 'customer analytics notes tab searched',
+    NotesTabFiltered: 'customer analytics notes tab filtered',
+    NotesTabNoteClicked: 'customer analytics notes tab note clicked',
+    NotesTabAccountClicked: 'customer analytics notes tab account clicked',
+    AccountViewEditorOpened: 'customer analytics account view editor opened',
+    AccountViewSaved: 'customer analytics account view saved',
+    AccountViewSaveFailed: 'customer analytics account view save failed',
+    AccountViewTileEditorOpened: 'customer analytics account view tile editor opened',
+    AccountViewTileRenamed: 'customer analytics account view tile renamed',
+    AccountViewTileRenameFailed: 'customer analytics account view tile rename failed',
+    AccountViewTileRemovalStarted: 'customer analytics account view tile removal started',
+    AccountViewTileRemoved: 'customer analytics account view tile removed',
+    AccountViewTileRemovalFailed: 'customer analytics account view tile removal failed',
+    AccountViewDeletionStarted: 'customer analytics account view deletion started',
+    AccountViewDeleted: 'customer analytics account view deleted',
+    AccountViewDeletionFailed: 'customer analytics account view deletion failed',
+    AccountViewTabSettingsOpened: 'customer analytics account view tab settings opened',
+    AccountViewTabSettingsSaveStarted: 'customer analytics account view tab settings save started',
+    AccountViewTabSettingsSaved: 'customer analytics account view tab settings saved',
+    AccountViewTabSettingsSaveFailed: 'customer analytics account view tab settings save failed',
+} as const
+
+export type NotesTabFilterType = 'created_by' | 'account' | 'my_notes' | 'my_accounts'

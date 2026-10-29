@@ -1,0 +1,150 @@
+"""
+Contract types for access_control.
+
+Stable, framework-free frozen dataclasses that define what this product
+exposes to the rest of the codebase. No Django/DRF imports here.
+"""
+
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from uuid import UUID
+
+from posthog.dataclasses import frozen
+from posthog.scopes import APIScopeObject
+
+
+class PropertyAccessLevel(str, Enum):
+    """Effective access level for a property."""
+
+    READ_WRITE = "read_write"
+    READ = "read"
+    NONE = "none"
+
+    def grants_access(self) -> bool:
+        """Returns True if this level allows the property to be read in queries."""
+        return self in (PropertyAccessLevel.READ_WRITE, PropertyAccessLevel.READ)
+
+
+class UserNotOrganizationMemberError(ValueError):
+    """The user has no membership in the organization, so their property access cannot be resolved."""
+
+
+# --- Output DTOs ---
+
+
+@dataclass(frozen=True)
+class RestrictedPropertyNames:
+    """Restricted property names grouped by event and person scope."""
+
+    event: frozenset[str]
+    person: frozenset[str]
+
+
+@dataclass(frozen=True)
+class PropertyAccessControlRule:
+    """A single access control rule for a property definition."""
+
+    id: UUID
+    property_definition_id: UUID
+    access_level: PropertyAccessLevel
+    organization_member_id: UUID | None
+    role_id: UUID | None
+    created_by_id: int | None
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass(frozen=True)
+class PropertyAccessControlState:
+    """The full access control state for a property definition."""
+
+    rules: list[PropertyAccessControlRule] = field(default_factory=list)
+    available_access_levels: list[PropertyAccessLevel] = field(default_factory=list)
+    default_access_level: PropertyAccessLevel = PropertyAccessLevel.READ_WRITE
+
+
+# --- Input DTOs ---
+
+
+@frozen
+class ObjectAccessRef:
+    """The fields object-level access control reads from one object, without the model.
+
+    A view that serves a facade contract passes this to `check_object_permissions` in place of a
+    model instance. Resolution needs only the resource, the object id, and the creator. A resource
+    that inherits access from a parent object through a foreign key (`RESOURCE_FALLBACK_MAP`)
+    cannot be resolved from a reference, so the check raises for it.
+    """
+
+    resource: APIScopeObject
+    id: str
+    team_id: int
+    created_by_id: int | None
+
+
+@frozen
+class UpsertPropertyAccessControlInput:
+    """Input for creating or updating an access control rule."""
+
+    access_level: PropertyAccessLevel
+    property_definition_id: str | None = None
+    ai_property: str | None = None
+    organization_member_id: UUID | None = None
+    role_id: UUID | None = None
+
+    def __post_init__(self) -> None:
+        if (self.property_definition_id is None) == (self.ai_property is None):
+            raise ValueError("Provide exactly one of property_definition_id or ai_property.")
+
+
+@dataclass(frozen=True)
+class DeletePropertyAccessControlInput:
+    """Input for deleting an access control rule."""
+
+    property_definition_id: str
+    organization_member_id: UUID | None = None
+    role_id: UUID | None = None
+
+
+@dataclass(frozen=True)
+class SetObjectAccessControlInput:
+    """Input for granting, changing, or removing one subject's access to one object.
+
+    `access_level=None` removes the rule. Exactly one of `organization_member_id` or `role_id`
+    names the subject.
+    """
+
+    resource: str
+    resource_id: str
+    access_level: str | None
+    organization_member_id: UUID | None = None
+    role_id: UUID | None = None
+    created_by_id: int | None = None
+
+    def __post_init__(self) -> None:
+        if (self.organization_member_id is None) == (self.role_id is None):
+            raise ValueError("Set exactly one of organization_member_id or role_id.")
+
+
+@dataclass(frozen=True)
+class ObjectAccessControlRule:
+    """One object-level access control rule as stored."""
+
+    id: UUID
+    resource: str
+    resource_id: str
+    access_level: str
+    organization_member_id: UUID | None
+    role_id: UUID | None
+
+
+@frozen
+class TerraformLock:
+    """The state of the Terraform lock of one project. has_terraform_account is true when Terraform
+    wrote access rules to the project at least once. An enabled lock with no account refuses all
+    writes until that first write."""
+
+    managed: bool
+    terraform_last_applied_at: datetime | None
+    has_terraform_account: bool

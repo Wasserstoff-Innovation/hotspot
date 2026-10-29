@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Hotspot • Product Analytics & Heatmaps</title>
+    <meta name="description" content="Hotspot is the unified, self-hosted platform for product analytics, click heatmaps, session replay, and user journeys. Powered by a single drop-in script.">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' stroke='%23FF5722' stroke-width='2.5' fill='none'/%3E%3Ccircle cx='16' cy='16' r='6' fill='%23FF5722'/%3E%3C/svg%3E">
+    <!-- Embedded Hotspot Tracking SDK for live testing -->
+    <script src="/hotspot.js" data-api-key="hotspot_landing_demo" data-debug="true"></script>
+
+    <style>
+        :root {
+            --bg-primary: #090c10;
+            --bg-secondary: #0f141c;
+            --bg-card: rgba(21, 28, 40, 0.7);
+            --border-glass: rgba(255, 255, 255, 0.08);
+            --border-hover: rgba(255, 87, 34, 0.35);
+            --text-primary: #f0f3f6;
+            --text-secondary: #8b949e;
+            --text-muted: #6e7681;
+            --brand-primary: #ff5722;
+            --brand-gradient: linear-gradient(135deg, #ff7a00 0%, #ff5722 50%, #e64a19 100%);
+            --brand-glow: rgba(255, 87, 34, 0.25);
+            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: var(--font-family);
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Ambient Glow Mesh */
+        .ambient-glow {
+            position: fixed;
+            top: -20%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 900px;
+            height: 600px;
+            background: radial-gradient(circle at center, rgba(255, 87, 34, 0.15) 0%, rgba(255, 122, 0, 0.06) 40%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+            filter: blur(80px);
+        }
+
+        .ambient-glow-2 {
+            position: fixed;
+            bottom: -15%;
+            right: -10%;
+            width: 700px;
+            height: 500px;
+            background: radial-gradient(circle at center, rgba(255, 61, 0, 0.1) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+            filter: blur(100px);
+        }
+
+        /* Container */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Header Navigation */
+        header {
+            position: sticky;
+            top: 0;
+            background: rgba(9, 12, 16, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border-glass);
+            z-index: 100;
+        }
+
+        .nav-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 72px;
+        }
+
+        .logo-wrap {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            color: #fff;
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            flex-shrink: 0;
+        }
+
+        .logo-text {
+            font-size: 21px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            background: linear-gradient(180deg, #ffffff 30%, #c9d1d9 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 28px;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            transition: color 0.2s ease;
+        }
+
+        .nav-links a:hover {
+            color: #fff;
+        }
+
+        .nav-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 18px;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 8px;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            border: 1px solid transparent;
+        }
+
+        .btn-ghost {
+            background: transparent;
+            color: var(--text-primary);
+            border-color: var(--border-glass);
+        }
+
+        .btn-ghost:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-primary {
+            background: var(--brand-gradient);
+            color: #fff;
+            box-shadow: 0 4px 18px var(--brand-glow);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 24px rgba(255, 87, 34, 0.45);
+        }
+
+        /* Hero Section */
+        .hero {
+            padding: 96px 0 64px;
+            text-align: center;
+        }
+
+        .badge-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            border-radius: 999px;
+            background: rgba(255, 87, 34, 0.12);
+            border: 1px solid rgba(255, 87, 34, 0.3);
+            color: #ff9800;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 24px;
+        }
+
+        .badge-pulse {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ff5722;
+            box-shadow: 0 0 10px #ff5722;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.3); opacity: 1; }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+
+        .hero-title {
+            font-size: 58px;
+            font-weight: 800;
+            line-height: 1.12;
+            letter-spacing: -1.5px;
+            margin-bottom: 20px;
+            max-width: 900px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .hero-title span {
+            background: var(--brand-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero-subtitle {
+            font-size: 19px;
+            color: var(--text-secondary);
+            max-width: 680px;
+            margin: 0 auto 36px;
+            line-height: 1.6;
+        }
+
+        .hero-buttons {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            margin-bottom: 56px;
+        }
+
+        .btn-large {
+            padding: 14px 28px;
+            font-size: 16px;
+            border-radius: 10px;
+        }
+
+        /* Metric Highlights */
+        .metrics-bar {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            max-width: 840px;
+            margin: 0 auto 72px;
+            padding: 18px 24px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-glass);
+            border-radius: 14px;
+            backdrop-filter: blur(12px);
+        }
+
+        .metric-item {
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 24px;
+            font-weight: 800;
+            color: #fff;
+        }
+
+        .metric-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 2px;
+        }
+
+        /* Code Showcase Section */
+        .showcase-section {
+            padding: 40px 0 80px;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 48px;
+        }
+
+        .section-tag {
+            color: var(--brand-primary);
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .section-title {
+            font-size: 36px;
+            font-weight: 800;
+            letter-spacing: -0.8px;
+            margin-bottom: 12px;
+        }
+
+        .section-desc {
+            color: var(--text-secondary);
+            font-size: 16px;
+            max-width: 580px;
+            margin: 0 auto;
+        }
+
+        .terminal-box {
+            background: #0d1117;
+            border: 1px solid var(--border-glass);
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: 0 20px 48px rgba(0, 0, 0, 0.4);
+            max-width: 960px;
+            margin: 0 auto;
+        }
+
+        .terminal-topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 18px;
+            background: rgba(255, 255, 255, 0.03);
+            border-bottom: 1px solid var(--border-glass);
+        }
+
+        .terminal-dots {
+            display: flex;
+            gap: 7px;
+        }
+
+        .dot {
+            width: 11px;
+            height: 11px;
+            border-radius: 50%;
+        }
+        .dot-red { background: #ff5f56; }
+        .dot-yellow { background: #ffbd2e; }
+        .dot-green { background: #27c93f; }
+
+        .terminal-title {
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-family: monospace;
+        }
+
+        .copy-btn {
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--text-primary);
+            border: 1px solid var(--border-glass);
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .copy-btn:hover {
+            background: rgba(255, 255, 255, 0.12);
+        }
+
+        .code-area {
+            padding: 22px 24px;
+            font-family: "SF Mono", Monaco, Consolas, "Liberation Mono", Menlo, Courier, monospace;
+            font-size: 14px;
+            line-height: 1.7;
+            color: #e6edf3;
+            overflow-x: auto;
+        }
+
+        .code-comment { color: #8b949e; }
+        .code-tag { color: #7ee787; }
+        .code-attr { color: #79c0ff; }
+        .code-str { color: #a5d6ff; }
+        .code-val { color: #ffa657; }
+
+        /* Interactive Test Deck */
+        .live-test-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 16px;
+            padding: 18px 24px;
+            background: rgba(255, 87, 34, 0.04);
+            border-top: 1px solid var(--border-glass);
+        }
+
+        .live-test-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .test-buttons-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-test {
+            background: rgba(255, 255, 255, 0.07);
+            border: 1px solid var(--border-glass);
+            color: var(--text-primary);
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-test:hover {
+            background: rgba(255, 87, 34, 0.15);
+            border-color: var(--brand-primary);
+            color: #fff;
+        }
+
+        .live-console-feed {
+            background: #06090e;
+            padding: 16px 20px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 160px;
+            overflow-y: auto;
+            border-top: 1px solid var(--border-glass);
+            color: #8b949e;
+        }
+
+        .feed-entry {
+            margin-bottom: 6px;
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .feed-ts { color: #6e7681; }
+        .feed-event { color: #ff9800; font-weight: bold; }
+        .feed-json { color: #a5d6ff; word-break: break-all; }
+
+        /* Interactive Heatmap Playground Sandbox */
+        .playground-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-glass);
+            border-radius: 16px;
+            padding: 32px;
+            max-width: 960px;
+            margin: 0 auto 80px;
+            position: relative;
+            user-select: none;
+            backdrop-filter: blur(12px);
+        }
+
+        .sandbox-surface {
+            height: 320px;
+            background: rgba(9, 12, 16, 0.6);
+            border: 2px dashed rgba(255, 87, 34, 0.35);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            cursor: crosshair;
+            overflow: hidden;
+            margin-top: 20px;
+            transition: border-color 0.2s;
+        }
+
+        .sandbox-surface:hover {
+            border-color: rgba(255, 87, 34, 0.7);
+        }
+
+        .sandbox-hint {
+            color: var(--text-secondary);
+            font-size: 15px;
+            pointer-events: none;
+            text-align: center;
+        }
+
+        .sandbox-hint span {
+            color: #ff9800;
+            font-weight: 600;
+        }
+
+        /* Dynamic Hotspot Mark on Click */
+        .hotspot-particle {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            margin-left: -20px;
+            margin-top: -20px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255, 87, 34, 0.9) 0%, rgba(255, 152, 0, 0.5) 45%, rgba(255, 87, 34, 0) 70%);
+            pointer-events: none;
+            animation: hotspot-glow 2.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes hotspot-glow {
+            0% { transform: scale(0.3); opacity: 1; }
+            50% { transform: scale(1.4); opacity: 0.85; }
+            100% { transform: scale(1.6); opacity: 0.4; }
+        }
+
+        /* Features Grid */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+            margin-bottom: 96px;
+        }
+
+        .feature-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-glass);
+            border-radius: 14px;
+            padding: 28px;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--border-hover);
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.3);
+        }
+
+        .feature-icon-box {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            background: rgba(255, 87, 34, 0.1);
+            border: 1px solid rgba(255, 87, 34, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            margin-bottom: 20px;
+        }
+
+        .feature-title {
+            font-size: 19px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            color: #fff;
+        }
+
+        .feature-text {
+            color: var(--text-secondary);
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        /* Bottom CTA Banner */
+        .bottom-cta {
+            background: linear-gradient(180deg, rgba(255, 87, 34, 0.08) 0%, rgba(9, 12, 16, 0.9) 100%);
+            border: 1px solid rgba(255, 87, 34, 0.25);
+            border-radius: 20px;
+            padding: 64px 32px;
+            text-align: center;
+            margin-bottom: 96px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cta-title {
+            font-size: 38px;
+            font-weight: 800;
+            letter-spacing: -1px;
+            margin-bottom: 16px;
+        }
+
+        .cta-desc {
+            color: var(--text-secondary);
+            font-size: 17px;
+            max-width: 580px;
+            margin: 0 auto 32px;
+        }
+
+        /* Footer */
+        footer {
+            border-top: 1px solid var(--border-glass);
+            padding: 40px 0;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        .footer-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 20px;
+        }
+
+        .footer-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .footer-links a:hover {
+            color: #fff;
+        }
+
+        @media (max-width: 860px) {
+            .hero-title { font-size: 40px; }
+            .features-grid { grid-template-columns: 1fr; }
+            .metrics-bar { grid-template-columns: repeat(2, 1fr); }
+            .nav-links { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="ambient-glow"></div>
+    <div class="ambient-glow-2"></div>
+
+    <!-- Header Navigation -->
+    <header>
+        <div class="container nav-content">
+            <a href="/" class="logo-wrap">
+                <svg class="logo-icon" viewBox="0 0 32 32" fill="none">
+                    <circle cx="16" cy="16" r="14" stroke="url(#logo-grad)" stroke-width="2" stroke-dasharray="3 3" opacity="0.45" />
+                    <circle cx="16" cy="16" r="9.5" stroke="url(#logo-grad)" stroke-width="2.5" opacity="0.85" />
+                    <circle cx="16" cy="16" r="5.2" fill="url(#logo-core)" />
+                    <circle cx="14.8" cy="14.8" r="1.6" fill="#FFF" opacity="0.9" />
+                    <defs>
+                        <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#FF6B00" />
+                            <stop offset="100%" stop-color="#F54E00" />
+                        </linearGradient>
+                        <linearGradient id="logo-core" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#FFA000" />
+                            <stop offset="100%" stop-color="#FF3D00" />
+                        </linearGradient>
+                    </defs>
+                </svg>
+                <span class="logo-text">Hotspot</span>
+            </a>
+
+            <ul class="nav-links">
+                <li><a href="#setup">1-Line Setup</a></li>
+                <li><a href="#playground">Interactive Sandbox</a></li>
+                <li><a href="#features">Features</a></li>
+                <li><a href="/login">Dashboard</a></li>
+            </ul>
+
+            <div class="nav-actions">
+                <a href="/login" class="btn btn-ghost">Sign In</a>
+                <a href="/signup" class="btn btn-primary">Get Started</a>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <!-- Hero Section -->
+        <section class="hero container">
+            <div class="badge-pill">
+                <div class="badge-pulse"></div>
+                <span>Hotspot 2.0 • Zero-Configuration Product Intelligence</span>
+            </div>
+
+            <h1 class="hero-title">
+                Turn Every User Click Into<br>
+                <span>Clear Growth Decisions.</span>
+            </h1>
+
+            <p class="hero-subtitle">
+                Product analytics, visual click heatmaps, session replay, and user journeys.
+                Completely self-hosted, 100% private, and loaded with a single lightweight JavaScript file.
+            </p>
+
+            <div class="hero-buttons">
+                <a href="/signup" class="btn btn-primary btn-large">Start Tracking Free</a>
+                <a href="#playground" class="btn btn-ghost btn-large">Explore Live Sandbox ↓</a>
+            </div>
+
+            <!-- Metrics Bar -->
+            <div class="metrics-bar">
+                <div class="metric-item">
+                    <div class="metric-value">&lt;12KB</div>
+                    <div class="metric-label">Bundle Size</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">1 Line</div>
+                    <div class="metric-label">Integration</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">100%</div>
+                    <div class="metric-label">Data Privacy</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-value">0ms</div>
+                    <div class="metric-label">Core Web Vitals Cost</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 1-Line Drop-in Showcase -->
+        <section class="showcase-section container" id="setup">
+            <div class="section-header">
+                <div class="section-tag">Instant Integration</div>
+                <h2 class="section-title">One Script. Complete Visibility.</h2>
+                <p class="section-desc">Drop this single script tag into your HTML &lt;head&gt;. Hotspot handles the rest automatically.</p>
+            </div>
+
+            <div class="terminal-box">
+                <div class="terminal-topbar">
+                    <div class="terminal-dots">
+                        <div class="dot dot-red"></div>
+                        <div class="dot dot-yellow"></div>
+                        <div class="dot dot-green"></div>
+                    </div>
+                    <span class="terminal-title">index.html — Hotspot Drop-in Snippet</span>
+                    <button class="copy-btn" id="copy-btn" onclick="copySnippet()">Copy Snippet</button>
+                </div>
+
+                <div class="code-area">
+<span class="code-comment">&lt;!-- Hotspot Single-Line Web Tracker --&gt;</span>
+<span class="code-tag">&lt;script</span>
+  <span class="code-attr">src=</span><span class="code-str">"{{ site_url }}/hotspot.js"</span>
+  <span class="code-attr">data-api-key=</span><span class="code-val">"{{ demo_api_key }}"</span>
+  <span class="code-attr">data-api-host=</span><span class="code-str">"{{ site_url }}"</span><span class="code-tag">&gt;&lt;/script&gt;</span>
+                </div>
+
+                <div class="live-test-bar">
+                    <div class="live-test-label">
+                        <span>🧪 Live Test Ingestion:</span>
+                        <span style="color: #8b949e; font-weight: normal; font-size: 13px;">Click to test event capture right now</span>
+                    </div>
+                    <div class="test-buttons-row">
+                        <button class="btn-test" onclick="fireTestEvent('$pageview')">Send $pageview</button>
+                        <button class="btn-test" onclick="fireTestEvent('purchase_completed', { amount: 89.99, plan: 'pro' })">Send Custom Event</button>
+                        <button class="btn-test" onclick="fireIdentify()">Identify User</button>
+                    </div>
+                </div>
+
+                <div class="live-console-feed" id="console-feed">
+                    <div class="feed-entry">
+                        <span class="feed-ts">[Ready]</span>
+                        <span class="feed-event">hotspot.js initialized</span>
+                        <span class="feed-json">Listening for user clicks, pageviews, and scroll events...</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Interactive Heatmap Playground Sandbox -->
+        <section class="container" id="playground">
+            <div class="section-header">
+                <div class="section-tag">Visual Intelligence</div>
+                <h2 class="section-title">Live Click Heatmap Sandbox</h2>
+                <p class="section-desc">Click anywhere in the area below to see Hotspot's real-time coordinate capture and glowing heat markers.</p>
+            </div>
+
+            <div class="playground-card">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="font-weight: 600; font-size: 15px;">Hotspot Canvas Area</div>
+                    <div style="font-size: 13px; color: var(--text-secondary);">
+                        Clicks Recorded: <strong id="click-counter" style="color: #ff5722;">0</strong>
+                    </div>
+                </div>
+
+                <div class="sandbox-surface" id="sandbox-surface">
+                    <div class="sandbox-hint">
+                        <span>Click anywhere</span> to generate a glowing hotspot.<br>
+                        Coordinates and element paths are streamed automatically.
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features Grid -->
+        <section class="container" id="features">
+            <div class="section-header">
+                <div class="section-tag">Engineered for Builders</div>
+                <h2 class="section-title">The Complete Analytics Engine</h2>
+                <p class="section-desc">Every tool you need to understand user behavior, completely under your control.</p>
+            </div>
+
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon-box">🗺️</div>
+                    <h3 class="feature-title">Visual Click Heatmaps</h3>
+                    <p class="feature-text">See exactly where users concentrate their attention, rage click, or get stuck with high-resolution coordinates.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon-box">📊</div>
+                    <h3 class="feature-title">Funnels & Conversions</h3>
+                    <p class="feature-text">Trace user journeys step-by-step. Discover the exact stage where prospective customers abandon signups.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon-box">🎥</div>
+                    <h3 class="feature-title">Session Replay</h3>
+                    <p class="feature-text">Watch pixel-perfect recreations of user sessions with console error logs, network requests, and DOM inspection.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon-box">⚡</div>
+                    <h3 class="feature-title">Smart Autocapture</h3>
+                    <p class="feature-text">No tedious tracking plans or manual element tagging. Clicks, scrolls, forms, and pages are collected automatically.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon-box">🚩</div>
+                    <h3 class="feature-title">Feature Flags</h3>
+                    <p class="feature-text">Safely roll out features to specific cohorts, run A/B experiments, and toggle rollouts without code redeploys.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon-box">🛡️</div>
+                    <h3 class="feature-title">100% Self-Hosted & Private</h3>
+                    <p class="feature-text">Your data never touches outside servers. Complete GDPR, CCPA, and HIPAA compliance out of the box.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bottom CTA -->
+        <section class="container">
+            <div class="bottom-cta">
+                <h2 class="cta-title">Ready to Experience Hotspot?</h2>
+                <p class="cta-desc">Launch your standalone analytics instance in seconds. No credit card required.</p>
+                <div style="display: flex; gap: 16px; justify-content: center;">
+                    <a href="/signup" class="btn btn-primary btn-large">Get Started Now</a>
+                    <a href="/login" class="btn btn-ghost btn-large">Log In to Workspace</a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container footer-row">
+            <div>&copy; {% now "Y" %} Hotspot Platform. Independent, private analytics.</div>
+            <div class="footer-links">
+                <a href="/login">Dashboard</a>
+                <a href="/signup">Sign Up</a>
+                <a href="#setup">Setup Guide</a>
+                <a href="/hotspot.js" target="_blank">SDK Source</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Interactive Scripts -->
+    <script>
+        // Copy snippet functionality
+        function copySnippet() {
+            var snippet = '<script src="{{ site_url }}/hotspot.js" data-api-key="{{ demo_api_key }}" data-api-host="{{ site_url }}"><\/script>';
+            navigator.clipboard.writeText(snippet).then(function() {
+                var btn = document.getElementById('copy-btn');
+                btn.textContent = 'Copied!';
+                btn.style.color = '#7ee787';
+                setTimeout(function() {
+                    btn.textContent = 'Copy Snippet';
+                    btn.style.color = '';
+                }, 2000);
+            });
+        }
+
+        // Live Feed Log
+        function logToFeed(eventName, props) {
+            var feed = document.getElementById('console-feed');
+            var entry = document.createElement('div');
+            entry.className = 'feed-entry';
+            var time = new Date().toLocaleTimeString();
+            entry.innerHTML = '<span class="feed-ts">[' + time + ']</span> <span class="feed-event">' + eventName + '</span> <span class="feed-json">' + JSON.stringify(props) + '</span>';
+            feed.insertBefore(entry, feed.firstChild);
+        }
+
+        // Test Event Triggers
+        function fireTestEvent(name, props) {
+            if (window.hotspot) {
+                window.hotspot.capture(name, props || { sample_metric: Math.round(Math.random() * 100) });
+            }
+            logToFeed(name, props || { sample_metric: 'sent' });
+        }
+
+        function fireIdentify() {
+            var sampleId = 'user_' + Math.floor(Math.random() * 9000 + 1000);
+            if (window.hotspot) {
+                window.hotspot.identify(sampleId, { email: sampleId + '@example.com', role: 'admin' });
+            }
+            logToFeed('$identify', { distinct_id: sampleId, email: sampleId + '@example.com' });
+        }
+
+        // Interactive Sandbox Particle Generation
+        var sandbox = document.getElementById('sandbox-surface');
+        var counter = document.getElementById('click-counter');
+        var clickCount = 0;
+
+        sandbox.addEventListener('click', function(e) {
+            var rect = sandbox.getBoundingClientRect();
+            var x = e.clientX - rect.left;
+            var y = e.clientY - rect.top;
+
+            var particle = document.createElement('div');
+            particle.className = 'hotspot-particle';
+            particle.style.left = x + 'px';
+            particle.style.top = y + 'px';
+            sandbox.appendChild(particle);
+
+            clickCount++;
+            counter.textContent = clickCount;
+
+            logToFeed('sandbox_click', {
+                canvas_x: Math.round(x),
+                canvas_y: Math.round(y),
+                ratio_x: +(x / rect.width).toFixed(3),
+                ratio_y: +(y / rect.height).toFixed(3)
+            });
+
+            setTimeout(function() {
+                if (particle.parentNode) {
+                    particle.parentNode.removeChild(particle);
+                }
+            }, 6000);
+        });
+    </script>
+</body>
+</html>

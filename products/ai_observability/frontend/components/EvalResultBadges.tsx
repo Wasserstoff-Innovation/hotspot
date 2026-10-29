@@ -1,0 +1,126 @@
+import { useActions, useMountedLogic, useValues } from 'kea'
+
+import { LemonSkeleton, LemonTag, LemonTagProps, Tooltip } from '@posthog/lemon-ui'
+
+import { dayjs } from 'lib/dayjs'
+import { pluralize } from 'lib/utils/strings'
+
+import { TraceViewMode, aiObservabilityTraceLogic } from '../aiObservabilityTraceLogic'
+import { llmEvaluationsLogic } from '../evaluations/llmEvaluationsLogic'
+import { EvaluationRun } from '../evaluations/types'
+import { generationEvaluationRunsLogic } from '../generationEvaluationRunsLogic'
+import { EvaluationResultDisplayOptions, getEvaluationResultDisplay } from './EvaluationResultTag'
+
+export interface EvalSummary {
+    latestRun: EvaluationRun
+    runCount: number
+}
+
+export function getEvalSummaries(runs: EvaluationRun[]): EvalSummary[] {
+    const producedAt = (run: EvaluationRun): number => dayjs(run.start_time ?? run.timestamp).valueOf()
+    const sorted = [...runs].sort((a, b) => producedAt(b) - producedAt(a))
+    const byEvalId = new Map<string, EvalSummary>()
+    for (const run of sorted) {
+        const existing = byEvalId.get(run.evaluation_id)
+        if (existing) {
+            existing.runCount++
+        } else {
+            byEvalId.set(run.evaluation_id, { latestRun: run, runCount: 1 })
+        }
+    }
+    return Array.from(byEvalId.values())
+}
+
+export function getEvalBadgeProps(
+    run: EvaluationRun,
+    options: EvaluationResultDisplayOptions = {}
+): {
+    type: LemonTagProps['type']
+    icon: JSX.Element
+    label: string
+} {
+    const { type, icon, label } = getEvaluationResultDisplay(run, options)
+    return { type, icon, label }
+}
+
+// Trace-target runs carry no $ai_target_event_id, which HogQL returns as '' (not null),
+// so falsiness of generation_id is the discriminator between the two run kinds.
+export function scopeRunsToTarget(runs: EvaluationRun[], generationEventId?: string): EvaluationRun[] {
+    return generationEventId
+        ? runs.filter((run) => run.generation_id === generationEventId)
+        : runs.filter((run) => !run.generation_id)
+}
+
+export function EvalTooltipContent({ latestRun, runCount }: EvalSummary): JSX.Element {
+    return (
+        <div className="max-w-80 space-y-1">
+            <div className="font-semibold">{latestRun.evaluation_name}</div>
+            <div className="text-xs opacity-75">
+                {dayjs(latestRun.timestamp).fromNow()}
+                {runCount > 1 && <> &middot; {pluralize(runCount, 'run', 'runs', true)} total</>}
+            </div>
+            <div className="text-sm">{latestRun.reasoning || 'No reasoning provided'}</div>
+        </div>
+    )
+}
+
+export function EvalResultBadges({
+    traceId,
+    generationEventId,
+}: {
+    traceId: string
+    /** When set, show runs targeting this generation; otherwise show trace-target runs. */
+    generationEventId?: string
+}): JSX.Element | null {
+    const { generationEvaluationRuns, generationEvaluationRunsLoading } = useValues(
+        generationEvaluationRunsLogic({ traceId })
+    )
+    const { detectorEvaluationIds, evaluations } = useValues(llmEvaluationsLogic)
+    const traceLogic = useMountedLogic(aiObservabilityTraceLogic)
+    const { setViewMode } = useActions(traceLogic)
+
+    if (generationEvaluationRunsLoading && generationEvaluationRuns.length === 0) {
+        return (
+            <div className="flex flex-row items-center gap-1.5">
+                <LemonSkeleton className="h-5 w-24" />
+                <LemonSkeleton className="h-5 w-24" />
+            </div>
+        )
+    }
+
+    // The trace-scoped fetch is capped at EVALUATION_RUNS_QUERY_LIMIT most-recent runs, so on a
+    // trace with very heavy eval volume older runs for a given generation can fall out of view.
+    const summaries = getEvalSummaries(scopeRunsToTarget(generationEvaluationRuns, generationEventId))
+
+    if (summaries.length === 0) {
+        return null
+    }
+
+    return (
+        <div className="flex flex-row flex-wrap items-center gap-1.5">
+            {summaries.map((summary) => {
+                const { type, icon, label } = getEvalBadgeProps(summary.latestRun, {
+                    trueIsFailure: detectorEvaluationIds.includes(summary.latestRun.evaluation_id),
+                    categoryOptions: evaluations?.find(
+                        (evaluation) => evaluation.id === summary.latestRun.evaluation_id
+                    )?.output_config.options,
+                    passingRule: evaluations?.find((evaluation) => evaluation.id === summary.latestRun.evaluation_id)
+                        ?.output_config.passing_rule,
+                })
+                return (
+                    <Tooltip key={summary.latestRun.evaluation_id} title={<EvalTooltipContent {...summary} />}>
+                        <LemonTag
+                            type={type}
+                            size="small"
+                            icon={icon}
+                            onClick={() => setViewMode(TraceViewMode.Evals)}
+                            className="cursor-pointer"
+                        >
+                            {summary.latestRun.evaluation_name}: {label}
+                        </LemonTag>
+                    </Tooltip>
+                )
+            })}
+        </div>
+    )
+}

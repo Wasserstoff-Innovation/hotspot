@@ -1,0 +1,461 @@
+import { useValues } from 'kea'
+
+import { IconInfo } from '@posthog/icons'
+import { LemonButton, LemonCollapse, LemonSelect, LemonTag, Tooltip } from '@posthog/lemon-ui'
+
+import { TaxonomicFilterGroupType } from 'lib/components/TaxonomicFilter/types'
+import { TestAccountFilterSwitch } from 'lib/components/TestAccountFiltersSwitch'
+import { useFeatureFlag } from 'lib/hooks/useFeatureFlag'
+import { SeriesActionFilter } from 'scenes/insights/filters/ActionFilter/ActionFilter'
+import { MathAvailability } from 'scenes/insights/filters/ActionFilter/ActionFilterRow/types'
+import { teamLogic } from 'scenes/teamLogic'
+
+import { ExperimentEventExposureConfig, ExperimentExposureCriteria, NodeKind } from '~/queries/schema/schema-general'
+import { ChartDisplayCategory, type Experiment } from '~/types'
+
+import { SelectableCard } from 'products/experiments/frontend/components/SelectableCard'
+
+import {
+    EXPERIMENT_EXPOSURE_EVENT,
+    EXPOSURE_DEFAULT_EVENT,
+    exposureEventLabel,
+    getActivationConfig,
+    resolveFilterTestAccounts,
+    resolvedExposureEvent,
+} from '../exposureContract'
+import { commonActionFilterProps } from '../Metrics/Selectors'
+import { exposureConfigToSeries, seriesToExposureConfig } from '../utils'
+
+const DEFAULT_EXPOSURE_CONFIG: ExperimentEventExposureConfig = {
+    kind: NodeKind.ExperimentEventExposureConfig,
+    event: EXPOSURE_DEFAULT_EVENT,
+    properties: [],
+}
+
+const DEFAULT_ACTIVATION_CONFIG: ExperimentEventExposureConfig = {
+    kind: NodeKind.ExperimentEventExposureConfig,
+    event: '$pageview',
+    properties: [],
+}
+
+type ExposureCriteriaPanelProps = {
+    experiment: Experiment
+    onChange: (exposureCriteria: ExperimentExposureCriteria) => void
+    compact?: boolean
+}
+
+function InclusionActionFilter({
+    experiment,
+    onChange,
+}: {
+    experiment: Experiment
+    onChange: ExposureCriteriaPanelProps['onChange']
+}): JSX.Element {
+    return (
+        <SeriesActionFilter
+            bordered
+            series={exposureConfigToSeries(experiment.exposure_criteria?.exposure_config || DEFAULT_EXPOSURE_CONFIG)}
+            trendsDisplayCategory={ChartDisplayCategory.TimeSeries}
+            onChange={(series) => {
+                const exposureConfig = seriesToExposureConfig(series)
+                if (exposureConfig) {
+                    onChange({ exposure_config: exposureConfig })
+                }
+            }}
+            typeKey="experiment-exposure-config"
+            buttonCopy="Add exposure event"
+            showSeriesIndicator={false}
+            hideRename={true}
+            entitiesLimit={1}
+            mathAvailability={MathAvailability.None}
+            showNumericalPropsOnly={false}
+            {...commonActionFilterProps}
+            actionsTaxonomicGroupTypes={[TaxonomicFilterGroupType.Events, TaxonomicFilterGroupType.Actions]}
+        />
+    )
+}
+
+function ActivationActionFilter({
+    experiment,
+    onChange,
+}: {
+    experiment: Experiment
+    onChange: ExposureCriteriaPanelProps['onChange']
+}): JSX.Element {
+    return (
+        <SeriesActionFilter
+            bordered
+            series={exposureConfigToSeries(
+                experiment.exposure_criteria?.activation_config || DEFAULT_ACTIVATION_CONFIG
+            )}
+            trendsDisplayCategory={ChartDisplayCategory.TimeSeries}
+            onChange={(series) => {
+                const activationConfig = seriesToExposureConfig(series)
+                if (activationConfig) {
+                    onChange({ activation_config: activationConfig })
+                }
+            }}
+            typeKey="experiment-activation-config"
+            buttonCopy="Add activation event"
+            showSeriesIndicator={false}
+            hideRename={true}
+            entitiesLimit={1}
+            mathAvailability={MathAvailability.None}
+            showNumericalPropsOnly={false}
+            {...commonActionFilterProps}
+            actionsTaxonomicGroupTypes={[TaxonomicFilterGroupType.Events, TaxonomicFilterGroupType.Actions]}
+        />
+    )
+}
+
+function ExposureCriteriaFields({
+    experiment,
+    onChange,
+    hasFilters,
+    defaultExposureEvent,
+    showActivationOption,
+}: {
+    experiment: Experiment
+    onChange: ExposureCriteriaPanelProps['onChange']
+    hasFilters: boolean
+    defaultExposureEvent: string
+    showActivationOption: boolean
+}): JSX.Element {
+    // getActivationConfig, not a raw field check: a stored default-sentinel exposure_config
+    // still composes with activation, and the editor must classify it the way the backend does
+    const isActivation = !!getActivationConfig(experiment.exposure_criteria)
+    const isCustom = !isActivation && !!experiment.exposure_criteria?.exposure_config
+
+    return (
+        <div className="space-y-4">
+            {/* Exposure Type Selection */}
+            <label className="block text-sm font-medium text-default mb-2">Exposure criteria</label>
+            <div className="flex gap-4 mb-4">
+                <SelectableCard
+                    title="Default"
+                    description={
+                        <>
+                            When a <LemonTag>{defaultExposureEvent}</LemonTag> event is recorded, a user is considered{' '}
+                            <strong>exposed</strong> to the experiment.
+                        </>
+                    }
+                    selected={!isCustom && !isActivation}
+                    onClick={() => {
+                        onChange({ exposure_config: undefined, activation_config: undefined })
+                    }}
+                />
+                {(showActivationOption || isActivation) && (
+                    <SelectableCard
+                        title="Activation event"
+                        description={
+                            <>
+                                Require an additional event after <LemonTag>{defaultExposureEvent}</LemonTag>. Users
+                                enter the analysis when this event follows their first exposure, and metrics count from
+                                the activation event.
+                            </>
+                        }
+                        selected={isActivation}
+                        onClick={() => {
+                            // Re-clicking the selected card must not reset a configured event
+                            if (isActivation) {
+                                return
+                            }
+                            onChange({ exposure_config: undefined, activation_config: DEFAULT_ACTIVATION_CONFIG })
+                        }}
+                    />
+                )}
+                <SelectableCard
+                    title="Custom"
+                    description={
+                        <>
+                            Select a custom event to signal that users reached the part of your app where the experiment
+                            runs. You can also filter out users you would like to exclude.
+                        </>
+                    }
+                    selected={isCustom}
+                    onClick={() => {
+                        // Re-clicking the selected card must not reset a configured event
+                        if (isCustom) {
+                            return
+                        }
+                        onChange({
+                            exposure_config: DEFAULT_EXPOSURE_CONFIG,
+                            activation_config: undefined,
+                        })
+                    }}
+                />
+            </div>
+
+            {isCustom && (
+                <div className="mb-4">
+                    <InclusionActionFilter experiment={experiment} onChange={onChange} />
+                </div>
+            )}
+            {isActivation && (
+                <div className="mb-4">
+                    <ActivationActionFilter experiment={experiment} onChange={onChange} />
+                </div>
+            )}
+
+            {/* Multiple Variant Handling */}
+            <div>
+                <label className="block text-sm font-medium text-default mb-2">Multiple variant handling</label>
+                <LemonSelect
+                    value={experiment.exposure_criteria?.multiple_variant_handling || 'exclude'}
+                    onChange={(value) => {
+                        onChange({ multiple_variant_handling: value as 'exclude' | 'first_seen' })
+                    }}
+                    options={[
+                        {
+                            value: 'exclude',
+                            label: 'Exclude from analysis',
+                            'data-attr': 'multiple-handling-exclude',
+                        },
+                        {
+                            value: 'first_seen',
+                            label: 'Use first seen variant',
+                            'data-attr': 'multiple-handling-first-seen',
+                        },
+                    ]}
+                    placeholder="Select handling method"
+                    fullWidth
+                />
+                <div className="text-xs text-muted mt-1">
+                    {experiment.exposure_criteria?.multiple_variant_handling === 'first_seen'
+                        ? 'Users exposed to multiple variants will be analyzed using their first seen variant.'
+                        : 'Users exposed to multiple variants will be excluded from the analysis (recommended).'}
+                </div>
+            </div>
+
+            {/* Test Account Filtering */}
+            <div>
+                <TestAccountFilterSwitch
+                    checked={hasFilters && resolveFilterTestAccounts(experiment.exposure_criteria)}
+                    onChange={(checked: boolean) => {
+                        onChange({ filterTestAccounts: checked })
+                    }}
+                    bordered={false}
+                    fullWidth
+                    settingsLinkIcon="new-tab"
+                    className="p-0"
+                />
+            </div>
+        </div>
+    )
+}
+
+export function ExposureCriteriaPanel({ experiment, onChange, compact }: ExposureCriteriaPanelProps): JSX.Element {
+    // getActivationConfig, not a raw field check: a stored default-sentinel exposure_config
+    // still composes with activation, and the editor must classify it the way the backend does
+    const isActivation = !!getActivationConfig(experiment.exposure_criteria)
+    const isCustom = !isActivation && !!experiment.exposure_criteria?.exposure_config
+    const activationEventEnabled = useFeatureFlag('EXPERIMENT_ACTIVATION_EVENT')
+    // Keep an existing activation config editable even if the team is no longer flagged in
+    const showActivationOption = activationEventEnabled || isActivation
+    const experimentExposureEventEnabled = useFeatureFlag('EXPERIMENT_EXPOSURE_EVENT')
+    const defaultExposureEvent = resolvedExposureEvent(
+        experiment,
+        experimentExposureEventEnabled ? EXPERIMENT_EXPOSURE_EVENT : EXPOSURE_DEFAULT_EVENT
+    )
+    const defaultExposureLabel = exposureEventLabel(defaultExposureEvent)
+
+    const { currentTeam } = useValues(teamLogic)
+    const hasFilters = (currentTeam?.test_account_filters || []).length > 0
+
+    if (compact) {
+        return (
+            <div className="space-y-4">
+                <div className="space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="flex items-center gap-1 whitespace-nowrap text-sm text-secondary">
+                            Exposure event
+                            <Tooltip title="People count toward the results once this event happens for them. By default, that's when your code checks the experiment's feature flag.">
+                                <LemonButton
+                                    size="xsmall"
+                                    noPadding
+                                    icon={<IconInfo className="text-base text-secondary" />}
+                                    aria-label="About the exposure event"
+                                    data-attr="experiment-analytics-exposure-event-help"
+                                    className="shrink-0"
+                                />
+                            </Tooltip>
+                        </span>
+                        <LemonSelect
+                            size="small"
+                            dropdownMatchSelectWidth={false}
+                            dropdownPlacement="bottom-end"
+                            value={isCustom ? 'custom' : isActivation ? 'activation' : 'default'}
+                            onChange={(value) => {
+                                // Re-selecting the current mode must not reset a configured event
+                                if ((value === 'custom' && isCustom) || (value === 'activation' && isActivation)) {
+                                    return
+                                }
+                                if (value === 'custom') {
+                                    onChange({
+                                        exposure_config: DEFAULT_EXPOSURE_CONFIG,
+                                        activation_config: undefined,
+                                    })
+                                } else if (value === 'activation') {
+                                    onChange({
+                                        exposure_config: undefined,
+                                        activation_config: DEFAULT_ACTIVATION_CONFIG,
+                                    })
+                                } else {
+                                    onChange({ exposure_config: undefined, activation_config: undefined })
+                                }
+                            }}
+                            options={[
+                                {
+                                    value: 'default' as const,
+                                    label: defaultExposureLabel,
+                                    labelInMenu: (
+                                        <div>
+                                            <div>{defaultExposureLabel}</div>
+                                            <div className="text-xs text-muted font-normal">
+                                                When {defaultExposureEvent} is recorded
+                                            </div>
+                                        </div>
+                                    ),
+                                },
+                                ...(showActivationOption
+                                    ? [
+                                          {
+                                              value: 'activation' as const,
+                                              label: 'Activation event',
+                                              labelInMenu: (
+                                                  <div>
+                                                      <div>Activation event</div>
+                                                      <div className="text-xs text-muted font-normal">
+                                                          When an additional event follows {defaultExposureEvent}
+                                                      </div>
+                                                  </div>
+                                              ),
+                                          },
+                                      ]
+                                    : []),
+                                {
+                                    value: 'custom' as const,
+                                    label: 'Custom event',
+                                    labelInMenu: (
+                                        <div>
+                                            <div>Custom event</div>
+                                            <div className="text-xs text-muted font-normal">
+                                                Select a custom event to signal users reached the experiment
+                                            </div>
+                                        </div>
+                                    ),
+                                },
+                            ]}
+                        />
+                    </div>
+                    {isCustom && <InclusionActionFilter experiment={experiment} onChange={onChange} />}
+                    {isActivation && <ActivationActionFilter experiment={experiment} onChange={onChange} />}
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="flex items-center gap-1 whitespace-nowrap text-sm text-secondary">
+                        Multiple variant handling
+                        <Tooltip title="Some people see more than one variant, for example after the split changes. Excluding them keeps the results clean. Using their first variant keeps them in, but can bias the results.">
+                            <LemonButton
+                                size="xsmall"
+                                noPadding
+                                icon={<IconInfo className="text-base text-secondary" />}
+                                aria-label="About multiple variant handling"
+                                data-attr="experiment-analytics-multiple-variant-handling-help"
+                                className="shrink-0"
+                            />
+                        </Tooltip>
+                    </span>
+                    <LemonSelect
+                        size="small"
+                        dropdownMatchSelectWidth={false}
+                        dropdownPlacement="bottom-end"
+                        value={experiment.exposure_criteria?.multiple_variant_handling || 'exclude'}
+                        onChange={(value) => {
+                            onChange({ multiple_variant_handling: value as 'exclude' | 'first_seen' })
+                        }}
+                        options={[
+                            {
+                                value: 'exclude',
+                                label: 'Exclude from analysis',
+                                labelInMenu: (
+                                    <div>
+                                        <div>Exclude from analysis</div>
+                                        <div className="text-xs text-muted font-normal">
+                                            Users exposed to multiple variants will be excluded (recommended)
+                                        </div>
+                                    </div>
+                                ),
+                                'data-attr': 'multiple-handling-exclude',
+                            },
+                            {
+                                value: 'first_seen',
+                                label: 'Use first seen variant',
+                                labelInMenu: (
+                                    <div>
+                                        <div>Use first seen variant</div>
+                                        <div className="text-xs text-muted font-normal">
+                                            Users will be analyzed using their first seen variant
+                                        </div>
+                                    </div>
+                                ),
+                                'data-attr': 'multiple-handling-first-seen',
+                            },
+                        ]}
+                    />
+                </div>
+
+                {/* As tall as the small selects above, so the three labels are evenly spaced */}
+                <div className="flex min-h-[2.0625rem] items-center">
+                    <TestAccountFilterSwitch
+                        checked={hasFilters && resolveFilterTestAccounts(experiment.exposure_criteria)}
+                        onChange={(checked: boolean) => {
+                            onChange({ filterTestAccounts: checked })
+                        }}
+                        bordered={false}
+                        fullWidth
+                        settingsLinkIcon="new-tab"
+                        // Keep the label to its text, or the whole row becomes a click target for the switch
+                        labelClassName="text-secondary font-normal !flex-none"
+                        className="p-0 justify-between"
+                    />
+                </div>
+            </div>
+        )
+    }
+
+    return (
+        <div className="space-y-4">
+            <LemonCollapse
+                panels={[
+                    {
+                        key: 'advanced-settings',
+                        header: {
+                            style: { backgroundColor: 'var(--color-bg-table)' },
+                            children: (
+                                <div>
+                                    <h3 className="l4 mt-2 font-semibold">Advanced settings</h3>
+                                    <div className="text-secondary mb-2 text-sm font-normal">
+                                        Configure when users are considered exposed to the experiment and included in
+                                        the analysis.
+                                    </div>
+                                </div>
+                            ),
+                        },
+                        content: (
+                            <div className="p-3">
+                                <ExposureCriteriaFields
+                                    experiment={experiment}
+                                    onChange={onChange}
+                                    hasFilters={hasFilters}
+                                    defaultExposureEvent={defaultExposureEvent}
+                                    showActivationOption={showActivationOption}
+                                />
+                            </div>
+                        ),
+                    },
+                ]}
+            />
+        </div>
+    )
+}

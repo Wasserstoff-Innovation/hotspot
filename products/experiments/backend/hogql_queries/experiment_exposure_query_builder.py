@@ -1,0 +1,583 @@
+from posthog.schema import ExperimentEventExposureConfig, MultipleVariantHandling
+
+from posthog.hogql import ast
+from posthog.hogql.parser import parse_expr, parse_select
+from posthog.hogql.property import property_to_expr
+
+from products.experiments.backend.hogql_queries import MULTIPLE_VARIANT_KEY
+from products.experiments.backend.hogql_queries.base_query_utils import event_or_action_to_filter
+from products.experiments.backend.hogql_queries.breakdown_injector import BreakdownInjector
+from products.experiments.backend.hogql_queries.experiment_query_context import ExperimentQueryContext, MaturityGate
+from products.experiments.backend.hogql_queries.exposure_query_logic import (
+    DEFAULT_EXPOSURE_EVENT,
+    EXPERIMENT_EXPOSURE_EVENT,
+    exposure_event_name_filter,
+)
+
+
+def _optimize_and_chain(expr: ast.Expr) -> ast.Expr:
+    """
+    Drops True constants from an AND chain. The SQL templates use True as a no-op filter, and
+    removing it preserves ClickHouse index optimizations.
+    """
+    if not isinstance(expr, ast.And):
+        return expr
+
+    filtered = [e for e in expr.exprs if not (isinstance(e, ast.Constant) and e.value is True)]
+
+    if len(filtered) == 0:
+        return ast.Constant(value=True)
+    elif len(filtered) == 1:
+        return filtered[0]
+    else:
+        return ast.And(exprs=filtered)
+
+
+class ExposureQueryBuilder:
+    """
+    Builds exposure queries shared across aggregate results, the exposures tab,
+    precomputation, and actors queries.
+
+    The exposure SELECT query (``select_query``/``_build_exposure_select_query``
+    and its precomputed equivalent ``_build_exposure_from_precomputed``) returns
+    one row per entity with the following output columns:
+
+    - ``entity_id``: the experiment entity (person or group)
+    - ``variant``: the attributed variant for the entity
+    - ``first_exposure_time``: timestamp of the entity's first exposure
+    - ``last_exposure_time``: timestamp of the entity's last exposure
+    - ``exposure_event_uuid``: uuid of the first exposure event
+    - ``exposure_session_id``: session id of the first exposure event
+    - optional breakdown columns (one per configured breakdown), attributed from
+      the entity's first exposure via ``argMin``
+
+    The builder takes the experiment-level invariants via ``ExperimentQueryContext``
+    plus the narrow inputs that depend on the current metric/precomputation state:
+    the optional ``breakdown_injector``, the ``maturity`` gate of the current build
+    with the metric's ``maturity_window_seconds`` (the window starts at the entity's
+    first exposure), and the optional ``preaggregation_job_ids`` used to read from
+    the precomputed exposures table instead of scanning events.
+    """
+
+    def __init__(
+        self,
+        context: ExperimentQueryContext,
+        breakdown_injector: BreakdownInjector | None = None,
+        maturity: MaturityGate | None = None,
+        maturity_window_seconds: int = 0,
+        preaggregation_job_ids: list[str] | None = None,
+    ):
+        self.context = context
+        self.breakdown_injector = breakdown_injector
+        self.maturity = maturity
+        self.maturity_window_seconds = maturity_window_seconds
+        self.preaggregation_job_ids = preaggregation_job_ids
+
+    def _maturity_having(self, first_exposure_time: ast.Expr) -> ast.Expr | None:
+        if self.maturity is None:
+            return None
+        return self.maturity.condition(first_exposure_time, self.maturity_window_seconds)
+
+    def timeseries_query(self) -> ast.SelectQuery:
+        """Daily exposure counts per variant. Each entity counts once, on its first exposure day."""
+        query = parse_select(
+            """
+            WITH first_exposures AS ({first_exposures_select})
+
+            SELECT
+                first_exposures.day AS day,
+                first_exposures.variant AS variant,
+                count(first_exposures.entity_id) AS exposed_count
+            FROM first_exposures
+            WHERE notEmpty(variant)
+            GROUP BY first_exposures.day, first_exposures.variant
+            ORDER BY first_exposures.day ASC
+            """,
+            placeholders={
+                "first_exposures_select": self._build_first_exposures_day_select(),
+            },
+        )
+
+        assert isinstance(query, ast.SelectQuery)
+        return query
+
+    def _build_first_exposures_day_select(self) -> ast.SelectQuery:
+        """Per-entity (entity_id, variant, day-of-first-exposure) select feeding the timeseries."""
+        if self.context.activation_config is not None:
+            query = parse_select(
+                """
+                SELECT
+                    {entity_key} AS entity_id,
+                    any(flag_exposures.variant) AS variant,
+                    toDate(toString(min(timestamp))) AS day
+                FROM events
+                INNER JOIN ({flag_exposures}) AS flag_exposures
+                    ON {entity_key} = flag_exposures.entity_id
+                WHERE {activation_predicate}
+                    AND timestamp >= flag_exposures.first_flag_exposure_time
+                GROUP BY entity_id
+                """,
+                placeholders={
+                    "entity_key": parse_expr(self.context.entity_key),
+                    "flag_exposures": self._build_flag_exposures_subquery(),
+                    "activation_predicate": self.build_activation_predicate(),
+                },
+            )
+        else:
+            query = parse_select(
+                """
+                SELECT
+                    {entity_key} AS entity_id,
+                    {variant_expr} AS variant,
+                    toDate(toString(min(timestamp))) AS day
+                FROM events
+                WHERE {exposure_predicate}
+                GROUP BY entity_id
+                """,
+                placeholders={
+                    "entity_key": parse_expr(self.context.entity_key),
+                    "variant_expr": self.build_variant_expr_for_mean(),
+                    "exposure_predicate": self.build_exposure_predicate(),
+                },
+            )
+        assert isinstance(query, ast.SelectQuery)
+        return query
+
+    def _build_precomputed_entity_id_expr(self) -> ast.Expr:
+        return (
+            parse_expr("toUUID(t.entity_id)") if self.context.entity_key == "person_id" else parse_expr("t.entity_id")
+        )
+
+    def _build_precomputed_variant_expr(self) -> ast.Expr:
+        if self.context.multiple_variant_handling == MultipleVariantHandling.FIRST_SEEN:
+            return parse_expr("argMin(t.variant, t.first_exposure_time)")
+        return parse_expr(
+            "if(uniqExact(t.variant) > 1, {multiple_key}, argMin(t.variant, t.first_exposure_time))",
+            placeholders={"multiple_key": ast.Constant(value=MULTIPLE_VARIANT_KEY)},
+        )
+
+    def daily_exposures_from_precomputed(self, job_ids: list[str]) -> ast.SelectQuery:
+        """Same output as timeseries_query, read from the precomputed exposures table."""
+        entity_id_expr = self._build_precomputed_entity_id_expr()
+        variant_expr = self._build_precomputed_variant_expr()
+
+        query = parse_select(
+            """
+            WITH deduplicated AS (
+                SELECT
+                    {entity_id_expr} AS entity_id,
+                    {variant_expr} AS variant,
+                    min(t.first_exposure_time) AS first_exposure_time
+                FROM experiment_exposures_preaggregated AS t
+                WHERE t.job_id IN {job_ids}
+                    AND t.team_id = {team_id}
+                    AND t.first_exposure_time >= {date_from}
+                    AND t.first_exposure_time <= {date_to}
+                GROUP BY entity_id
+            )
+            SELECT
+                toDate(toString(first_exposure_time)) AS day,
+                variant AS variant,
+                count(entity_id) AS exposed_count
+            FROM deduplicated
+            WHERE notEmpty(variant)
+            GROUP BY day, variant
+            ORDER BY day ASC
+            """,
+            placeholders={
+                "entity_id_expr": entity_id_expr,
+                "variant_expr": variant_expr,
+                "job_ids": ast.Constant(value=job_ids),
+                "team_id": ast.Constant(value=self.context.team.id),
+                "date_from": self.context.date_range_query.date_from_as_hogql(),
+                "date_to": self.context.date_range_query.date_to_as_hogql(),
+            },
+        )
+
+        assert isinstance(query, ast.SelectQuery)
+        return query
+
+    def build_test_accounts_filter(self) -> ast.Expr:
+        if (
+            self.context.filter_test_accounts
+            and isinstance(self.context.team.test_account_filters, list)
+            and len(self.context.team.test_account_filters) > 0
+        ):
+            return ast.And(
+                exprs=[
+                    property_to_expr(property, self.context.team) for property in self.context.team.test_account_filters
+                ]
+            )
+        return ast.Constant(value=True)
+
+    def build_variant_property(self) -> ast.Field:
+        # $feature_flag_called carries the variant in $feature_flag_response. $experiment_exposure
+        # is an ingestion-side duplicate of $feature_flag_called with the same properties.
+        if isinstance(
+            self.context.exposure_config, ExperimentEventExposureConfig
+        ) and self.context.exposure_config.event in (DEFAULT_EXPOSURE_EVENT, EXPERIMENT_EXPOSURE_EVENT):
+            return ast.Field(chain=["properties", "$feature_flag_response"])
+
+        return ast.Field(chain=["properties", f"$feature/{self.context.feature_flag_key}"])
+
+    def build_exposure_event_predicate(self) -> ast.Expr:
+        """Event-level exposure predicate, without date, variant, or test-account conditions."""
+        exposure_config = self.context.exposure_config
+        if not (
+            isinstance(exposure_config, ExperimentEventExposureConfig)
+            and exposure_config.event in (DEFAULT_EXPOSURE_EVENT, EXPERIMENT_EXPOSURE_EVENT)
+        ):
+            return event_or_action_to_filter(self.context.team, exposure_config)
+
+        event_predicate = exposure_event_name_filter(
+            exposure_config.event, read_copies=self.context.read_exposure_copies
+        )
+        if exposure_config.properties:
+            event_predicate = ast.And(
+                exprs=[
+                    event_predicate,
+                    ast.And(exprs=[property_to_expr(prop, self.context.team) for prop in exposure_config.properties]),
+                ]
+            )
+
+        # $feature_flag_called and $experiment_exposure are not specific to one flag, so without the
+        # flag key filter, exposures of other experiments would count too.
+        return ast.And(
+            exprs=[
+                event_predicate,
+                parse_expr(
+                    "{flag_property} = {feature_flag_key}",
+                    placeholders={
+                        "flag_property": ast.Field(chain=["properties", "$feature_flag"]),
+                        "feature_flag_key": ast.Constant(value=self.context.feature_flag_key),
+                    },
+                ),
+            ]
+        )
+
+    def build_entity_key_filter(self) -> ast.Expr:
+        """
+        For group experiments, excludes exposure events that don't carry the group key.
+        SDKs emit these when the flag is evaluated before a group is set; without this
+        filter they all collapse into a single entity with entity_id = '', which can
+        absorb a large share of the traffic under one variant. Funnels apply the same
+        rule to aggregation_target when aggregating by group.
+        """
+        if self.context.entity_key == "person_id":
+            return ast.Constant(value=True)
+        return ast.Call(name="notEmpty", args=[ast.Field(chain=[self.context.entity_key])])
+
+    def build_exposure_predicate(self) -> ast.Expr:
+        return _optimize_and_chain(
+            parse_expr(
+                """
+                timestamp >= {date_from}
+                AND timestamp <= {date_to}
+                AND {event_predicate}
+                AND {test_accounts_filter}
+                AND {variant_property} IN {variants}
+                AND {entity_key_filter}
+                """,
+                placeholders={
+                    "date_from": self.context.date_range_query.date_from_as_hogql(),
+                    "date_to": self.context.date_range_query.date_to_as_hogql(),
+                    "event_predicate": self.build_exposure_event_predicate(),
+                    "variant_property": self.build_variant_property(),
+                    "variants": ast.Constant(value=list(self.context.variants)),
+                    "test_accounts_filter": self.build_test_accounts_filter(),
+                    "entity_key_filter": self.build_entity_key_filter(),
+                },
+            )
+        )
+
+    def build_exposure_step_predicate(self) -> ast.Expr:
+        """
+        Row-level predicate for rows that can serve as the funnel's exposure step (step_0).
+        In activation mode that is the activation event; qualification (at/after the first
+        flag exposure) is enforced by the exposures-CTE temporal filter, which activation
+        mode forces on for funnels.
+        """
+        if self.context.activation_config is not None:
+            return self.build_activation_predicate()
+        return self.build_exposure_predicate()
+
+    def build_exposure_step_event_predicate(self) -> ast.Expr:
+        """
+        Event-level variant of build_exposure_step_predicate (no date, variant, or
+        test-account conditions), for callers that apply those separately.
+        """
+        if self.context.activation_config is not None:
+            return event_or_action_to_filter(self.context.team, self.context.activation_config)
+        return self.build_exposure_event_predicate()
+
+    def reads_precomputed(self) -> bool:
+        """
+        Whether select_query() reads the precomputed exposures table. Job ids alone do not
+        decide it: activation mode and breakdowns scan events even when job ids are set.
+        """
+        # Activation mode never reads precomputed exposures: the per-day cache is built from
+        # the flag predicate alone and cannot express the cross-day flag→activation ordering.
+        if self.context.activation_config is not None:
+            return False
+        return bool(self.preaggregation_job_ids) and not self.context.breakdowns
+
+    def select_query(self) -> ast.SelectQuery:
+        if self.context.activation_config is not None:
+            return self._build_activation_exposure_select_query()
+
+        if self.reads_precomputed():
+            assert self.preaggregation_job_ids is not None
+            return self.precomputed_select_query(self.preaggregation_job_ids)
+
+        return self._build_exposure_select_query()
+
+    def _build_flag_exposures_subquery(self) -> ast.SelectQuery:
+        """
+        Per-entity flag exposures feeding activation mode: variant assignment (with
+        multiple-variant handling) and the first default exposure time an activation
+        event must follow.
+        """
+        query = parse_select(
+            """
+                SELECT
+                    {entity_key} AS entity_id,
+                    {variant_expr} AS variant,
+                    min(timestamp) AS first_flag_exposure_time
+                FROM events
+                WHERE {exposure_predicate}
+                GROUP BY entity_id
+            """,
+            placeholders={
+                "entity_key": parse_expr(self.context.entity_key),
+                "variant_expr": self.build_variant_expr_for_mean(),
+                "exposure_predicate": self.build_exposure_predicate(),
+            },
+        )
+        assert isinstance(query, ast.SelectQuery)
+        return query
+
+    def build_activation_predicate(self) -> ast.Expr:
+        """
+        Row predicate for activation events: date range, event/action + property filters, and
+        test-account exclusion. No variant filter: activation events don't carry flag
+        properties; the variant comes from the flag-exposure rows this joins against.
+        """
+        assert self.context.activation_config is not None
+        return _optimize_and_chain(
+            parse_expr(
+                """
+                timestamp >= {date_from}
+                AND timestamp <= {date_to}
+                AND {event_predicate}
+                AND {test_accounts_filter}
+                """,
+                placeholders={
+                    "date_from": self.context.date_range_query.date_from_as_hogql(),
+                    "date_to": self.context.date_range_query.date_to_as_hogql(),
+                    "event_predicate": event_or_action_to_filter(self.context.team, self.context.activation_config),
+                    "test_accounts_filter": self.build_test_accounts_filter(),
+                },
+            )
+        )
+
+    def _build_activation_exposure_select_query(self) -> ast.SelectQuery:
+        """
+        Activation-mode exposure select: same output shape as _build_exposure_select_query,
+        but an entity only qualifies via an activation event at/after its first flag exposure,
+        and first/last exposure times, event uuid, and session id come from activation events.
+        """
+        exposure_query = parse_select(
+            """
+                SELECT
+                    {entity_key} AS entity_id,
+                    any(flag_exposures.variant) AS variant,
+                    min(timestamp) AS first_exposure_time,
+                    max(timestamp) AS last_exposure_time,
+                    argMin(uuid, timestamp) AS exposure_event_uuid,
+                    argMin(`$session_id`, timestamp) AS exposure_session_id
+                    -- _finalize_exposure_select appends the breakdown columns
+                FROM events
+                INNER JOIN ({flag_exposures}) AS flag_exposures
+                    ON {entity_key} = flag_exposures.entity_id
+                WHERE {activation_predicate}
+                    AND timestamp >= flag_exposures.first_flag_exposure_time
+                GROUP BY entity_id
+            """,
+            placeholders={
+                "entity_key": parse_expr(self.context.entity_key),
+                "flag_exposures": self._build_flag_exposures_subquery(),
+                "activation_predicate": self.build_activation_predicate(),
+            },
+        )
+        assert isinstance(exposure_query, ast.SelectQuery)
+        return self._finalize_exposure_select(exposure_query)
+
+    def _build_exposure_select_query(self) -> ast.SelectQuery:
+        exposure_query = parse_select(
+            """
+                SELECT
+                    {entity_key} AS entity_id,
+                    {variant_expr} AS variant,
+                    min(timestamp) AS first_exposure_time,
+                    max(timestamp) AS last_exposure_time,
+                    argMin(uuid, timestamp) AS exposure_event_uuid,
+                    argMin(`$session_id`, timestamp) AS exposure_session_id
+                    -- _finalize_exposure_select appends the breakdown columns
+                FROM events
+                WHERE {exposure_predicate}
+                GROUP BY entity_id
+            """,
+            placeholders={
+                "entity_key": parse_expr(self.context.entity_key),
+                "variant_expr": self.build_variant_expr_for_mean(),
+                "exposure_predicate": self.build_exposure_predicate(),
+            },
+        )
+        assert isinstance(exposure_query, ast.SelectQuery)
+        return self._finalize_exposure_select(exposure_query)
+
+    def _finalize_exposure_select(self, exposure_query: ast.SelectQuery) -> ast.SelectQuery:
+        if self.breakdown_injector:
+            breakdown_exprs = self.breakdown_injector.build_breakdown_exprs(table_alias="")
+
+            # argMin attributes each entity to the breakdown value of its first exposure. An entity
+            # whose exposures carry different values is then counted in one breakdown only.
+            for alias, expr in breakdown_exprs:
+                breakdown_attributed = parse_expr("argMin({expr}, timestamp)", placeholders={"expr": expr})
+                exposure_query.select.append(ast.Alias(alias=alias, expr=breakdown_attributed))
+
+        # Filter out users whose conversion window hasn't elapsed yet
+        maturity_having = self._maturity_having(parse_expr("min(timestamp)"))
+        if maturity_having is not None:
+            if exposure_query.having is None:
+                exposure_query.having = maturity_having
+            else:
+                exposure_query.having = ast.And(exprs=[exposure_query.having, maturity_having])
+
+        return exposure_query
+
+    def precomputed_select_query(self, job_ids: list[str]) -> ast.SelectQuery:
+        """
+        Builds the exposure CTE from the lazy-computed table instead of scanning events. Returns
+        the same column shape as _build_exposure_select_query().
+
+        Re-aggregates across jobs, because the same user can appear in several time-window jobs.
+        A job can cover a wider time range than the experiment (so that it can be reused), so the
+        query also filters on the experiment start and end dates.
+        """
+        # The lazy-computed table stores entity_id as String, but person_id is UUID in events.
+        # Cast back to match the type expected by downstream JOINs.
+        entity_id_expr = self._build_precomputed_entity_id_expr()
+        variant_expr = self._build_precomputed_variant_expr()
+
+        query = parse_select(
+            """
+                SELECT
+                    {entity_id_expr} AS entity_id,
+                    {variant_expr} AS variant,
+                    min(t.first_exposure_time) AS first_exposure_time,
+                    max(t.last_exposure_time) AS last_exposure_time,
+                    argMin(t.exposure_event_uuid, t.first_exposure_time) AS exposure_event_uuid,
+                    argMin(t.exposure_session_id, t.first_exposure_time) AS exposure_session_id
+                FROM experiment_exposures_preaggregated AS t
+                WHERE t.job_id IN {job_ids}
+                    AND t.team_id = {team_id}
+                    AND t.first_exposure_time >= {date_from}
+                    AND t.first_exposure_time <= {date_to}
+                GROUP BY entity_id
+            """,
+            placeholders={
+                "entity_id_expr": entity_id_expr,
+                "variant_expr": variant_expr,
+                "job_ids": ast.Constant(value=job_ids),
+                "team_id": ast.Constant(value=self.context.team.id),
+                "date_from": self.context.date_range_query.date_from_as_hogql(),
+                "date_to": self.context.date_range_query.date_to_as_hogql(),
+            },
+        )
+        assert isinstance(query, ast.SelectQuery)
+
+        # Filter out users whose conversion window hasn't elapsed yet, anchored on
+        # first exposure
+        maturity_having = self._maturity_having(parse_expr("min(t.first_exposure_time)"))
+        if maturity_having is not None:
+            if query.having is None:
+                query.having = maturity_having
+            else:
+                query.having = ast.And(exprs=[query.having, maturity_having])
+
+        return query
+
+    def precomputation_query(self) -> tuple[str, dict[str, ast.Expr]]:
+        """
+        Returns (query_string, placeholders) for lazy computation.
+
+        The lazy computation system fills the {time_window_min} and {time_window_max}
+        placeholders for each daily bucket. Pass the returned placeholders to ensure_precomputed().
+        """
+        if self.context.activation_config is not None:
+            # Callers gate on has_activation_config before precomputing; a cache built from
+            # this per-day query would count flag exposures alone and poison later reads.
+            raise ValueError("Activation-mode exposures cannot be precomputed per day")
+
+        # Keep in sync with _build_exposure_select_query. This query uses < for time_window_max
+        # (exclusive end for bucket boundaries), where the normal query uses <= (inclusive end for
+        # the experiment boundary).
+        #
+        # The time_window_min/max placeholders define the job's cache window
+        # (UTC-day-aligned). The experiment_date_from/to placeholders tighten
+        # the scan to the actual experiment dates so that variant aggregation
+        # only considers events within the experiment.
+        query_string = """
+            SELECT
+                {entity_key} AS entity_id,
+                {variant_expr} AS variant,
+                min(timestamp) AS first_exposure_time,
+                max(timestamp) AS last_exposure_time,
+                argMin(uuid, timestamp) AS exposure_event_uuid,
+                argMin(`$session_id`, timestamp) AS exposure_session_id,
+                [] AS breakdown_value
+            FROM events
+            WHERE timestamp >= {time_window_min}
+                AND timestamp < {time_window_max}
+                AND timestamp >= {experiment_date_from}
+                AND timestamp <= {experiment_date_to}
+                AND {event_predicate}
+                AND {test_accounts_filter}
+                AND {variant_property} IN {variants}
+            GROUP BY entity_id
+        """
+
+        placeholders = {
+            "entity_key": parse_expr(self.context.entity_key),
+            "variant_expr": self.build_variant_expr_for_mean(),
+            "event_predicate": self.build_exposure_event_predicate(),
+            "test_accounts_filter": self.build_test_accounts_filter(),
+            "variant_property": self.build_variant_property(),
+            "variants": ast.Constant(value=list(self.context.variants)),
+            "experiment_date_from": self.context.date_range_query.date_from_as_hogql(),
+            "experiment_date_to": self.context.date_range_query.date_to_as_hogql(),
+        }
+
+        return query_string, placeholders
+
+    def build_variant_expr_for_mean(self) -> ast.Expr:
+        """
+        Per-entity variant: the first-seen variant under FIRST_SEEN handling. Otherwise
+        MULTIPLE_VARIANT_KEY when the entity saw more than one variant.
+        """
+        if self.context.multiple_variant_handling == MultipleVariantHandling.FIRST_SEEN:
+            return parse_expr(
+                "argMin({variant_property}, timestamp)",
+                placeholders={
+                    "variant_property": self.build_variant_property(),
+                },
+            )
+        else:
+            return parse_expr(
+                "if(uniqExact({variant_property}) > 1, {multiple_key}, any({variant_property}))",
+                placeholders={
+                    "variant_property": self.build_variant_property(),
+                    "multiple_key": ast.Constant(value=MULTIPLE_VARIANT_KEY),
+                },
+            )

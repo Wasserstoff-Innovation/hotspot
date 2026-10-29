@@ -1,0 +1,320 @@
+"""
+Facade API for experiments product.
+
+This module provides the public interface for creating and managing experiments
+using framework-free DTOs, wrapping the existing ExperimentService.
+"""
+
+from datetime import datetime
+from typing import Any
+from uuid import UUID
+
+import pydantic
+import structlog
+
+from posthog.schema import ExperimentEventExposureConfig
+
+from posthog.models.team import Team
+from posthog.models.user import User
+
+from products.experiments.backend.experiment_service import ExperimentService
+from products.experiments.backend.flag_enrollment import enrolled_people_by_flag
+from products.experiments.backend.health.inputs_payload import health_inputs_payload
+from products.experiments.backend.health.loader import load_experiment_health_context, load_experiment_health_inputs
+from products.experiments.backend.health.registry import (
+    EXPERIMENT_HEALTH_CHECKS,
+    evaluate as evaluate_health,
+)
+from products.experiments.backend.hogql_queries.exposure_query_logic import (
+    DEFAULT_EXPOSURE_EVENT,
+    get_exposure_event_and_property,
+    is_default_exposure_config,
+    normalize_to_exposure_criteria,
+    resolve_default_exposure_event,
+)
+from products.experiments.backend.metric_calculation.config import (
+    build_primary_calculation_configs,
+    calculation_metric_name,
+)
+from products.experiments.backend.metric_calculation.results import MetricResultStore
+from products.experiments.backend.models.experiment import Experiment as ExperimentModel
+from products.experiments.backend.running_time_target import load_running_time_target
+from products.experiments.stats.shared.enums import DifferenceType
+
+from .contracts import (
+    CreateExperimentInput,
+    EndedExperiment,
+    Experiment,
+    ExperimentDetectableEffectCheckpoint,
+    ExperimentHealth,
+    ExperimentHealthReaderAccess,
+    ExperimentRunningTimeOutlook,
+    ExperimentRunningTimeTarget,
+    ExperimentValidationError,
+    RunningExperiment,
+    RunningTimeMode,
+    StoredArmResult,
+    StoredPrimaryResult,
+)
+
+logger = structlog.get_logger(__name__)
+
+
+def create_experiment(*, team: Team, user: User, input_dto: CreateExperimentInput) -> Experiment:
+    """
+    Create a new experiment.
+
+    Transactional safety is provided by ExperimentService.create_experiment.
+
+    Args:
+        team: Team creating the experiment
+        user: User creating the experiment
+        input_dto: Experiment creation input with all configuration
+
+    Returns:
+        Experiment DTO
+
+    Raises:
+        ExperimentValidationError: If the holdout does not exist for this team
+        rest_framework.exceptions.ValidationError: If validation fails in service layer
+    """
+
+    # Load holdout if ID provided
+    from products.experiments.backend.models.experiment import ExperimentHoldout
+
+    holdout = None
+    if input_dto.holdout_id is not None:
+        try:
+            holdout = ExperimentHoldout.objects.get(id=input_dto.holdout_id, team_id=team.id)
+        except ExperimentHoldout.DoesNotExist:
+            raise ExperimentValidationError(f"Holdout with id {input_dto.holdout_id} does not exist for this team")
+
+    # Convert tuple to list for ordering fields (DTO uses tuple for immutability)
+    primary_metrics_ordered_uuids = list(input_dto.metrics_ordering) if input_dto.metrics_ordering else None
+    secondary_metrics_ordered_uuids = (
+        list(input_dto.secondary_metrics_ordering) if input_dto.secondary_metrics_ordering else None
+    )
+
+    # Call existing service (already @transaction.atomic)
+    service = ExperimentService(team=team, user=user)
+    experiment_model = service.create_experiment(
+        name=input_dto.name,
+        feature_flag_key=input_dto.feature_flag_key,
+        description=input_dto.description,
+        type=input_dto.type,
+        parameters=input_dto.parameters,
+        feature_flag_config=input_dto.feature_flag_config,
+        running_time_calculation=input_dto.running_time_calculation,
+        excluded_variants=input_dto.excluded_variants,
+        metrics=input_dto.metrics,
+        metrics_secondary=input_dto.metrics_secondary,
+        secondary_metrics=input_dto.secondary_metrics,
+        stats_config=input_dto.stats_config,
+        exposure_criteria=input_dto.exposure_criteria,
+        holdout=holdout,
+        saved_metrics_ids=input_dto.saved_metrics_ids,
+        start_date=input_dto.start_date,
+        end_date=input_dto.end_date,
+        primary_metrics_ordered_uuids=primary_metrics_ordered_uuids,
+        secondary_metrics_ordered_uuids=secondary_metrics_ordered_uuids,
+        create_in_folder=input_dto.create_in_folder,
+        filters=input_dto.filters,
+        scheduling_config=input_dto.scheduling_config,
+        only_count_matured_users=input_dto.only_count_matured_users,
+        archived=input_dto.archived,
+        deleted=input_dto.deleted,
+        conclusion=input_dto.conclusion,
+        conclusion_comment=input_dto.conclusion_comment,
+        repository=input_dto.repository,
+        serializer_context=input_dto.serializer_context,
+        allow_unknown_events=input_dto.allow_unknown_events,
+    )
+
+    # Convert model to DTO
+    return _experiment_model_to_dto(experiment_model)
+
+
+def count_running_experiments_on_feature_flag_called(organization_id: UUID) -> int:
+    """Count the organization's running experiments that count exposures on $feature_flag_called.
+
+    Those exposures come from the events table, so they stop when ingestion stops writing
+    $feature_flag_called to events.
+    """
+    experiments = (
+        ExperimentModel.objects.filter(
+            team__organization_id=organization_id, start_date__isnull=False, end_date__isnull=True, archived=False
+        )
+        .exclude(deleted=True)
+        .select_related("team", "feature_flag")
+    )
+    count = 0
+    for experiment in experiments:
+        exposure_event, _ = get_exposure_event_and_property(
+            experiment.feature_flag.key,
+            experiment.exposure_criteria,
+            default_exposure_event=resolve_default_exposure_event(experiment.team, experiment.start_date),
+        )
+        count += exposure_event == DEFAULT_EXPOSURE_EVENT
+    return count
+
+
+def get_experiment_health(
+    *, team_id: int, experiment_id: int, reader_access: ExperimentHealthReaderAccess, user: User | None
+) -> ExperimentHealth:
+    """The findings and the result of each health check that reads the experiment, its flag, its linked metrics,
+    and the changes of the flag since launch and the flag's recent calls, as far as `reader_access` allows. The
+    metric queries compile with `user`'s warehouse access."""
+    context = load_experiment_health_context(
+        team_id=team_id, experiment_id=experiment_id, reader_access=reader_access, user=user
+    )
+    return evaluate_health(context, EXPERIMENT_HEALTH_CHECKS)
+
+
+def get_experiment_health_inputs(
+    *, team_id: int, experiment_id: int, reader_access: ExperimentHealthReaderAccess, user: User | None
+) -> dict[str, Any]:
+    """Everything the health checks read for the reader, as plain data in the shape of the staff `health_inputs`
+    response: the checks' context, the exposure query's answer that the exposure checks read, and the project's
+    experiment defaults and SDK profile."""
+    inputs = load_experiment_health_inputs(
+        team_id=team_id, experiment_id=experiment_id, reader_access=reader_access, user=user
+    )
+    return health_inputs_payload(inputs)
+
+
+def get_stored_primary_result(*, team_id: int, experiment_id: int) -> StoredPrimaryResult | None:
+    """The current stored result of the experiment's primary metric. It reads Postgres only, not ClickHouse.
+
+    None for an experiment that reports absolute differences: the calculation key leaves out the difference type,
+    so the stored interval can be in either unit."""
+    experiment = ExperimentModel.objects.filter(team_id=team_id, pk=experiment_id, deleted=False).first()
+    config = next(iter(build_primary_calculation_configs(experiment)), None) if experiment else None
+    if experiment is None or config is None or config.settings.stats.difference_type == DifferenceType.ABSOLUTE:
+        return None
+    stats = MetricResultStore(experiment_id=experiment_id).current_result(config)
+    if stats is None:
+        return None
+    base = stats.baseline.mean
+    definition = config.definition
+    return StoredPrimaryResult(
+        metric_name=calculation_metric_name(experiment, config),
+        metric_type=definition.get("metric_type"),
+        proportion=definition.get("metric_type") == "funnel" or definition.get("threshold") is not None,
+        goal=definition.get("goal"),
+        baseline=StoredArmResult(key=stats.baseline.key, number_of_samples=stats.baseline.number_of_samples, mean=base),
+        variants=tuple(
+            StoredArmResult(
+                key=variant.key,
+                number_of_samples=variant.number_of_samples,
+                mean=variant.mean,
+                change=variant.interval.midpoint if variant.interval and base and base > 0 else None,
+                significant=variant.significant,
+            )
+            for variant in stats.variants
+        ),
+    )
+
+
+def get_running_time_target(
+    *, team_id: int, experiment_id: int, mode: RunningTimeMode | None = None
+) -> ExperimentRunningTimeTarget:
+    """The target sample of the experiment's running time estimate, with what the experiment can detect over time.
+    `mode` replaces the saved one, so that the page can show the automatic target while the user switches to it."""
+    experiment = ExperimentModel.objects.select_related("feature_flag").get(team_id=team_id, id=experiment_id)
+    target = load_running_time_target(experiment, mode=mode)
+    outlook = target.outlook
+    return ExperimentRunningTimeTarget(
+        minimum_detectable_effect=target.minimum_detectable_effect,
+        recommended_sample_size=target.recommended_sample_size,
+        current_sample_size=target.current_sample_size,
+        outlook=ExperimentRunningTimeOutlook(
+            days_since_launch=outlook.days_since_launch,
+            exposures_per_day=outlook.exposures_per_day,
+            detectable_effect_now=outlook.detectable_effect_now,
+            upcoming_checkpoints=tuple(
+                ExperimentDetectableEffectCheckpoint(
+                    weeks_since_launch=checkpoint.weeks_since_launch,
+                    detectable_effect=checkpoint.detectable_effect,
+                )
+                for checkpoint in outlook.upcoming_checkpoints
+            ),
+            reachable_effect=outlook.reachable_effect,
+        )
+        if outlook
+        else None,
+    )
+
+
+def list_ended_experiments_without_conclusion(
+    *, team_id: int, user_id: int, since: datetime, limit: int
+) -> list[EndedExperiment]:
+    rows = (
+        ExperimentModel.objects.filter(
+            team_id=team_id,
+            created_by_id=user_id,
+            end_date__gte=since,
+            conclusion__isnull=True,
+            archived=False,
+        )
+        .exclude(deleted=True)
+        .order_by("-end_date")
+        .values_list("id", "name", "end_date")[:limit]
+    )
+    return [EndedExperiment(id=id, name=name, ended_at=ended_at) for id, name, ended_at in rows]
+
+
+def _exposes_on_flag_calls(experiment_id: int, exposure_criteria: dict | None) -> bool:
+    try:
+        criteria = normalize_to_exposure_criteria(exposure_criteria)
+    except pydantic.ValidationError:
+        logger.warning("experiment_exposure_criteria_invalid", experiment_id=experiment_id, exc_info=True)
+        return False
+    return criteria is None or (
+        criteria.activation_config is None
+        and is_default_exposure_config(criteria.exposure_config)
+        and not (
+            isinstance(criteria.exposure_config, ExperimentEventExposureConfig) and criteria.exposure_config.properties
+        )
+    )
+
+
+def list_running_experiments(
+    *, team_id: int, user_id: int, started_after: datetime | None, started_before: datetime, limit: int
+) -> list[RunningExperiment]:
+    experiments = ExperimentModel.objects.filter(
+        team_id=team_id,
+        created_by_id=user_id,
+        start_date__lte=started_before,
+        end_date__isnull=True,
+        archived=False,
+    ).exclude(deleted=True)
+    if started_after is not None:
+        experiments = experiments.filter(start_date__gt=started_after)
+    rows = experiments.order_by("-start_date").values_list(
+        "id", "name", "start_date", "feature_flag__key", "exposure_criteria"
+    )[:limit]
+    return [
+        RunningExperiment(id=id, name=name, started_at=started_at, flag_key=flag_key)
+        for id, name, started_at, flag_key, exposure_criteria in rows
+        if _exposes_on_flag_calls(id, exposure_criteria)
+    ]
+
+
+def count_enrolled_people(*, team: Team, user: User, flag_keys: list[str]) -> dict[str, int]:
+    return enrolled_people_by_flag(team, user, flag_keys)
+
+
+def _experiment_model_to_dto(experiment: ExperimentModel) -> Experiment:
+    """Convert Django model to DTO."""
+    return Experiment(
+        id=experiment.id,
+        name=experiment.name,
+        description=experiment.description or None,
+        feature_flag_id=experiment.feature_flag_id,
+        feature_flag_key=experiment.feature_flag.key,
+        is_draft=experiment.start_date is None,
+        start_date=experiment.start_date,
+        end_date=experiment.end_date,
+        created_at=experiment.created_at,
+        updated_at=experiment.updated_at,
+    )

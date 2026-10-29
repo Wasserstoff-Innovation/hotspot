@@ -1,0 +1,280 @@
+package core
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+	"regexp"
+	"strings"
+	"time"
+)
+
+// Service-to-service secrets that each get their own random value, so a leak from one
+// container cannot yield POSTHOG_SECRET, which is Django's SECRET_KEY.
+var dedicatedSecretKeys = []string{"INTERNAL_REQUEST_TOKEN", "BROWSERLESS_SECRET", "RECORDING_API_JWT_SECRET"}
+
+type EnvConfig struct {
+	PosthogSecret        string
+	DedicatedSecrets     map[string]string
+	EncryptionSaltKeys   string
+	Domain               string
+	TLSBlock             string
+	RegistryURL          string
+	PosthogAppTag        string
+	PosthogNodeTag       string
+	SessionRecordingDate string
+}
+
+func NewEnvConfig(domain, version string) (*EnvConfig, error) {
+	secret, err := GenerateSecret()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate secret: %w", err)
+	}
+
+	dedicatedSecrets := make(map[string]string, len(dedicatedSecretKeys))
+	for _, key := range dedicatedSecretKeys {
+		value, err := GenerateSecret()
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate %s: %w", key, err)
+		}
+		dedicatedSecrets[key] = value
+	}
+
+	encryptionKey, err := GenerateEncryptionKey()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate encryption key: %w", err)
+	}
+
+	registryURL := os.Getenv("REGISTRY_URL")
+	if registryURL == "" {
+		registryURL = "posthog/posthog"
+	}
+
+	tlsBlock := os.Getenv("TLS_BLOCK")
+
+	nodeTag := os.Getenv("POSTHOG_NODE_TAG")
+	if nodeTag == "" {
+		nodeTag = "latest"
+	}
+
+	return &EnvConfig{
+		PosthogSecret:        secret,
+		DedicatedSecrets:     dedicatedSecrets,
+		EncryptionSaltKeys:   encryptionKey,
+		Domain:               domain,
+		TLSBlock:             tlsBlock,
+		RegistryURL:          registryURL,
+		PosthogAppTag:        version,
+		PosthogNodeTag:       nodeTag,
+		SessionRecordingDate: time.Now().Format(time.RFC3339),
+	}, nil
+}
+
+func (c *EnvConfig) WriteEnvFile() error {
+	content := fmt.Sprintf(`POSTHOG_SECRET=%s
+ENCRYPTION_SALT_KEYS=%s
+DOMAIN=%s
+TLS_BLOCK=%s
+REGISTRY_URL=%s
+CADDY_TLS_BLOCK=%s
+CADDY_HOST="%s, http://, https://"
+POSTHOG_APP_TAG=%s
+POSTHOG_NODE_TAG=%s
+SESSION_RECORDING_V2_METADATA_SWITCHOVER=%s
+`,
+		c.PosthogSecret,
+		c.EncryptionSaltKeys,
+		c.Domain,
+		c.TLSBlock,
+		c.RegistryURL,
+		c.TLSBlock,
+		c.Domain,
+		c.PosthogAppTag,
+		c.PosthogNodeTag,
+		c.SessionRecordingDate,
+	)
+	for _, key := range dedicatedSecretKeys {
+		content += fmt.Sprintf("%s=%s\n", key, c.DedicatedSecrets[key])
+	}
+
+	return os.WriteFile(".env", []byte(content), 0600)
+}
+
+func LoadExistingEnv() map[string]string {
+	values := make(map[string]string)
+	keys := []string{
+		"POSTHOG_SECRET",
+		"ENCRYPTION_SALT_KEYS",
+		"DOMAIN",
+		"TLS_BLOCK",
+		"CADDY_HOST",
+		"CADDY_TLS_BLOCK",
+		"REGISTRY_URL",
+		"POSTHOG_APP_TAG",
+		"POSTHOG_NODE_TAG",
+		"SESSION_RECORDING_V2_METADATA_SWITCHOVER",
+		"SESSION_RECORDING_STORAGE_MIGRATED_TO_SEAWEEDFS",
+		"OBJECT_STORAGE_MINIO_REMOVED",
+	}
+
+	keys = append(keys, dedicatedSecretKeys...)
+
+	for _, key := range keys {
+		if val := ReadEnvValue(key); val != "" {
+			values[key] = val
+		}
+	}
+
+	return values
+}
+
+func UpdateEnvValue(key, value string) error {
+	data, err := os.ReadFile(".env")
+	if err != nil {
+		return err
+	}
+	lines := strings.Split(string(data), "\n")
+	prefix := key + "="
+	found := false
+	for i, line := range lines {
+		if strings.HasPrefix(line, prefix) {
+			lines[i] = prefix + value
+			found = true
+		}
+	}
+	if !found {
+		if len(lines) > 0 && lines[len(lines)-1] == "" {
+			lines = lines[:len(lines)-1]
+		}
+		lines = append(lines, prefix+value)
+	}
+	updated := strings.Join(lines, "\n")
+	if !strings.HasSuffix(updated, "\n") {
+		updated += "\n"
+	}
+	return os.WriteFile(".env", []byte(updated), 0600)
+}
+
+func UpdateEnvForUpgrade(version string) error {
+	existing := LoadExistingEnv()
+
+	if existing["ENCRYPTION_SALT_KEYS"] == "" {
+		key, err := GenerateEncryptionKey()
+		if err != nil {
+			return err
+		}
+		if err := AppendToEnv("ENCRYPTION_SALT_KEYS", key); err != nil {
+			return err
+		}
+	}
+
+	for _, key := range dedicatedSecretKeys {
+		if existing[key] != "" {
+			continue
+		}
+		value, err := GenerateSecret()
+		if err != nil {
+			return err
+		}
+		if err := AppendToEnv(key, value); err != nil {
+			return err
+		}
+	}
+
+	if existing["SESSION_RECORDING_V2_METADATA_SWITCHOVER"] == "" {
+		if err := AppendToEnv("SESSION_RECORDING_V2_METADATA_SWITCHOVER", time.Now().Format(time.RFC3339)); err != nil {
+			return err
+		}
+	}
+
+	// Compose fills the proxy Caddyfile from .env, so older installs without these keys serve http://localhost:8000.
+	if existing["CADDY_HOST"] == "" && existing["DOMAIN"] != "" {
+		if err := UpdateEnvValue("CADDY_HOST", fmt.Sprintf(`"%s, http://, https://"`, existing["DOMAIN"])); err != nil {
+			return err
+		}
+	}
+
+	if existing["CADDY_TLS_BLOCK"] == "" && existing["TLS_BLOCK"] != "" {
+		if err := UpdateEnvValue("CADDY_TLS_BLOCK", fmt.Sprintf(`"%s"`, existing["TLS_BLOCK"])); err != nil {
+			return err
+		}
+	}
+
+	if version != "" {
+		if err := UpdateEnvValue("POSTHOG_APP_TAG", version); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func FixEnvQuoting() error {
+	data, err := os.ReadFile(".env")
+	if err != nil {
+		return nil
+	}
+
+	var result strings.Builder
+	scanner := bufio.NewScanner(strings.NewReader(string(data)))
+
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		if strings.TrimSpace(line) == "" || strings.HasPrefix(strings.TrimSpace(line), "#") {
+			result.WriteString(line)
+			result.WriteString("\n")
+			continue
+		}
+
+		idx := strings.Index(line, "=")
+		if idx == -1 {
+			result.WriteString(line)
+			result.WriteString("\n")
+			continue
+		}
+
+		key := strings.TrimSpace(line[:idx])
+		value := strings.TrimSpace(line[idx+1:])
+
+		if (strings.HasPrefix(value, "\"") && strings.HasSuffix(value, "\"")) ||
+			(strings.HasPrefix(value, "'") && strings.HasSuffix(value, "'")) {
+			result.WriteString(line)
+			result.WriteString("\n")
+			continue
+		}
+
+		needsQuote := strings.ContainsAny(value, " ,") || strings.Contains(value, "://")
+		if needsQuote {
+			value = strings.ReplaceAll(value, "\"", "\\\"")
+			fmt.Fprintf(&result, "%s=\"%s\"\n", key, value)
+		} else {
+			result.WriteString(line)
+			result.WriteString("\n")
+		}
+	}
+
+	return os.WriteFile(".env", []byte(result.String()), 0600)
+}
+
+func ValidateEnvForUpgrade() error {
+	required := []string{"POSTHOG_SECRET", "DOMAIN"}
+	for _, key := range required {
+		if ReadEnvValue(key) == "" {
+			return fmt.Errorf("missing required env var: %s", key)
+		}
+	}
+
+	encKey := ReadEnvValue("ENCRYPTION_SALT_KEYS")
+	if encKey != "" {
+		if !regexp.MustCompile(`^[A-Za-z0-9_-]{32}$`).MatchString(encKey) {
+			return fmt.Errorf("ENCRYPTION_SALT_KEYS is not in correct format")
+		}
+	}
+
+	return nil
+}
+
+func GetExistingDomain() string {
+	return ReadEnvValue("DOMAIN")
+}

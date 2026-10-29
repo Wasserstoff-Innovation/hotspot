@@ -1,0 +1,72 @@
+#!/bin/bash
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+COMPOSE_FILE="$REPO_ROOT/docker-compose.hotspot.yml"
+ENV_FILE="$REPO_ROOT/.env.hotspot"
+
+usage() {
+    cat <<EOF
+Hotspot CLI - Manage your local Hotspot analytics platform
+
+Usage:
+    ./bin/hotspot [command]
+
+Commands:
+    start | up        Start the Hotspot standalone Docker Compose stack
+    stop  | down      Stop all Hotspot containers
+    restart           Restart Hotspot containers
+    status            Check health and status of Hotspot containers
+    logs [service]    View container logs (e.g. ./bin/hotspot logs web)
+    shell             Open a Django shell in the Hotspot web container
+    dev               Start local native development stack using hogli
+    help              Show this help message
+
+Web UI will be available at: http://localhost:8000
+EOF
+}
+
+COMMAND="${1:-help}"
+shift || true
+
+case "$COMMAND" in
+    start|up)
+        echo "🚀 Starting Hotspot standalone stack..."
+        docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d "$@"
+        echo "✅ Hotspot services launched!"
+        echo "🌐 Web UI available at: http://localhost:8000 (and proxy port 8010)"
+        ;;
+    stop|down)
+        echo "🛑 Stopping Hotspot stack..."
+        docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" down "$@"
+        echo "✅ Hotspot stopped."
+        ;;
+    restart)
+        echo "🔄 Restarting Hotspot stack..."
+        docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" restart "$@"
+        echo "✅ Hotspot restarted."
+        ;;
+    status|ps)
+        docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" ps "$@"
+        ;;
+    logs)
+        docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" logs -f "$@"
+        ;;
+    shell)
+        echo "🐚 Opening Hotspot Django shell..."
+        docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec web python manage.py shell_plus || \
+        "$REPO_ROOT/.venv/bin/python" "$REPO_ROOT/manage.py" shell_plus
+        ;;
+    dev)
+        echo "💻 Launching local Hotspot dev environment..."
+        exec "$REPO_ROOT/bin/hogli" start "$@"
+        ;;
+    help|-h|--help)
+        usage
+        ;;
+    *)
+        echo "Unknown command: $COMMAND"
+        usage
+        exit 1
+        ;;
+esac

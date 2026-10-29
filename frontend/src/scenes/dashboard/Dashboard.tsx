@@ -1,0 +1,275 @@
+import './Dashboard.scss'
+
+import { BindLogic, useActions, useMountedLogic, useValues } from 'kea'
+import posthog from 'posthog-js'
+import { Suspense } from 'react'
+
+import { AccessDenied } from 'lib/components/AccessDenied'
+import { dashboardTileScreenshotKey } from 'lib/components/Cards/InsightCard/insightCardImageCapture'
+import { NotFound } from 'lib/components/NotFound'
+import { ScreenShotEditor } from 'lib/components/TakeScreenshot/ScreenShotEditor'
+import { useFileSystemLogView } from 'lib/hooks/useFileSystemLogView'
+import { useOnMountEffect } from 'lib/hooks/useOnMountEffect'
+import { LemonBanner } from 'lib/lemon-ui/LemonBanner'
+import { Link } from 'lib/lemon-ui/Link'
+import { cn } from 'lib/utils/css-classes'
+import { lazyWithRetry } from 'lib/utils/retryImport'
+import { DashboardFilterBar } from 'scenes/dashboard/DashboardFilters'
+import { DashboardItems } from 'scenes/dashboard/DashboardItems'
+import { DashboardLogicProps, dashboardLogic } from 'scenes/dashboard/dashboardLogic'
+import { dataThemeLogic } from 'scenes/dataThemeLogic'
+import { InsightErrorState } from 'scenes/insights/EmptyStates'
+import { SceneExport } from 'scenes/sceneTypes'
+import { urls } from 'scenes/urls'
+
+import { SceneContent } from '~/layout/scenes/components/SceneContent'
+import { SceneStickyBar } from '~/layout/scenes/components/SceneStickyBar'
+import { ProductKey } from '~/queries/schema/schema-general'
+import { DashboardPlacement, DashboardType, DataColorThemeModel } from '~/types'
+
+import { useAttachedContext } from 'products/posthog_ai/frontend/api/logics'
+import { SubscriptionSummaries } from 'products/subscriptions/frontend/components/SubscriptionSummaries/SubscriptionSummaries'
+
+import { teamLogic } from '../teamLogic'
+import { addInsightToDashboardLogic } from './addInsightToDashboardModalLogic'
+import { DashboardFlagCalledBanner } from './DashboardFlagCalledBanner'
+import { DashboardHeader } from './DashboardHeader'
+import { DashboardEmbeddedShareButton } from './DashboardHeaderActions'
+import { DashboardModalLoading } from './DashboardModalLoading'
+import { DashboardQueryScanBanner } from './DashboardQueryScanBanner'
+import { DashboardRetentionBanner } from './DashboardRetentionBanner'
+import { dashboardSubscribeNudgeLogic } from './dashboardSubscribeNudgeLogic'
+import { DashboardWarehouseSyncBanner } from './DashboardWarehouseSyncBanner'
+import { DashboardZoomControl } from './DashboardZoomControl'
+import { EmptyDashboardComponent } from './EmptyDashboardComponent'
+
+// The modal renders the saved insights list, which no dashboard needs until someone adds an insight.
+const AddInsightToDashboardModal = lazyWithRetry(() =>
+    import('./addInsightToDashboardModal/AddInsightToDashboardModal').then((m) => ({
+        default: m.AddInsightToDashboardModal,
+    }))
+)
+
+// Mount-only: runs the subscribe-nudge eligibility machinery for this dashboard; renders nothing.
+function DashboardSubscribeNudgeTrigger({ dashboardId }: { dashboardId: number }): null {
+    useMountedLogic(dashboardSubscribeNudgeLogic({ dashboardId }))
+    return null
+}
+
+interface DashboardProps {
+    id?: string
+    dashboard?: DashboardType
+    placement?: DashboardPlacement
+    themes?: DataColorThemeModel[]
+    /** When set, the "Edit dashboard" menu item links to the dashboard editor with a back button pointing here. */
+    backTo?: { url: string; name: string }
+    showCreateAnomalyAlertButton?: boolean
+    /** Shows the dashboard without tile menus or drag-to-edit controls. */
+    readOnly?: boolean
+}
+
+export const parseDashboardId = (id: string | undefined): number => {
+    if (!id || !/^\d+$/.test(id)) {
+        return NaN
+    }
+    // Reject "0" and all-zero variants: id 0 is the reserved internal sentinel, never a real dashboard.
+    const dashboardId = Number(id)
+    return dashboardId > 0 ? dashboardId : NaN
+}
+
+// Wrapper needed because SceneComponent<DashboardLogicProps> requires the component to accept
+// DashboardLogicProps, but DashboardScene takes { backTo? } (logic props are bound separately).
+function DashboardSceneWrapper(): JSX.Element {
+    return <DashboardScene />
+}
+
+export const scene: SceneExport<DashboardLogicProps> = {
+    component: DashboardSceneWrapper,
+    logic: dashboardLogic,
+    paramsToProps: ({ params: { id, placement } }) => ({ id: parseDashboardId(id), placement }),
+    productKey: ProductKey.PRODUCT_ANALYTICS,
+}
+
+export function Dashboard({
+    id,
+    dashboard,
+    placement,
+    themes,
+    backTo,
+    showCreateAnomalyAlertButton,
+    readOnly,
+}: DashboardProps): JSX.Element {
+    useMountedLogic(dataThemeLogic({ themes }))
+
+    return (
+        <BindLogic logic={dashboardLogic} props={{ id: parseDashboardId(id), placement, dashboard, readOnly }}>
+            <DashboardScene backTo={backTo} showCreateAnomalyAlertButton={showCreateAnomalyAlertButton} />
+        </BindLogic>
+    )
+}
+
+function DashboardScene({
+    backTo,
+    showCreateAnomalyAlertButton,
+}: {
+    backTo?: { url: string; name: string }
+    showCreateAnomalyAlertButton?: boolean
+}): JSX.Element {
+    const {
+        placement,
+        dashboard,
+        canEditDashboard,
+        tiles,
+        itemsLoading,
+        dashboardLoading,
+        dashboardStreaming,
+        layoutEditMode,
+        dashboardFailedToLoad,
+        internetConnectionIssue,
+        accessDeniedToDashboard,
+        error404,
+        hasInvalidDashboardId,
+    } = useValues(dashboardLogic)
+    const { layoutZoom } = useValues(dashboardLogic)
+    const { currentTeamId } = useValues(teamLogic)
+    const { reportDashboardViewed, cancelDashboardRefresh, retryDashboardLoad, setLayoutZoom } =
+        useActions(dashboardLogic)
+    const { addInsightToDashboardModalVisible } = useValues(addInsightToDashboardLogic)
+    const { hideAddInsightToDashboardModal } = useActions(addInsightToDashboardLogic)
+    const closeAddInsightToDashboardModal = (): void => {
+        // Mirror AddInsightToDashboardModal.handleClose, so a close during the chunk load still
+        // emits this event. 'insight dashboard modal - closed' is a frozen event name; keep both in sync.
+        posthog.capture('insight dashboard modal - closed')
+        hideAddInsightToDashboardModal()
+    }
+
+    useAttachedContext(
+        dashboard ? [{ type: 'dashboard', key: dashboard.id, label: dashboard.name ?? undefined }] : null
+    )
+
+    useFileSystemLogView({
+        type: 'dashboard',
+        ref: dashboard?.id,
+        enabled: Boolean(currentTeamId && dashboard?.id && !dashboardFailedToLoad && !accessDeniedToDashboard),
+    })
+
+    useOnMountEffect(() => {
+        reportDashboardViewed()
+
+        // request cancellation of any running insight, widget and tile group loads when this component is no longer in the dom
+        return () => cancelDashboardRefresh()
+    })
+
+    // `error404` only becomes true once a load has settled as a 404, so pending loads fall through to the empty/loading state
+    if (error404 && !dashboard && !dashboardFailedToLoad) {
+        return (
+            <NotFound
+                object="dashboard"
+                caption={
+                    <>
+                        {hasInvalidDashboardId
+                            ? 'This dashboard link is not valid.'
+                            : 'It may have been deleted, or the link is out of date.'}{' '}
+                        <Link to={urls.dashboards()}>Go to your dashboards</Link>.
+                    </>
+                }
+            />
+        )
+    }
+
+    if (accessDeniedToDashboard) {
+        return <AccessDenied object="dashboard" />
+    }
+
+    return (
+        <SceneContent className={cn('dashboard')}>
+            {placement == DashboardPlacement.Dashboard && (
+                <DashboardHeader loading={!dashboard && !dashboardFailedToLoad} />
+            )}
+            {placement == DashboardPlacement.Dashboard && !!dashboard?.id && (
+                <DashboardSubscribeNudgeTrigger dashboardId={dashboard.id} />
+            )}
+            {canEditDashboard && addInsightToDashboardModalVisible && (
+                <Suspense
+                    fallback={
+                        <DashboardModalLoading
+                            isOpen={addInsightToDashboardModalVisible}
+                            onClose={closeAddInsightToDashboardModal}
+                            label="Loading insights"
+                        />
+                    }
+                >
+                    <AddInsightToDashboardModal />
+                </Suspense>
+            )}
+            {/* Lets a tile copied as a PNG be annotated before it is shared. Export placement renders headlessly. */}
+            {placement !== DashboardPlacement.Export && (
+                <ScreenShotEditor screenshotKey={dashboardTileScreenshotKey(dashboard?.id)} />
+            )}
+            <DashboardEmbeddedShareButton dashboard={dashboard} placement={placement} />
+            {/* Outside the tile-count branches: a dashboard can keep subscriptions and delivery history after its tiles are removed. */}
+            {placement === DashboardPlacement.Dashboard && !!dashboard?.id && (
+                <SubscriptionSummaries dashboardId={dashboard.id} className="mt-2 mb-2" />
+            )}
+
+            {dashboardFailedToLoad && !tiles?.length ? (
+                <InsightErrorState
+                    title={
+                        internetConnectionIssue
+                            ? "We couldn't connect to PostHog. Check your connection and try again."
+                            : 'There was an error loading this dashboard'
+                    }
+                    onRetry={placement === DashboardPlacement.Export ? undefined : retryDashboardLoad}
+                    retryLoading={dashboardLoading || dashboardStreaming}
+                    placement={placement}
+                />
+            ) : !tiles || tiles.length === 0 ? (
+                <EmptyDashboardComponent loading={itemsLoading || !dashboard} canEdit={canEditDashboard} />
+            ) : (
+                <div
+                    className={cn({
+                        '-mt-4': placement == DashboardPlacement.ProjectHomepage,
+                    })}
+                >
+                    {dashboardFailedToLoad && (
+                        <LemonBanner
+                            type="warning"
+                            className="mb-4"
+                            action={
+                                placement === DashboardPlacement.Export
+                                    ? undefined
+                                    : {
+                                          children: 'Try again',
+                                          onClick: retryDashboardLoad,
+                                          loading: dashboardLoading || dashboardStreaming,
+                                          'data-attr': 'dashboard-load-retry',
+                                      }
+                            }
+                        >
+                            This dashboard couldn't finish loading.
+                        </LemonBanner>
+                    )}
+                    <DashboardRetentionBanner />
+                    <DashboardFlagCalledBanner />
+                    <DashboardQueryScanBanner />
+                    <DashboardWarehouseSyncBanner />
+
+                    <SceneStickyBar showBorderBottom={false} className="flex gap-2 space-y-0">
+                        <DashboardFilterBar backTo={backTo} />
+                        {layoutEditMode &&
+                            canEditDashboard &&
+                            [
+                                DashboardPlacement.Dashboard,
+                                DashboardPlacement.ProjectHomepage,
+                                DashboardPlacement.Builtin,
+                            ].includes(placement) && (
+                                <DashboardZoomControl layoutZoom={layoutZoom} setLayoutZoom={setLayoutZoom} />
+                            )}
+                    </SceneStickyBar>
+
+                    <DashboardItems showCreateAnomalyAlertButton={showCreateAnomalyAlertButton} />
+                </div>
+            )}
+        </SceneContent>
+    )
+}

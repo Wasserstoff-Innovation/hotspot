@@ -1,0 +1,1272 @@
+import { mockFetch } from '~/tests/helpers/mocks/request.mock'
+
+import { DateTime } from 'luxon'
+import { register } from 'prom-client'
+
+import { FixtureHogFlowBuilder } from '~/cdp/_tests/builders/hogflow.builder'
+import { insertHogFunctionTemplate, insertIntegration } from '~/cdp/_tests/fixtures'
+import { createExampleHogFlowInvocation } from '~/cdp/_tests/fixtures-hogflows'
+import { EmailStatusOutput } from '~/cdp/outputs/outputs'
+import { HogFlowAction } from '~/cdp/schema/hogflow'
+import { createInvocationResult } from '~/cdp/utils/invocation-utils'
+import { PosthogJwtAudience } from '~/cdp/utils/jwt-utils'
+import { ScopedServiceJwt } from '~/cdp/utils/scoped-service-jwt'
+import { workflowStepDispatchKeyFromInvocation } from '~/cdp/utils/workflow-step-dispatch-key'
+import { IngestionOutputs } from '~/common/outputs/ingestion-outputs'
+import { closeHub, createHub } from '~/common/utils/db/hub'
+import { parseJSON } from '~/common/utils/json-parse'
+import { UUIDT } from '~/common/utils/utils'
+import { createTestTeamFixture } from '~/tests/helpers/sql'
+import { Hub, Team } from '~/types'
+
+import { CyclotronJobInvocationHogFlow, DBHogFunctionTemplate } from '../../../types'
+import { HogExecutorAsyncService } from '../../hog-executor-async.service'
+import { HogExecutorService } from '../../hog-executor.service'
+import { HogInputsService } from '../../hog-inputs.service'
+import { HogFunctionTemplateManagerService } from '../../managers/hog-function-template-manager.service'
+import { RecipientsManagerService } from '../../managers/recipients-manager.service'
+import { TeamWorkflowsConfigService } from '../../managers/team-workflows-config.service'
+import { EmailStatusService } from '../../messaging/email-status.service'
+import { EmailSuppressionService, emailSuppressionConfigFromEnv } from '../../messaging/email-suppression.service'
+import { EmailValidationService } from '../../messaging/email-validation.service'
+import { EmailService } from '../../messaging/email.service'
+import { EmailTrackingCodeSigner } from '../../messaging/helpers/tracking-code'
+import { RecipientPreferencesService } from '../../messaging/recipient-preferences.service'
+import { RecipientTokensService } from '../../messaging/recipient-tokens.service'
+import { CdpUsageReporterService } from '../../usage/cdp-usage-reporter.service'
+import { HogFlowFunctionsService } from '../hogflow-functions.service'
+import { TRANSACTIONAL_EMAIL_EVENT } from '../hogflow-sensitivity'
+import { findActionByType } from '../hogflow-utils'
+import { HogFunctionHandler, messageOptOutsAfterStep } from './hog_function'
+
+describe('HogFunctionHandler', () => {
+    describe('messageOptOutsAfterStep', () => {
+        const optOut = { identifier: 'sam@example.com', categoryId: '$all' }
+
+        it.each([
+            ['records an opt-out step', 'template-posthog-opt-out-of-messages', [optOut]],
+            ['ignores any other step', 'template-webhook', undefined],
+        ])('%s', (_name, templateId, expected) => {
+            expect(
+                messageOptOutsAfterStep(undefined, templateId, { identifier: ' sam@example.com ', category_id: '$all' })
+            ).toEqual(expected)
+        })
+    })
+
+    let hub: Hub
+    let team: Team
+    let hogFunctionHandler: HogFunctionHandler
+    let mockHogFunctionExecutor: HogExecutorAsyncService
+    let mockHogFunctionTemplateManager: HogFunctionTemplateManagerService
+    let mockHogFlowFunctionsService: HogFlowFunctionsService
+    let mockRecipientPreferencesService: RecipientPreferencesService
+    let mockEmailValidationService: EmailValidationService
+
+    let invocation: CyclotronJobInvocationHogFlow
+    let action: Extract<HogFlowAction, { type: 'function' }>
+    let template: DBHogFunctionTemplate
+    let integrationId: number
+
+    beforeEach(async () => {
+        hub = await createHub()
+        team = (await createTestTeamFixture(hub.postgres)).team
+
+        const recipientTokensService = new RecipientTokensService(hub.ENCRYPTION_SALT_KEYS, hub.SITE_URL)
+        const hogInputsService = new HogInputsService(
+            hub.integrationManager,
+            recipientTokensService,
+            hub.encryptedFields
+        )
+        const emailService = new EmailService(
+            {
+                sesAccessKeyId: hub.SES_ACCESS_KEY_ID,
+                sesSecretAccessKey: hub.SES_SECRET_ACCESS_KEY,
+                sesRegion: hub.SES_REGION,
+                sesEndpoint: hub.SES_ENDPOINT,
+                sesTrackedConfigurationSet: hub.SES_TRACKED_CONFIGURATION_SET,
+                sesUntrackedConfigurationSet: hub.SES_UNTRACKED_CONFIGURATION_SET,
+            },
+            hub.integrationManager,
+            new TeamWorkflowsConfigService(hub.postgres, hub.pubSub),
+            hub.ENCRYPTION_SALT_KEYS,
+            hub.SITE_URL,
+            new EmailTrackingCodeSigner(hub.ENCRYPTION_SALT_KEYS, hub.CDP_EMAIL_TRACKING_URL),
+            new EmailSuppressionService(hub.postgres, emailSuppressionConfigFromEnv()),
+            new RecipientsManagerService(hub.postgres),
+            null
+        )
+        mockHogFunctionExecutor = new HogExecutorAsyncService(
+            new HogExecutorService({ executionTimeoutMs: hub.CDP_WATCHER_HOG_COST_TIMING_UPPER_MS }, hogInputsService),
+            {
+                googleAdwordsDeveloperToken: hub.CDP_GOOGLE_ADWORDS_DEVELOPER_TOKEN,
+                fetchRetries: hub.CDP_FETCH_RETRIES,
+                fetchBackoffBaseMs: hub.CDP_FETCH_BACKOFF_BASE_MS,
+                fetchBackoffMaxMs: hub.CDP_FETCH_BACKOFF_MAX_MS,
+                siteUrl: hub.SITE_URL,
+                internalApiBaseUrl: hub.INTERNAL_API_BASE_URL,
+            },
+            {
+                teamManager: hub.teamManager,
+                conversationsTicketsJwt: new ScopedServiceJwt(
+                    PosthogJwtAudience.CONVERSATIONS_TICKETS,
+                    hub.CONVERSATIONS_TICKETS_JWT_SECRET
+                ),
+                customerAnalyticsAccountsJwt: new ScopedServiceJwt(
+                    PosthogJwtAudience.CUSTOMER_ANALYTICS_ACCOUNTS,
+                    hub.CUSTOMER_ANALYTICS_ACCOUNTS_JWT_SECRET
+                ),
+                hogInputsService,
+                emailService,
+                recipientTokensService,
+                pushNotificationService: undefined as any,
+            }
+        )
+        mockHogFunctionTemplateManager = new HogFunctionTemplateManagerService(hub.postgres)
+        mockHogFlowFunctionsService = new HogFlowFunctionsService(
+            hub.SITE_URL,
+            mockHogFunctionTemplateManager,
+            mockHogFunctionExecutor
+        )
+        mockRecipientPreferencesService = {
+            shouldSkipAction: jest.fn().mockResolvedValue(null),
+            isFrequencyCapped: jest.fn().mockResolvedValue(false),
+        } as any
+        mockEmailValidationService = {
+            getSkipReason: jest.fn().mockResolvedValue(null),
+        } as any
+        hogFunctionHandler = new HogFunctionHandler(
+            mockHogFlowFunctionsService,
+            mockRecipientPreferencesService,
+            mockEmailValidationService,
+            'fetch',
+            null
+        )
+
+        // Simple hog function that prints the inputs
+
+        template = await insertHogFunctionTemplate(hub.postgres, {
+            id: `template-test-hogflow-executor-${team.id}`,
+            name: 'Test Template',
+            code: `fetch('http://localhost/test', { 'method': 'POST', 'body': inputs })`,
+            inputs_schema: [
+                {
+                    key: 'name',
+                    type: 'string',
+                    required: true,
+                },
+                {
+                    key: 'oauth',
+                    type: 'integration',
+                    required: true,
+                },
+            ],
+        })
+
+        integrationId = team.id
+        await insertIntegration(hub.postgres, team.id, {
+            id: integrationId,
+            kind: 'slack',
+            config: { team: 'foobar' },
+            sensitive_config: {
+                access_token: hub.encryptedFields.encrypt('token'),
+                not_encrypted: 'not-encrypted',
+            },
+        })
+
+        const hogFlow = new FixtureHogFlowBuilder()
+            .withTeamId(team.id)
+            .withWorkflow({
+                actions: {
+                    function: {
+                        type: 'function',
+                        config: {
+                            template_id: template.template_id,
+                            inputs: {
+                                name: {
+                                    value: 'John Doe',
+                                },
+                                oauth: {
+                                    value: integrationId,
+                                },
+                            },
+                            mappings: [
+                                {
+                                    name: 'input mapping field',
+                                },
+                            ],
+                        },
+                    },
+                    exit: {
+                        type: 'exit',
+                        config: {},
+                    },
+                },
+                edges: [
+                    {
+                        from: 'function',
+                        to: 'exit',
+                        type: 'continue',
+                    },
+                ],
+            })
+            .build()
+
+        action = findActionByType(hogFlow, 'function')!
+        invocation = createExampleHogFlowInvocation(hogFlow)
+
+        invocation.state.currentAction = {
+            id: action.id,
+            startedAtTimestamp: DateTime.utc().toMillis(),
+        }
+    })
+
+    afterEach(async () => {
+        await closeHub(hub)
+    })
+
+    it('should execute a hog function with integration inputs and continue', async () => {
+        const invocationResult = createInvocationResult<CyclotronJobInvocationHogFlow>(invocation, {
+            queue: 'hog',
+            queuePriority: 0,
+        })
+
+        const handlerResult = await hogFunctionHandler.execute({ invocation, action, result: invocationResult })
+
+        expect(mockFetch.mock.calls[0][0]).toBe('http://localhost/test')
+        expect(parseJSON(mockFetch.mock.calls[0][1].body)).toEqual({
+            name: 'John Doe',
+            oauth: {
+                $integration_id: integrationId,
+                team: 'foobar',
+                access_token: 'token',
+                not_encrypted: 'not-encrypted',
+                access_token_raw: 'token',
+            },
+        })
+
+        expect(handlerResult.nextAction?.id).toBe('exit')
+        expect(invocationResult.logs).toHaveLength(1)
+        expect(invocationResult.logs[0].message).toContain('[Action:function] Function completed')
+    })
+
+    describe('with groups', () => {
+        beforeEach(() => {
+            invocation.groups = {
+                organization: {
+                    id: 'org_key',
+                    type: 'organization',
+                    index: 0,
+                    url: '',
+                    properties: { owner_name: 'Chris McNeill' },
+                },
+            }
+        })
+
+        it('should forward groups to the hog function invocation globals', async () => {
+            const buildHogFunctionInvocationSpy = jest.spyOn(mockHogFlowFunctionsService, 'buildHogFunctionInvocation')
+
+            const invocationResult = createInvocationResult<CyclotronJobInvocationHogFlow>(invocation, {
+                queue: 'hog',
+                queuePriority: 0,
+            })
+
+            await hogFunctionHandler.execute({ invocation, action, result: invocationResult })
+
+            const passedGlobals = buildHogFunctionInvocationSpy.mock.calls[0][2]
+            expect(passedGlobals.groups).toEqual(invocation.groups)
+        })
+
+        it('should render a group property referenced in a function input template', async () => {
+            // {groups.organization.properties.owner_name} compiled to hog bytecode
+            action.config.inputs.name = {
+                value: '{groups.organization.properties.owner_name}',
+                templating: 'hog',
+                bytecode: ['_H', 1, 32, 'owner_name', 32, 'properties', 32, 'organization', 32, 'groups', 1, 4],
+            }
+
+            const invocationResult = createInvocationResult<CyclotronJobInvocationHogFlow>(invocation, {
+                queue: 'hog',
+                queuePriority: 0,
+            })
+
+            const handlerResult = await hogFunctionHandler.execute({ invocation, action, result: invocationResult })
+
+            expect(handlerResult.error).toBeUndefined()
+            expect(mockFetch.mock.calls[0][1].body).toContain('"name":"Chris McNeill"')
+        })
+    })
+
+    describe('missing variable references', () => {
+        beforeEach(() => {
+            // {variables.coupon} compiled to hog bytecode; the run has no `coupon` variable
+            action.config.inputs.name = {
+                value: '{variables.coupon}',
+                templating: 'hog',
+                bytecode: ['_H', 1, 32, 'coupon', 32, 'variables', 1, 2],
+            }
+            invocation.state.variables = {}
+        })
+
+        it('warns in the run log when an input references a variable the run does not have', async () => {
+            const invocationResult = createInvocationResult<CyclotronJobInvocationHogFlow>(invocation, {
+                queue: 'hog',
+                queuePriority: 0,
+            })
+
+            const handlerResult = await hogFunctionHandler.execute({ invocation, action, result: invocationResult })
+
+            const warnings = invocationResult.logs.filter(
+                (l) => l.level === 'warn' && l.message.includes('not set for this run')
+            )
+            expect(warnings).toHaveLength(1)
+            expect(warnings[0].message).toContain('coupon')
+            // Rendering is unchanged: the step still executes, with the reference rendered empty
+            expect(handlerResult.error).toBeUndefined()
+            expect(mockFetch).toHaveBeenCalled()
+        })
+
+        it('does not warn again on a continuation that reuses already-rendered state', async () => {
+            const firstResult = createInvocationResult<CyclotronJobInvocationHogFlow>(invocation, {
+                queue: 'hog',
+                queuePriority: 0,
+            })
+            await hogFunctionHandler.execute({ invocation, action, result: firstResult })
+
+            // Simulate a continuation: the rendered function state is carried on the action,
+            // exactly as the handler persists it for a paused function
+            invocation.state.currentAction!.hogFunctionState = {
+                globals: { ...createExampleHogFlowInvocation(invocation.hogFlow).state.event, inputs: {} } as any,
+                timings: [],
+                attempts: 0,
+            } as any
+
+            const continuationResult = createInvocationResult<CyclotronJobInvocationHogFlow>(invocation, {
+                queue: 'hog',
+                queuePriority: 0,
+            })
+            await hogFunctionHandler.execute({ invocation, action, result: continuationResult })
+
+            expect(
+                continuationResult.logs.filter((l) => l.level === 'warn' && l.message.includes('not set for this run'))
+            ).toHaveLength(0)
+        })
+    })
+
+    it('renders the workflow name and id from source in function inputs', async () => {
+        action.config.inputs.name = { value: '{{ source.name }}|{{ source.id }}', templating: 'liquid' }
+
+        const invocationResult = createInvocationResult<CyclotronJobInvocationHogFlow>(invocation, {
+            queue: 'hog',
+            queuePriority: 0,
+        })
+
+        const handlerResult = await hogFunctionHandler.execute({ invocation, action, result: invocationResult })
+
+        expect(handlerResult.error).toBeUndefined()
+        expect(mockFetch.mock.calls[0][1].body).toContain(`"name":"Hog Flow|${invocation.hogFlow.id}"`)
+    })
+
+    it('should throw an error if template is not found', async () => {
+        const action = findActionByType(invocation.hogFlow, 'function')!
+        action.config.template_id = 'template_123'
+
+        const invocationResult = createInvocationResult<CyclotronJobInvocationHogFlow>(invocation, {
+            queue: 'hog',
+            queuePriority: 0,
+        })
+
+        await expect(hogFunctionHandler.execute({ invocation, action, result: invocationResult })).rejects.toThrow(
+            "Template 'template_123' not found"
+        )
+    })
+
+    it('should check recipient preferences before execution', async () => {
+        const invocationResult = createInvocationResult<CyclotronJobInvocationHogFlow>(invocation, {
+            queue: 'hog',
+            queuePriority: 0,
+        })
+
+        await hogFunctionHandler.execute({ invocation, action, result: invocationResult })
+
+        const callArgs = (mockRecipientPreferencesService.shouldSkipAction as jest.Mock).mock.calls[0]
+        expect(callArgs[0]).toBeTruthy()
+        expect(callArgs[1]).toBe(action)
+    })
+
+    it('should pass proper inputs to buildHogFunctionInvocation', async () => {
+        const buildHogFunctionInvocationSpy = jest.spyOn(mockHogFlowFunctionsService, 'buildHogFunctionInvocation')
+
+        const invocationResult = createInvocationResult<CyclotronJobInvocationHogFlow>(invocation, {
+            queue: 'hog',
+            queuePriority: 0,
+        })
+
+        await hogFunctionHandler.execute({ invocation, action, result: invocationResult })
+
+        const calledConfig = buildHogFunctionInvocationSpy.mock.calls[0][1]
+        expect(calledConfig.inputs).toEqual({
+            name: {
+                value: 'John Doe',
+            },
+            oauth: {
+                value: integrationId,
+            },
+        })
+        expect(calledConfig.inputs_schema).toEqual([
+            {
+                key: 'name',
+                type: 'string',
+                required: true,
+            },
+            {
+                key: 'oauth',
+                type: 'integration',
+                required: true,
+            },
+        ])
+        expect(calledConfig.template_id).toEqual(template.template_id)
+        expect(calledConfig.mappings).toEqual([{ name: 'input mapping field' }])
+    })
+
+    it('should skip execution and log an opt-out message when recipient preferences returns opted_out', async () => {
+        ;(mockRecipientPreferencesService.shouldSkipAction as jest.Mock).mockResolvedValueOnce('opted_out')
+
+        const invocationResult = createInvocationResult<CyclotronJobInvocationHogFlow>(invocation, {
+            queue: 'hog',
+            queuePriority: 0,
+        })
+
+        const handlerResult = await hogFunctionHandler.execute({ invocation, action, result: invocationResult })
+
+        const callArgs = (mockRecipientPreferencesService.shouldSkipAction as jest.Mock).mock.calls[0]
+        expect(callArgs[0]).toBeTruthy()
+        expect(callArgs[1]).toBe(action)
+        expect(handlerResult.nextAction?.id).toBe('exit')
+        expect(invocationResult.logs).toHaveLength(1)
+        expect(invocationResult.logs[0].message).toContain(
+            `[Action:function] Recipient has opted out, skipping message delivery.`
+        )
+        // Opt-out skips do not emit an app metric — no billable_invocation, no email_suppressed.
+        expect(invocationResult.metrics).toEqual([])
+        expect(mockFetch).not.toHaveBeenCalled()
+    })
+
+    // Guards the fix that split suppression from opt-out: previously both branches collapsed to a
+    // single "opted out" log with no metric, so a customer couldn't tell why a workflow send was
+    // skipped or measure suppression volume from the app-metrics view.
+    it.each([
+        ['a workflow run', undefined],
+        ['a broadcast run', 'broadcast-run-id'],
+    ])(
+        'should skip execution, log a suppression message, and emit email_suppressed when recipient preferences returns suppressed for %s',
+        async (_label, parentRunId) => {
+            ;(mockRecipientPreferencesService.shouldSkipAction as jest.Mock).mockResolvedValueOnce('suppressed')
+            invocation.parentRunId = parentRunId
+
+            const invocationResult = createInvocationResult<CyclotronJobInvocationHogFlow>(invocation, {
+                queue: 'hog',
+                queuePriority: 0,
+            })
+
+            const handlerResult = await hogFunctionHandler.execute({ invocation, action, result: invocationResult })
+
+            expect(handlerResult.nextAction?.id).toBe('exit')
+            expect(invocationResult.logs).toHaveLength(1)
+            expect(invocationResult.logs[0].message).toContain(
+                `[Action:function] Skipping send: recipient is on the suppression list.`
+            )
+            expect(invocationResult.metrics).toEqual([
+                {
+                    team_id: team.id,
+                    app_source_id: parentRunId ?? invocation.functionId,
+                    instance_id: action.id,
+                    metric_kind: 'email',
+                    metric_name: 'email_suppressed',
+                    count: 1,
+                },
+            ])
+            expect(mockFetch).not.toHaveBeenCalled()
+        }
+    )
+
+    // A broadcast run carries a parentRunId, and its run view reads metrics keyed on that ID.
+    it.each([
+        ['a workflow run', undefined],
+        ['a broadcast run', 'broadcast-run-id'],
+    ])(
+        'should skip the send and emit message_frequency_capped when the recipient reached the frequency cap for %s',
+        async (_label, parentRunId) => {
+            ;(mockRecipientPreferencesService.isFrequencyCapped as jest.Mock).mockResolvedValueOnce(true)
+            invocation.parentRunId = parentRunId
+
+            const invocationResult = createInvocationResult<CyclotronJobInvocationHogFlow>(invocation, {
+                queue: 'hog',
+                queuePriority: 0,
+            })
+
+            const handlerResult = await hogFunctionHandler.execute({ invocation, action, result: invocationResult })
+
+            expect(handlerResult.nextAction?.id).toBe('exit')
+            expect(invocationResult.logs[0].message).toContain(
+                `[Action:function] Skipping send: recipient reached the frequency cap.`
+            )
+            expect(invocationResult.metrics).toEqual([
+                {
+                    team_id: team.id,
+                    app_source_id: parentRunId ?? invocation.functionId,
+                    instance_id: action.id,
+                    metric_kind: 'other',
+                    metric_name: 'message_frequency_capped',
+                    count: 1,
+                },
+            ])
+            expect(mockFetch).not.toHaveBeenCalled()
+        }
+    )
+
+    it.each([
+        ['a workflow run', undefined],
+        ['a broadcast run', 'broadcast-run-id'],
+    ])(
+        'should skip the send and emit email_bounce_prevented when validation predicts a hard bounce for %s',
+        async (_label, parentRunId) => {
+            ;(mockEmailValidationService.getSkipReason as jest.Mock).mockResolvedValueOnce(
+                'Skipping send: the domain "dead.invalid" has no reachable mail servers, so this message would hard bounce.'
+            )
+            invocation.parentRunId = parentRunId
+
+            const invocationResult = createInvocationResult<CyclotronJobInvocationHogFlow>(invocation, {
+                queue: 'hog',
+                queuePriority: 0,
+            })
+
+            const handlerResult = await hogFunctionHandler.execute({ invocation, action, result: invocationResult })
+
+            // Flow continues to the next action (a skip, not a failure branch), and nothing was sent.
+            expect(handlerResult.nextAction?.id).toBe('exit')
+            expect(mockFetch).not.toHaveBeenCalled()
+            expect(invocationResult.logs[0].message).toContain('no reachable mail servers')
+            expect(invocationResult.emailSendResult).toEqual({
+                status: 'skipped',
+                reason: 'Skipping send: the domain "dead.invalid" has no reachable mail servers, so this message would hard bounce.',
+            })
+            expect(invocationResult.metrics).toEqual([
+                {
+                    team_id: team.id,
+                    app_source_id: parentRunId ?? invocation.functionId,
+                    instance_id: action.id,
+                    metric_kind: 'email',
+                    metric_name: 'email_bounce_prevented',
+                    count: 1,
+                },
+            ])
+        }
+    )
+
+    describe('transactional email status', () => {
+        const skipOptedOut = (): void => {
+            ;(mockRecipientPreferencesService.shouldSkipAction as jest.Mock).mockResolvedValueOnce('opted_out')
+        }
+        const skipSuppressed = (): void => {
+            ;(mockRecipientPreferencesService.shouldSkipAction as jest.Mock).mockResolvedValueOnce('suppressed')
+        }
+        const skipUnreachable = (): void => {
+            ;(mockEmailValidationService.getSkipReason as jest.Mock).mockResolvedValueOnce(
+                'Skipping send: the domain has no reachable mail servers.'
+            )
+        }
+        const skipFrequencyCapped = (): void => {
+            ;(mockRecipientPreferencesService.isFrequencyCapped as jest.Mock).mockResolvedValueOnce(true)
+        }
+
+        it.each([
+            ['an opt-out', skipOptedOut, TRANSACTIONAL_EMAIL_EVENT, 'function_email', false, 'recipient_opted_out'],
+            [
+                'a suppression',
+                skipSuppressed,
+                TRANSACTIONAL_EMAIL_EVENT,
+                'function_email',
+                false,
+                'recipient_suppressed',
+            ],
+            [
+                'a predicted bounce',
+                skipUnreachable,
+                TRANSACTIONAL_EMAIL_EVENT,
+                'function_email',
+                false,
+                'recipient_unreachable',
+            ],
+            [
+                'the frequency cap',
+                skipFrequencyCapped,
+                TRANSACTIONAL_EMAIL_EVENT,
+                'function_email',
+                false,
+                'frequency_capped',
+            ],
+            ['a suppression of a test send', skipSuppressed, TRANSACTIONAL_EMAIL_EVENT, 'function_email', true, null],
+            ['a suppression of a workflow email', skipSuppressed, '$pageview', 'function_email', false, null],
+            ['a suppression of an SMS step', skipSuppressed, TRANSACTIONAL_EMAIL_EVENT, 'function_sms', false, null],
+        ] as const)(
+            'records the email status of a send skipped by %s',
+            async (_desc, skip, triggerEvent, actionType, isTest, reason) => {
+                const produce = jest.fn().mockResolvedValue(undefined)
+                const emailStatusService = new EmailStatusService(
+                    { produce } as unknown as IngestionOutputs<EmailStatusOutput>,
+                    { EMAIL_STATUS_ENABLED: true }
+                )
+                const handler = new HogFunctionHandler(
+                    mockHogFlowFunctionsService,
+                    mockRecipientPreferencesService,
+                    mockEmailValidationService,
+                    'email',
+                    emailStatusService
+                )
+                invocation.id = new UUIDT().toString()
+                invocation.state.event.event = triggerEvent
+                skip()
+                const invocationResult = createInvocationResult<CyclotronJobInvocationHogFlow>(invocation, {
+                    queue: 'hog',
+                    queuePriority: 0,
+                })
+
+                await handler.execute({
+                    invocation,
+                    action: { ...action, type: actionType } as Extract<HogFlowAction, { type: typeof actionType }>,
+                    result: invocationResult,
+                    hogExecutorOptions: { isTest },
+                })
+                await emailStatusService.flush()
+
+                const rows = produce.mock.calls.map(([, message]) => parseJSON(message.value.toString()))
+                expect(rows).toEqual(
+                    reason
+                        ? [
+                              expect.objectContaining({
+                                  team_id: team.id,
+                                  message_id: invocation.id,
+                                  status: 'failed',
+                                  reason,
+                              }),
+                          ]
+                        : []
+                )
+            }
+        )
+    })
+
+    // The billing kind is the whole point of the per-channel handlers: push bills at its own rate
+    // (roughly half of email), so a completed invocation must emit exactly one billable_invocation
+    // carrying the handler's billing type — never fall back to another channel's kind.
+    it.each([
+        ['fetch', 'workflow_billable_invocations'],
+        ['email', 'workflow_emails_sent'],
+        ['sms', 'workflow_sms_sent'],
+    ] as const)(
+        'emits a single billable_invocation with %s kind matching the handler billing type',
+        async (billingType, usageKey) => {
+            const usageReporter: Pick<CdpUsageReporterService, 'reportBillableInvocation'> = {
+                reportBillableInvocation: jest.fn(),
+            }
+            const handler = new HogFunctionHandler(
+                mockHogFlowFunctionsService,
+                mockRecipientPreferencesService,
+                mockEmailValidationService,
+                billingType,
+                null,
+                usageReporter
+            )
+
+            const invocationResult = createInvocationResult<CyclotronJobInvocationHogFlow>(invocation, {
+                queue: 'hog',
+                queuePriority: 0,
+            })
+
+            await handler.execute({ invocation, action, result: invocationResult })
+
+            const billableMetrics = invocationResult.metrics.filter(
+                (metric) => metric.metric_name === 'billable_invocation'
+            )
+
+            expect(billableMetrics).toHaveLength(1)
+
+            expect(billableMetrics[0]).toMatchObject({
+                team_id: team.id,
+                app_source_id: invocation.functionId,
+                instance_id: action.id,
+                metric_kind: billingType,
+                metric_name: 'billable_invocation',
+                count: 1,
+            })
+            expect(usageReporter.reportBillableInvocation).toHaveBeenCalledWith(
+                expect.objectContaining({ teamId: team.id, usageKey })
+            )
+        }
+    )
+
+    // A push with no device token finishes unskipped, so only the send knows nobody was reached.
+    it.each([
+        ['reached a device', true, true],
+        ['found no device token', false, false],
+    ] as const)('bills a push step only when the send %s', async (_label, delivered, shouldBill) => {
+        const usageReporter: Pick<CdpUsageReporterService, 'reportBillableInvocation'> = {
+            reportBillableInvocation: jest.fn(),
+        }
+        const handler = new HogFunctionHandler(
+            mockHogFlowFunctionsService,
+            mockRecipientPreferencesService,
+            mockEmailValidationService,
+            'push',
+            null,
+            usageReporter
+        )
+
+        const executeWithAsyncFunctions =
+            mockHogFlowFunctionsService.executeWithAsyncFunctions.bind(mockHogFlowFunctionsService)
+        jest.spyOn(mockHogFlowFunctionsService, 'executeWithAsyncFunctions').mockImplementation(
+            async (hogFunctionInvocation, options) => {
+                const functionResult = await executeWithAsyncFunctions(hogFunctionInvocation, options)
+                functionResult.deliveredToRecipient = delivered
+                return functionResult
+            }
+        )
+
+        const invocationResult = createInvocationResult<CyclotronJobInvocationHogFlow>(invocation, {
+            queue: 'hog',
+            queuePriority: 0,
+        })
+
+        await handler.execute({ invocation, action, result: invocationResult })
+
+        expect(invocationResult.metrics.some((metric) => metric.metric_name === 'billable_invocation')).toBe(shouldBill)
+        if (shouldBill) {
+            expect(usageReporter.reportBillableInvocation).toHaveBeenCalledWith(
+                expect.objectContaining({ teamId: team.id, usageKey: 'workflow_push_sent' })
+            )
+        } else {
+            expect(usageReporter.reportBillableInvocation).not.toHaveBeenCalled()
+        }
+    })
+
+    // Live edits reach runs already in flight, so a run that entered on one version can send its
+    // message under a newer one. The conversion belongs to the version whose message the person
+    // received — the same version `email_sent` is counted under — so a send re-pins the attribution
+    // version. A non-message step must leave it alone.
+    it.each([
+        { billingType: 'email' as const, expected: 3 },
+        { billingType: 'push' as const, expected: 3 },
+        { billingType: 'fetch' as const, expected: 1 },
+    ])(
+        'a completed $billingType step leaves the attribution version at $expected',
+        async ({ billingType, expected }) => {
+            const handler = new HogFunctionHandler(
+                mockHogFlowFunctionsService,
+                mockRecipientPreferencesService,
+                mockEmailValidationService,
+                billingType,
+                null
+            )
+            // The run entered on v1; v3 is what is live now and what this step executes under.
+            const republished = {
+                ...invocation,
+                hogFlow: { ...invocation.hogFlow, version: 3 },
+                state: { ...invocation.state, flowVersion: 1 },
+            }
+
+            const invocationResult = createInvocationResult<CyclotronJobInvocationHogFlow>(republished, {
+                queue: 'hog',
+                queuePriority: 0,
+            })
+
+            await handler.execute({ invocation: republished, action, result: invocationResult })
+
+            expect(invocationResult.invocation.state.flowVersion).toBe(expected)
+        }
+    )
+
+    it('should not emit a billable_invocation metric if function is not finished', async () => {
+        // Mock the executeWithAsyncFunctions to return a non-finished result
+        jest.spyOn(mockHogFlowFunctionsService, 'executeWithAsyncFunctions').mockResolvedValueOnce({
+            finished: false,
+            invocation: invocation as any,
+            logs: [],
+            metrics: [],
+            capturedPostHogEvents: [],
+            warehouseWebhookPayloads: [],
+            messageAssets: [],
+            conversionWatchers: [],
+        })
+
+        const invocationResult = createInvocationResult<CyclotronJobInvocationHogFlow>(invocation, {
+            queue: 'hog',
+            queuePriority: 0,
+        })
+
+        await hogFunctionHandler.execute({ invocation, action, result: invocationResult })
+
+        const billableMetrics = invocationResult.metrics.filter(
+            (metric) => metric.metric_name === 'billable_invocation' && metric.metric_kind === 'fetch'
+        )
+
+        expect(billableMetrics).toHaveLength(0)
+    })
+
+    it('drops the stale execResult when the function fails so the step stores no result', async () => {
+        jest.spyOn(mockHogFlowFunctionsService, 'executeWithAsyncFunctions').mockResolvedValueOnce({
+            finished: true,
+            error: 'Request failed with status 500',
+            execResult: { status: 500, body: 'upstream down' },
+            invocation: invocation as any,
+            logs: [],
+            metrics: [],
+            capturedPostHogEvents: [],
+            warehouseWebhookPayloads: [],
+            messageAssets: [],
+            conversionWatchers: [],
+        })
+
+        const invocationResult = createInvocationResult<CyclotronJobInvocationHogFlow>(invocation, {
+            queue: 'hog',
+            queuePriority: 0,
+        })
+
+        const handlerResult = await hogFunctionHandler.execute({ invocation, action, result: invocationResult })
+
+        expect(handlerResult.error).toBe('Request failed with status 500')
+        expect(handlerResult.result).toBeUndefined()
+    })
+
+    it('should not emit a billable_invocation metric when recipient opts out', async () => {
+        ;(mockRecipientPreferencesService.shouldSkipAction as jest.Mock).mockResolvedValueOnce('opted_out')
+
+        const invocationResult = createInvocationResult<CyclotronJobInvocationHogFlow>(invocation, {
+            queue: 'hog',
+            queuePriority: 0,
+        })
+
+        await hogFunctionHandler.execute({ invocation, action, result: invocationResult })
+
+        const billableMetrics = invocationResult.metrics.filter(
+            (metric) => metric.metric_name === 'billable_invocation'
+        )
+
+        // Ensure NO billing metrics are emitted when recipient has opted out
+        expect(billableMetrics).toHaveLength(0)
+
+        // Verify the function was still marked as finished with the right log
+        expect(invocationResult.logs).toHaveLength(1)
+        expect(invocationResult.logs[0].message).toContain('Recipient has opted out')
+    })
+
+    describe('non_failure_status_codes propagation', () => {
+        it('propagates non_failure_status_codes from action.config.inputs into the synthetic hog function', async () => {
+            const templateWithNonFailure = await insertHogFunctionTemplate(hub.postgres, {
+                id: `template-test-hogflow-non-failure-status-${team.id}`,
+                name: 'Test Template With Non-Failure Codes',
+                code: `fetch('http://localhost/test', { 'method': 'POST', 'body': {} })`,
+                inputs_schema: [
+                    {
+                        key: 'non_failure_status_codes',
+                        type: 'non_failure_status_codes',
+                        required: false,
+                    },
+                ],
+            })
+
+            const hogFlow = new FixtureHogFlowBuilder()
+                .withTeamId(team.id)
+                .withWorkflow({
+                    actions: {
+                        function: {
+                            type: 'function',
+                            config: {
+                                template_id: templateWithNonFailure.template_id,
+                                inputs: {
+                                    non_failure_status_codes: {
+                                        value: ['4xx', 500],
+                                    },
+                                },
+                            },
+                        },
+                        exit: {
+                            type: 'exit',
+                            config: {},
+                        },
+                    },
+                    edges: [{ from: 'function', to: 'exit', type: 'continue' }],
+                })
+                .build()
+
+            const flowAction = findActionByType(hogFlow, 'function')!
+
+            const builtHogFunction = await mockHogFlowFunctionsService.buildHogFunction(hogFlow, flowAction.config)
+
+            expect(builtHogFunction.inputs_schema).toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({
+                        key: 'non_failure_status_codes',
+                        type: 'non_failure_status_codes',
+                    }),
+                ])
+            )
+            expect(builtHogFunction.inputs?.non_failure_status_codes).toEqual({
+                value: ['4xx', 500],
+            })
+        })
+    })
+
+    describe('awaited templates', () => {
+        let TASK_TEMPLATE_ID: string
+        let awaitingHandler: HogFunctionHandler
+        let dispatchKey: string
+
+        const buildTaskFlow = (inputs: Record<string, { value: unknown }> = {}): void => {
+            const hogFlow = new FixtureHogFlowBuilder()
+                .withTeamId(team.id)
+                .withWorkflow({
+                    actions: {
+                        task: { type: 'function', config: { template_id: TASK_TEMPLATE_ID, inputs } },
+                        exit: { type: 'exit', config: {} },
+                    },
+                    edges: [{ from: 'task', to: 'exit', type: 'continue' }],
+                })
+                .build()
+            action = findActionByType(hogFlow, 'function')!
+            invocation = createExampleHogFlowInvocation(hogFlow)
+            invocation.state.actionStepCount = 3
+            invocation.state.currentAction = { id: action.id, startedAtTimestamp: DateTime.utc().toMillis() }
+            dispatchKey = `${invocation.id}:${action.id}:3`
+        }
+
+        const execute = async (handler: HogFunctionHandler = awaitingHandler) => {
+            const invocationResult = createInvocationResult<CyclotronJobInvocationHogFlow>(invocation, {
+                queue: 'hog',
+                queuePriority: 0,
+            })
+            const handlerResult = await handler.execute({ invocation, action, result: invocationResult })
+            return { handlerResult, invocationResult }
+        }
+
+        beforeEach(async () => {
+            TASK_TEMPLATE_ID = `template-awaited-step-${team.id}`
+            await insertHogFunctionTemplate(hub.postgres, {
+                id: TASK_TEMPLATE_ID,
+                name: 'Create task',
+                code: `if (inputs.skip) { return { 'skipped': true, 'reason': 'over the cap' } } return { 'id': 't1', 'run_id': 'r1', 'await': { 'max_wait': '190m', 'label': 'task' } }`,
+                inputs_schema: [{ key: 'skip', type: 'boolean', required: false }],
+            })
+            awaitingHandler = new HogFunctionHandler(
+                mockHogFlowFunctionsService,
+                mockRecipientPreferencesService,
+                mockEmailValidationService,
+                'fetch',
+                null,
+                undefined,
+                { awaitedStepsEnabled: true }
+            )
+            buildTaskFlow()
+        })
+
+        it.each([
+            { rerunAttempts: 0, legacyDispatch: false },
+            { rerunAttempts: 1, legacyDispatch: false },
+            { rerunAttempts: 2, legacyDispatch: false },
+            { rerunAttempts: 1, legacyDispatch: true },
+        ])('uses the dispatch key when parking: %j', async ({ rerunAttempts, legacyDispatch }) => {
+            invocation.state.rerunAttempts = rerunAttempts
+            const originalBuild =
+                mockHogFlowFunctionsService.buildHogFunctionInvocation.bind(mockHogFlowFunctionsService)
+            const buildSpy = jest.spyOn(mockHogFlowFunctionsService, 'buildHogFunctionInvocation')
+            if (legacyDispatch) {
+                buildSpy.mockImplementationOnce(async (...args) => {
+                    const child = await originalBuild(...args)
+                    delete child.state.rerunAttempts
+                    invocation.state.currentAction!.hogFunctionState = child.state
+                    return originalBuild(...args)
+                })
+            }
+            const { invocationResult } = await execute()
+            const child = await buildSpy.mock.results[0].value
+
+            expect(child.state.rerunAttempts).toBe(legacyDispatch ? undefined : rerunAttempts)
+            expect(workflowStepDispatchKeyFromInvocation(child)).toBe(
+                invocationResult.invocation.state.currentAction?.awaitingResume?.key
+            )
+            expect(invocationResult.invocation.state.currentAction?.awaitingResume?.key).toBe(
+                `${dispatchKey}${rerunAttempts && !legacyDispatch ? `.r${rerunAttempts}` : ''}`
+            )
+        })
+
+        it('parks after the dispatch until the task finishes', async () => {
+            const before = DateTime.now()
+            const { handlerResult, invocationResult } = await execute()
+
+            expect(handlerResult.nextAction).toBeUndefined()
+            expect(handlerResult.scheduledAt!.diff(before).as('minutes')).toBeGreaterThanOrEqual(190)
+            expect(handlerResult.result).toEqual({ id: 't1', run_id: 'r1' })
+            expect(invocationResult.invocation.state.currentAction?.awaitingResume).toEqual({
+                key: dispatchKey,
+                deadlineAt: handlerResult.scheduledAt!.toISO(),
+                dispatch: { id: 't1', run_id: 'r1' },
+                label: 'task',
+                parkedAt: expect.any(String),
+            })
+            expect(invocationResult.metrics.map((m) => m.metric_name)).toContain('billable_invocation')
+            expect(invocationResult.logs.map((l) => l.message)).toContainEqual(
+                expect.stringContaining('Waiting for the task to finish')
+            )
+        })
+
+        it.each([
+            ['the template asks for no wait', { skip: { value: true } }, true],
+            ['waiting is turned off', {}, false],
+        ])('advances without waiting when %s', async (_, inputs, awaitedStepsEnabled) => {
+            buildTaskFlow(inputs)
+            const handler = new HogFunctionHandler(
+                mockHogFlowFunctionsService,
+                mockRecipientPreferencesService,
+                mockEmailValidationService,
+                'fetch',
+                null,
+                undefined,
+                { awaitedStepsEnabled }
+            )
+
+            const { handlerResult, invocationResult } = await execute(handler)
+
+            expect(handlerResult.nextAction?.id).toBe('exit')
+            expect(invocationResult.invocation.state.currentAction?.awaitingResume).toBeUndefined()
+        })
+
+        it.each([
+            ['clamps a wait past the ceiling', { max_wait: '99d', label: 'export' }, 24 * 60, 'Waiting for the export'],
+            [
+                'continues and logs when it cannot parse the wait',
+                { max_wait: '190min' },
+                null,
+                `Ignored the template's wait request: await.max_wait must be a duration like '190m' or '2h', got "190min"`,
+            ],
+        ])('%s', async (_, awaitRequest, expectedMinutes, expectedLog) => {
+            jest.spyOn(mockHogFlowFunctionsService, 'executeWithAsyncFunctions').mockResolvedValueOnce({
+                finished: true,
+                execResult: { id: 'x1', await: awaitRequest },
+                invocation: invocation as any,
+                logs: [],
+                metrics: [],
+                capturedPostHogEvents: [],
+                warehouseWebhookPayloads: [],
+                messageAssets: [],
+                conversionWatchers: [],
+            })
+            const before = DateTime.now()
+
+            const { handlerResult, invocationResult } = await execute()
+
+            if (expectedMinutes === null) {
+                expect(handlerResult.nextAction?.id).toBe('exit')
+                expect(invocationResult.invocation.state.currentAction?.awaitingResume).toBeUndefined()
+            } else {
+                expect(Math.round(handlerResult.scheduledAt!.diff(before).as('minutes'))).toBe(expectedMinutes)
+                expect(handlerResult.result).toEqual({ id: 'x1' })
+            }
+            expect(invocationResult.logs.map((l) => l.message)).toContainEqual(expect.stringContaining(expectedLog))
+        })
+
+        it('sizes an answer the template already has to the variables the run holds, without parking', async () => {
+            action.output_variable = { key: 'answer' }
+            invocation.state.variables = { ticket_body: 'y'.repeat(4700 - '{"ticket_body":""}'.length) }
+            jest.spyOn(mockHogFlowFunctionsService, 'executeWithAsyncFunctions').mockResolvedValueOnce({
+                finished: true,
+                execResult: {
+                    request_id: 'r1',
+                    await: {
+                        max_wait: '8h',
+                        label: 'scan',
+                        result: { state: 'succeeded', output: 'x'.repeat(3000), warnings: ['The answer was cut.'] },
+                    },
+                },
+                invocation: invocation as any,
+                logs: [],
+                metrics: [],
+                capturedPostHogEvents: [],
+                warehouseWebhookPayloads: [],
+                messageAssets: [],
+                conversionWatchers: [],
+            })
+
+            const { handlerResult, invocationResult } = await execute()
+
+            const stored = handlerResult.result as Record<string, unknown>
+            expect(handlerResult.nextAction?.id).toBe('exit')
+            expect(invocationResult.invocation.state.currentAction?.awaitingResume).toBeUndefined()
+            expect(stored).toMatchObject({ request_id: 'r1', status: 'completed', state: 'succeeded' })
+            expect(invocationResult.logs.map((l) => l.message)).toContainEqual(
+                expect.stringContaining('The answer was cut.')
+            )
+            expect(
+                Buffer.byteLength(JSON.stringify({ ...invocation.state.variables, answer: stored }))
+            ).toBeLessThanOrEqual(5120)
+        })
+
+        describe('on resume', () => {
+            let executeSpy: jest.SpyInstance
+            const deadlineAt = DateTime.now().plus({ hours: 1 }).toISO()!
+
+            const finishedCount = async (outcome: string): Promise<number> => {
+                const metric = await register.getSingleMetric('cdp_hogflow_awaited_step_finished')!.get()
+                return metric.values.find((v) => v.labels.outcome === outcome)?.value ?? 0
+            }
+
+            beforeEach(() => {
+                register.resetMetrics()
+                executeSpy = jest.spyOn(mockHogFlowFunctionsService, 'executeWithAsyncFunctions')
+                invocation.state.currentAction!.awaitingResume = {
+                    key: dispatchKey,
+                    deadlineAt,
+                    dispatch: { id: 't1', run_id: 'r1' },
+                    label: 'task',
+                    parkedAt: DateTime.now().minus({ minutes: 5 }).toISO()!,
+                }
+            })
+
+            it.each([true, false])('resumes without dispatch when the flag is %s', async (awaitedStepsEnabled) => {
+                delete invocation.state.currentAction!.awaitingResume
+                const { invocationResult: parked } = await execute()
+                expect(executeSpy).toHaveBeenCalledTimes(1)
+                executeSpy.mockClear()
+                invocation = parked.invocation
+                invocation.state.currentAction!.resumeResult = {
+                    key: dispatchKey,
+                    status: 'completed',
+                    result: { final_message: 'done' },
+                }
+                const handler = new HogFunctionHandler(
+                    mockHogFlowFunctionsService,
+                    mockRecipientPreferencesService,
+                    mockEmailValidationService,
+                    'fetch',
+                    null,
+                    undefined,
+                    { awaitedStepsEnabled }
+                )
+
+                const { handlerResult } = await execute(handler)
+
+                expect(executeSpy).not.toHaveBeenCalled()
+                expect(handlerResult.nextAction?.id).toBe('exit')
+                expect(handlerResult.result).toMatchObject({ status: 'completed', final_message: 'done' })
+            })
+
+            it('advances with the dispatch and the run result merged, without re-running the step', async () => {
+                invocation.state.currentAction!.resumeResult = {
+                    key: dispatchKey,
+                    status: 'completed',
+                    result: { final_message: 'x'.repeat(5000), pr_urls: ['https://example.com/pr/1'] },
+                }
+
+                const { handlerResult, invocationResult } = await execute()
+
+                expect(executeSpy).not.toHaveBeenCalled()
+                expect(handlerResult.nextAction?.id).toBe('exit')
+                expect(handlerResult.result).toEqual({
+                    id: 't1',
+                    run_id: 'r1',
+                    status: 'completed',
+                    final_message: 'x'.repeat(1500),
+                    pr_urls: ['https://example.com/pr/1'],
+                })
+                expect(invocationResult.invocation.state.currentAction?.awaitingResume).toBeUndefined()
+                expect(invocationResult.invocation.state.currentAction?.resumeResult).toBeUndefined()
+                expect(await finishedCount('completed')).toBe(1)
+                const waited = await register.getSingleMetric('cdp_hogflow_awaited_step_wait_seconds')!.get()
+                // prom-client types histogram values without metricName, but the runtime sets it.
+                const sum = waited.values.find(
+                    (v) =>
+                        (v as { metricName?: string }).metricName?.endsWith('_sum') && v.labels.outcome === 'completed'
+                )
+                expect(sum?.value).toBeGreaterThanOrEqual(300)
+            })
+
+            it.each([4000, 4700])('fits the resumed result with %s bytes of existing variables', async (usedBytes) => {
+                action.output_variable = { key: 'task_result' }
+                invocation.state.variables = { ticket_body: 'y'.repeat(usedBytes - '{"ticket_body":""}'.length) }
+                invocation.state.currentAction!.resumeResult = {
+                    key: dispatchKey,
+                    status: 'completed',
+                    result: { final_message: 'x'.repeat(5000), pr_urls: ['u'] },
+                }
+
+                const { handlerResult } = await execute()
+
+                const stored = handlerResult.result as Record<string, unknown>
+                expect(stored.pr_urls).toEqual(['u'])
+                expect(
+                    Buffer.byteLength(JSON.stringify({ ...invocation.state.variables, task_result: stored }))
+                ).toBeLessThanOrEqual(5120)
+            })
+
+            it('continues past a completed task whose output is off, and warns in the run log', async () => {
+                invocation.state.currentAction!.resumeResult = {
+                    key: dispatchKey,
+                    status: 'completed',
+                    result: { output: { verdict: 'ship' }, warnings: ["'score' is a required property"] },
+                }
+
+                const { handlerResult, invocationResult } = await execute()
+
+                expect(handlerResult.nextAction?.id).toBe('exit')
+                expect(handlerResult.result).toMatchObject({ output: { verdict: 'ship' } })
+                expect(invocationResult.logs).toContainEqual(
+                    expect.objectContaining({
+                        level: 'warn',
+                        message: expect.stringContaining("'score' is a required property"),
+                    })
+                )
+            })
+
+            it('fails the step with the outcome as its result when the task did not complete', async () => {
+                invocation.state.currentAction!.resumeResult = {
+                    key: dispatchKey,
+                    status: 'failed',
+                    result: { error_message: 'sandbox crashed' },
+                }
+
+                const { handlerResult } = await execute()
+
+                expect(handlerResult.error).toEqual(new Error('The task failed: sandbox crashed'))
+                expect(handlerResult.result).toEqual({
+                    id: 't1',
+                    run_id: 'r1',
+                    status: 'failed',
+                    error_message: 'sandbox crashed',
+                })
+                expect(executeSpy).not.toHaveBeenCalled()
+                expect(await finishedCount('failed')).toBe(1)
+            })
+
+            it('ignores a wake for an earlier visit and keeps waiting', async () => {
+                invocation.state.currentAction!.resumeResult = {
+                    key: `${invocation.id}:${action.id}:1`,
+                    status: 'completed',
+                }
+
+                const { handlerResult, invocationResult } = await execute()
+
+                expect(handlerResult.nextAction).toBeUndefined()
+                expect(handlerResult.scheduledAt!.toISO()).toBe(deadlineAt)
+                expect(invocationResult.invocation.state.currentAction?.resumeResult).toBeUndefined()
+                expect(invocationResult.invocation.state.currentAction?.awaitingResume?.key).toBe(dispatchKey)
+            })
+
+            it('fails the step when the deadline passes without a wake', async () => {
+                invocation.state.currentAction!.awaitingResume!.deadlineAt = DateTime.now()
+                    .minus({ minutes: 1 })
+                    .toISO()!
+
+                await expect(execute()).rejects.toThrow('Timed out waiting for the task to finish')
+                expect(await finishedCount('timed_out')).toBe(1)
+            })
+        })
+    })
+})

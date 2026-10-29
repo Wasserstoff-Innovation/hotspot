@@ -1,0 +1,171 @@
+#
+# Hotspot Standalone Docker Compose Stack
+#
+# Usage:
+#   docker compose -f docker-compose.hotspot.yml --env-file .env.hotspot up -d
+#   Or via helper: ./bin/hotspot up
+#
+
+services:
+    proxy:
+        extends:
+            file: docker-compose.base.yml
+            service: proxy
+        ports:
+            - '8000:8000'
+            - '8010:8000'
+        depends_on:
+            - web
+        environment:
+            CADDYFILE: |
+                {
+                    servers {
+                        trusted_proxies static 127.0.0.1/32 ::1/128
+                    }
+                }
+                :8000 {
+                    reverse_proxy web:8000
+                }
+
+    db:
+        extends:
+            file: docker-compose.base.yml
+            service: db
+        ports:
+            - '5432:5432'
+        volumes:
+            - postgres-hotspot-data:/var/lib/postgresql/data
+
+    redis7:
+        extends:
+            file: docker-compose.base.yml
+            service: redis7
+        ports:
+            - '6379:6379'
+        volumes:
+            - redis-hotspot-data:/data
+
+    valkey:
+        extends:
+            file: docker-compose.base.yml
+            service: valkey
+
+    clickhouse:
+        extends:
+            file: docker-compose.base.yml
+            service: clickhouse
+        ports:
+            - '8123:8123'
+            - '9000:9000'
+        volumes:
+            - ./posthog/idl:/idl
+            - ./docker/clickhouse/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
+            - ./docker/clickhouse/config.xml:/etc/clickhouse-server/config.xml
+            - ./docker/clickhouse/config.d/default.xml:/etc/clickhouse-server/config.d/default.xml
+            - ./docker/clickhouse/users-dev.xml:/etc/clickhouse-server/users.xml
+            - ./docker/clickhouse/user_defined_function.xml:/etc/clickhouse-server/user_defined_function.xml
+            - ./posthog/user_scripts:/var/lib/clickhouse/user_scripts
+            - clickhouse-hotspot-data:/var/lib/clickhouse
+        depends_on:
+            - kafka
+            - zookeeper
+
+    zookeeper:
+        extends:
+            file: docker-compose.base.yml
+            service: zookeeper
+        volumes:
+            - zookeeper-hotspot-data:/data
+            - zookeeper-hotspot-datalog:/datalog
+
+    kafka:
+        extends:
+            file: docker-compose.base.yml
+            service: kafka
+        ports:
+            - '9092:9092'
+        volumes:
+            - kafka-hotspot-data:/var/lib/redpanda/data
+        depends_on:
+            - zookeeper
+
+    objectstorage:
+        extends:
+            file: docker-compose.base.yml
+            service: objectstorage
+        ports:
+            - '19000:19000'
+            - '19001:19001'
+        volumes:
+            - objectstorage-hotspot-data:/data
+
+    web:
+        image: ${HOTSPOT_IMAGE:-posthog/posthog:latest}
+        command: ./bin/docker-server
+        ports:
+            - '8005:8000'
+        volumes:
+            - ./posthog:/code/posthog
+            - ./frontend/src:/code/frontend/src
+        environment:
+            DEBUG: '1'
+            SITE_URL: ${SITE_URL:-http://localhost:8000}
+            SECRET_KEY: ${SECRET_KEY:-hotspot-secure-local-secret-key-32chars}
+            OPT_OUT_CAPTURE: 'true'
+            DATABASE_URL: postgres://posthog:posthog@db:5432/posthog
+            REDIS_URL: redis://redis7:6379/
+            CLICKHOUSE_HOST: clickhouse
+            CLICKHOUSE_DATABASE: posthog
+            CLICKHOUSE_SECURE: 'false'
+            KAFKA_HOSTS: kafka:9092
+            OBJECT_STORAGE_ENDPOINT: http://objectstorage:19000
+            OBJECT_STORAGE_ACCESS_KEY_ID: object_storage_root_user
+            OBJECT_STORAGE_SECRET_ACCESS_KEY: object_storage_root_password
+            OBJECT_STORAGE_FORCE_PATH_STYLE: 'true'
+            POSTHOG_SKIP_MIGRATION_CHECKS: 'true'
+            OTEL_SDK_DISABLED: 'true'
+        depends_on:
+            - db
+            - redis7
+            - clickhouse
+            - kafka
+            - objectstorage
+
+    worker:
+        image: ${HOTSPOT_IMAGE:-posthog/posthog:latest}
+        command: ./bin/docker-worker-celery --with-scheduler
+        volumes:
+            - ./posthog:/code/posthog
+            - ./frontend/src:/code/frontend/src
+        environment:
+            DEBUG: '1'
+            SITE_URL: ${SITE_URL:-http://localhost:8000}
+            SECRET_KEY: ${SECRET_KEY:-hotspot-secure-local-secret-key-32chars}
+            OPT_OUT_CAPTURE: 'true'
+            DATABASE_URL: postgres://posthog:posthog@db:5432/posthog
+            REDIS_URL: redis://redis7:6379/
+            CLICKHOUSE_HOST: clickhouse
+            CLICKHOUSE_DATABASE: posthog
+            CLICKHOUSE_SECURE: 'false'
+            KAFKA_HOSTS: kafka:9092
+            OBJECT_STORAGE_ENDPOINT: http://objectstorage:19000
+            OBJECT_STORAGE_ACCESS_KEY_ID: object_storage_root_user
+            OBJECT_STORAGE_SECRET_ACCESS_KEY: object_storage_root_password
+            OBJECT_STORAGE_FORCE_PATH_STYLE: 'true'
+            POSTHOG_SKIP_MIGRATION_CHECKS: 'true'
+            OTEL_SDK_DISABLED: 'true'
+        depends_on:
+            - db
+            - redis7
+            - clickhouse
+            - kafka
+            - objectstorage
+
+volumes:
+    postgres-hotspot-data:
+    redis-hotspot-data:
+    clickhouse-hotspot-data:
+    zookeeper-hotspot-data:
+    zookeeper-hotspot-datalog:
+    kafka-hotspot-data:
+    objectstorage-hotspot-data:

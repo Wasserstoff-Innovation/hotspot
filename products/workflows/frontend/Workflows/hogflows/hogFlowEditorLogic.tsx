@@ -1,0 +1,3314 @@
+import {
+    Edge,
+    EdgeChange,
+    MarkerType,
+    Node,
+    NodeChange,
+    Position,
+    ReactFlowInstance,
+    applyEdgeChanges,
+    applyNodeChanges,
+    getOutgoers,
+} from '@xyflow/react'
+import { MakeLogicType, actions, connect, events, kea, key, listeners, path, props, reducers, selectors } from 'kea'
+import { loaders } from 'kea-loaders'
+import { router, urlToAction } from 'kea-router'
+import { subscriptions } from 'kea-subscriptions'
+import posthog from 'posthog-js'
+import type { DragEvent, RefObject } from 'react'
+
+import { lemonToast } from '@posthog/lemon-ui'
+
+import {
+    AppMetricsTotalsRequest,
+    AppMetricsTotalsResponse,
+    loadAppMetricsTotals,
+} from 'lib/components/AppMetrics/appMetricsLogic'
+import { FEATURE_FLAGS } from 'lib/constants'
+import { integrationsLogic } from 'lib/integrations/integrationsLogic'
+import { FeatureFlagsSet, featureFlagLogic } from 'lib/logic/featureFlagLogic'
+import { trackedActionToUrl } from 'lib/logic/scenes/trackedActionToUrl'
+import { uuid } from 'lib/utils/dom'
+import { objectsEqual, reconcileById } from 'lib/utils/objects'
+import { templateToConfiguration } from 'scenes/hog-functions/configuration/hogFunctionConfigurationLogic'
+import { teamLogic } from 'scenes/teamLogic'
+import { urls } from 'scenes/urls'
+
+import type {
+    HogFunctionTemplateType,
+    IntegrationType,
+    TeamPublicType,
+    TeamType,
+    UserBasicType,
+} from '../../../../../frontend/src/types'
+import { resolveDefaultEmailSender } from '../../Channels/defaultEmailSender'
+import { optOutCategoriesLogic } from '../../OptOuts/optOutCategoriesLogic'
+import type { MessageCategory } from '../../OptOuts/optOutCategoriesLogic'
+import { EXIT_NODE_ID, TRIGGER_NODE_ID, WorkflowLogicProps, workflowLogic } from '../workflowLogic'
+import { getEdgeId } from './edgeId'
+import { getFormattedNodes } from './react_flow_utils/autolayout'
+import {
+    BOTTOM_HANDLE_POSITION,
+    MAX_ZOOM,
+    MIN_ZOOM,
+    NODE_HEIGHT,
+    NODE_WIDTH,
+    TOP_HANDLE_POSITION,
+} from './react_flow_utils/constants'
+import { getSmartStepPath } from './react_flow_utils/SmartEdge'
+import { getTeamUtmDefaults, newEmailUtmConfig, utmKeysFollowingSavedDefault } from './steps/components/utmDefaults'
+import type { UtmTagValues } from './steps/components/UtmTagFields'
+import type { UtmTagKey } from './steps/components/UtmTagFields'
+import { getHogFlowStep } from './steps/HogFlowSteps'
+import { CyclotronInputType, StepViewNodeHandle } from './steps/types'
+import { isWorkflowTreeComplete } from './tree/workflowTree'
+import type { DropzoneNode, HogFlow, HogFlowAction, HogFlowActionEdge, HogFlowActionNode } from './types'
+import type { HogFlowEdge } from './types'
+
+export function computeInsertEdges(
+    edges: HogFlow['edges'],
+    newActionId: string,
+    branchEdges: number,
+    edgesToReplace: HogFlow['edges']
+): HogFlow['edges'] | null {
+    const edgeIdsToReplace = new Set(edgesToReplace.map(getEdgeId))
+    const matchingEdges = edges.filter((edge) => edgeIdsToReplace.has(getEdgeId(edge)))
+
+    if (matchingEdges.length === 0 || matchingEdges.length !== edgesToReplace.length) {
+        return null
+    }
+
+    return [
+        ...edges.filter((edge) => !edgeIdsToReplace.has(getEdgeId(edge))),
+        ...matchingEdges.map((edge) => ({ ...edge, to: newActionId })),
+        ...Array.from({ length: branchEdges }, (_, index) => ({
+            ...matchingEdges[0],
+            index,
+            type: 'branch' as const,
+            from: newActionId,
+        })),
+        {
+            ...matchingEdges[0],
+            index: undefined,
+            type: 'continue' as const,
+            from: newActionId,
+        },
+    ]
+}
+
+/**
+ * Helper to get branch label with custom name fallback
+ */
+const getBranchLabel = (action: HogFlowAction | undefined, edge: HogFlow['edges'][0]): string => {
+    if (!action) {
+        return `If condition #${(edge.index || 0) + 1} matches`
+    }
+
+    switch (action.type) {
+        case 'wait_until_condition': {
+            const waitAction = action as Extract<HogFlowAction, { type: 'wait_until_condition' }>
+            const customName = waitAction.config.condition?.name
+            return customName || 'If condition matches'
+        }
+        case 'random_cohort_branch': {
+            const cohortAction = action as Extract<HogFlowAction, { type: 'random_cohort_branch' }>
+            const cohort = cohortAction.config.cohorts?.[edge.index || 0]
+            return cohort?.name || `If cohort #${(edge.index || 0) + 1} matches`
+        }
+        case 'conditional_branch': {
+            const branchAction = action as Extract<HogFlowAction, { type: 'conditional_branch' }>
+            const condition = branchAction.config.conditions?.[edge.index || 0]
+            return condition?.name || `If condition #${(edge.index || 0) + 1} matches`
+        }
+        default:
+            return `If condition #${(edge.index || 0) + 1} matches`
+    }
+}
+
+/**
+ * Computes the new edges after moving a node to a new position in the graph.
+ * Extracted into pure function to be easier to test.
+ */
+export function computeMoveEdges(
+    edges: HogFlow['edges'],
+    movingNodeId: string,
+    targetEdge: HogFlow['edges'][0],
+    isBranchJoinDropzone: boolean,
+    joinEdges?: HogFlow['edges']
+): HogFlow['edges'] | null {
+    const incomingEdges = edges.filter((e) => e.to === movingNodeId)
+    const outgoingEdge = edges.find((e) => e.from === movingNodeId)
+
+    if (!outgoingEdge || incomingEdges.length === 0) {
+        return null
+    }
+
+    // Step 1: Bypass the node — incoming edges point to the node's outgoer, outgoing edge removed
+    let newEdges = edges
+        .map((e) => (e.to === movingNodeId ? { ...e, to: outgoingEdge.to } : e))
+        .filter((e) => e.from !== movingNodeId)
+
+    // Step 2: Find the target edge(s) to insert into.
+    // We match by from/type/index (not the full edge ID) because step 1 may have
+    // changed the 'to' field of the target edge if the moving node was its target.
+    let edgesToSplitIndexes: number[] = []
+
+    if (isBranchJoinDropzone) {
+        const newTarget = targetEdge.to === movingNodeId ? outgoingEdge.to : targetEdge.to
+        const joinEdgeIds = joinEdges ? new Set(joinEdges.map(getEdgeId)) : null
+        edgesToSplitIndexes = newEdges
+            .map((edge, index) => ({ edge, index }))
+            .filter(({ edge }) => (joinEdgeIds ? joinEdgeIds.has(getEdgeId(edge)) : edge.to === newTarget))
+            .map(({ index }) => index)
+    } else {
+        edgesToSplitIndexes = [
+            newEdges.findIndex(
+                (edge) =>
+                    edge.from === targetEdge.from && edge.type === targetEdge.type && edge.index === targetEdge.index
+            ),
+        ]
+    }
+
+    if (edgesToSplitIndexes.length === 0 || edgesToSplitIndexes.includes(-1)) {
+        return null
+    }
+
+    // Step 3: Split the target edge(s) — sources → movingNode → original target
+    const edgesToSplit = edgesToSplitIndexes.map((i) => newEdges[i])
+    const insertionTarget = edgesToSplit[0].to
+
+    edgesToSplitIndexes.sort((a, b) => b - a).forEach((i) => newEdges.splice(i, 1))
+
+    for (const edge of edgesToSplit) {
+        newEdges.push({ ...edge, to: movingNodeId })
+    }
+
+    newEdges.push({
+        from: movingNodeId,
+        to: insertionTarget,
+        type: 'continue',
+        index: undefined,
+    } as HogFlow['edges'][0])
+
+    return newEdges
+}
+
+export const HOG_FLOW_EDITOR_MODES = ['build', 'variables', 'test', 'metrics', 'logs'] as const
+export type HogFlowEditorMode = (typeof HOG_FLOW_EDITOR_MODES)[number]
+export const HOG_FLOW_EDITOR_DEFAULT_PANEL_WIDTH = 592
+export type HogFlowEditorLayout = 'simple' | 'advanced'
+export type HogFlowEditorActionMetrics = {
+    actionId: string
+    succeeded: number
+    failed: number
+    filtered: number
+}
+
+/** Turns metric totals broken down by step and metric into one entry per step. */
+export function actionMetricsFromTotals(
+    response: AppMetricsTotalsResponse
+): Record<string, HogFlowEditorActionMetrics> {
+    const res: Record<string, HogFlowEditorActionMetrics> = {}
+    Object.values(response).forEach((value) => {
+        let [instanceId, metricName] = value.breakdowns
+
+        if (!metricName) {
+            return
+        }
+
+        if (!instanceId) {
+            // TRICKY: Trigger and exit dont get their own metrics so we pull from the overall metrics
+            if (['succeeded', 'failed'].includes(metricName)) {
+                instanceId = EXIT_NODE_ID
+            } else if (['rate_limited', 'triggered'].includes(metricName)) {
+                instanceId = TRIGGER_NODE_ID
+                if (['rate_limited'].includes(metricName)) {
+                    metricName = 'failed'
+                }
+                if (['triggered'].includes(metricName)) {
+                    metricName = 'succeeded'
+                }
+            }
+        }
+
+        res[instanceId] = res[instanceId] || {
+            actionId: instanceId,
+            succeeded: 0,
+            failed: 0,
+            filtered: 0,
+        }
+        if (metricName in res[instanceId]) {
+            ;(res[instanceId] as any)[metricName] = value.total
+        }
+    })
+
+    return res
+}
+
+export type OutputMappingSuggestion = {
+    key: string
+    result_path: string
+    label: string
+}
+
+export type CreateActionType = Pick<HogFlowAction, 'type' | 'config' | 'name' | 'description'> & {
+    branchEdges?: number
+    output_variable?: HogFlowAction['output_variable']
+    on_error?: HogFlowAction['on_error']
+    getDefaultInputs?: () => Record<string, CyclotronInputType> | undefined
+    getOutputMappingSuggestions?: () => Promise<OutputMappingSuggestion[]>
+}
+
+// Generated by kea-typegen. Update if you're an agent, ignore if you're human.
+export interface hogFlowEditorLogicValues {
+    featureFlags: FeatureFlagsSet // featureFlagLogic
+    integrations: IntegrationType[] | null // integrationsLogic
+    categories: MessageCategory[] // optOutCategoriesLogic
+    categoriesLoading: boolean // optOutCategoriesLogic
+    currentTeam: TeamPublicType | TeamType | null // teamLogic
+    edgesByActionId: Record<string, HogFlowEdge[]> // workflowLogic
+    hogFunctionTemplatesById: Record<string, HogFunctionTemplateType> // workflowLogic
+    workflow: HogFlow // workflowLogic
+    actionMetricsById: Record<string, HogFlowEditorActionMetrics> | null
+    actionMetricsByIdLoading: boolean
+    animatingEdgePair: string | null
+    dropzoneNodes: DropzoneNode[]
+    edges: HogFlowActionEdge[]
+    editorLayout: HogFlowEditorLayout
+    highlightedDropzoneNodeId: string | null
+    isCopyingNode: boolean
+    isMovingNode: boolean
+    isTileCanvas: boolean
+    isTreeView: boolean
+    isZoomedOutFar: boolean
+    mode: HogFlowEditorMode
+    movingNodeId: string | null
+    nodeToBeAdded: CreateActionType | HogFlowActionNode | null
+    nodes: HogFlowActionNode[]
+    nodesById: Record<string, HogFlowActionNode>
+    panelWidth: number | null
+    reactFlowInstance: ReactFlowInstance<Node, Edge> | null
+    reactFlowWrapper: RefObject<HTMLDivElement> | null
+    selectedNode: HogFlowActionNode | null
+    selectedNodeCanBeCopiedOrMoved: boolean
+    selectedNodeCanBeDeleted: boolean
+    selectedNodeId: string | null
+    treePathsCollapsedByDefault: boolean
+}
+
+// Generated by kea-typegen. Update if you're an agent, ignore if you're human.
+export interface hogFlowEditorLogicActions {
+    loadCategories: () => {
+        value: true
+    } // optOutCategoriesLogic
+    loadWorkflowSuccess: (
+        originalWorkflow:
+            | HogFlow
+            | {
+                  abort_action?: string | undefined
+                  actions: (
+                      | {
+                            config: {
+                                cohorts: {
+                                    name?: string | undefined
+                                    percentage: number
+                                }[]
+                            }
+                            created_at?: number | undefined
+                            description: string
+                            filters?:
+                                | {
+                                      actions?: any[] | undefined
+                                      events?: any[] | undefined
+                                      properties?: any[] | undefined
+                                  }
+                                | null
+                                | undefined
+                            id: string
+                            name: string
+                            on_error?: 'abort' | 'continue' | null | undefined
+                            output_variable?:
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }[]
+                                | null
+                                | undefined
+                            type: 'random_cohort_branch'
+                            updated_at?: number | undefined
+                        }
+                      | {
+                            config: {
+                                conditions: {
+                                    filters: {
+                                        actions?: any[] | undefined
+                                        events?: any[] | undefined
+                                        properties?: any[] | undefined
+                                    }
+                                    name?: string | undefined
+                                }[]
+                            }
+                            created_at?: number | undefined
+                            description: string
+                            filters?:
+                                | {
+                                      actions?: any[] | undefined
+                                      events?: any[] | undefined
+                                      properties?: any[] | undefined
+                                  }
+                                | null
+                                | undefined
+                            id: string
+                            name: string
+                            on_error?: 'abort' | 'continue' | null | undefined
+                            output_variable?:
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }[]
+                                | null
+                                | undefined
+                            type: 'conditional_branch'
+                            updated_at?: number | undefined
+                        }
+                      | {
+                            config: {
+                                reason?: string | undefined
+                            }
+                            created_at?: number | undefined
+                            description: string
+                            filters?:
+                                | {
+                                      actions?: any[] | undefined
+                                      events?: any[] | undefined
+                                      properties?: any[] | undefined
+                                  }
+                                | null
+                                | undefined
+                            id: string
+                            name: string
+                            on_error?: 'abort' | 'continue' | null | undefined
+                            output_variable?:
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }[]
+                                | null
+                                | undefined
+                            type: 'exit'
+                            updated_at?: number | undefined
+                        }
+                      | {
+                            config: {
+                                condition: {
+                                    filters?:
+                                        | {
+                                              actions?: any[] | undefined
+                                              events?: any[] | undefined
+                                              properties?: any[] | undefined
+                                          }
+                                        | null
+                                        | undefined
+                                    name?: string | undefined
+                                }
+                                events?:
+                                    | {
+                                          filters?:
+                                              | {
+                                                    actions?: any[] | undefined
+                                                    events?: any[] | undefined
+                                                    properties?: any[] | undefined
+                                                }
+                                              | null
+                                              | undefined
+                                          name?: string | undefined
+                                      }[]
+                                    | undefined
+                                max_wait_duration: string
+                            }
+                            created_at?: number | undefined
+                            description: string
+                            filters?:
+                                | {
+                                      actions?: any[] | undefined
+                                      events?: any[] | undefined
+                                      properties?: any[] | undefined
+                                  }
+                                | null
+                                | undefined
+                            id: string
+                            name: string
+                            on_error?: 'abort' | 'continue' | null | undefined
+                            output_variable?:
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }[]
+                                | null
+                                | undefined
+                            type: 'wait_until_condition'
+                            updated_at?: number | undefined
+                        }
+                      | {
+                            config: {
+                                delay_duration?: string | undefined
+                                delay_until?:
+                                    | {
+                                          bytecode?: any
+                                          bytecode_error?: string | undefined
+                                          expression: string
+                                          fallback_timezone?: string | null | undefined
+                                          offset?: string | undefined
+                                          timezone?: string | null | undefined
+                                          use_person_timezone?: boolean | undefined
+                                      }
+                                    | undefined
+                                max_delay_duration?: string | undefined
+                            }
+                            created_at?: number | undefined
+                            description: string
+                            filters?:
+                                | {
+                                      actions?: any[] | undefined
+                                      events?: any[] | undefined
+                                      properties?: any[] | undefined
+                                  }
+                                | null
+                                | undefined
+                            id: string
+                            name: string
+                            on_error?: 'abort' | 'continue' | null | undefined
+                            output_variable?:
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }[]
+                                | null
+                                | undefined
+                            type: 'delay'
+                            updated_at?: number | undefined
+                        }
+                      | {
+                            config: {
+                                inputs: Record<
+                                    string,
+                                    {
+                                        bytecode?: any
+                                        order?: number | undefined
+                                        secret?: boolean | undefined
+                                        templating?: 'hog' | 'liquid' | undefined
+                                        value: any
+                                    }
+                                >
+                                mappings?:
+                                    | {
+                                          disabled?: boolean | undefined
+                                          filters?: any
+                                          inputs?:
+                                              | Record<
+                                                    string,
+                                                    {
+                                                        bytecode?: any
+                                                        order?: number | undefined
+                                                        secret?: boolean | undefined
+                                                        templating?: 'hog' | 'liquid' | undefined
+                                                        value: any
+                                                    }
+                                                >
+                                              | null
+                                              | undefined
+                                          inputs_schema?:
+                                              | {
+                                                    choices?:
+                                                        | {
+                                                              label: string
+                                                              value: string
+                                                          }[]
+                                                        | undefined
+                                                    default?: any
+                                                    description?: string | undefined
+                                                    hidden?: boolean | undefined
+                                                    integration?: string | undefined
+                                                    integration_field?: string | undefined
+                                                    integration_key?: string | undefined
+                                                    key: string
+                                                    label: string
+                                                    required?: boolean | undefined
+                                                    requiredScopes?: string | undefined
+                                                    requires_field?: string | undefined
+                                                    secret?: boolean | undefined
+                                                    templating?: boolean | undefined
+                                                    type:
+                                                        | 'boolean'
+                                                        | 'choice'
+                                                        | 'customer_analytics_account_properties'
+                                                        | 'customer_analytics_account_relationships'
+                                                        | 'dictionary'
+                                                        | 'email'
+                                                        | 'integration'
+                                                        | 'integration_field'
+                                                        | 'integration_multi'
+                                                        | 'json'
+                                                        | 'native_email'
+                                                        | 'non_failure_status_codes'
+                                                        | 'number'
+                                                        | 'posthog_assignee'
+                                                        | 'posthog_business_hours'
+                                                        | 'posthog_ticket_tags'
+                                                        | 'replay_vision_scan'
+                                                        | 'signals_scout'
+                                                        | 'string'
+                                                        | 'task_mcp_installations'
+                                                        | 'task_model'
+                                                        | 'task_repository'
+                                                        | 'task_skills'
+                                                }[]
+                                              | undefined
+                                          name: string
+                                      }[]
+                                    | undefined
+                                template_id: string
+                                template_uuid?: string | undefined
+                            }
+                            created_at?: number | undefined
+                            description: string
+                            filters?:
+                                | {
+                                      actions?: any[] | undefined
+                                      events?: any[] | undefined
+                                      properties?: any[] | undefined
+                                  }
+                                | null
+                                | undefined
+                            id: string
+                            name: string
+                            on_error?: 'abort' | 'continue' | null | undefined
+                            output_variable?:
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }[]
+                                | null
+                                | undefined
+                            type: 'function'
+                            updated_at?: number | undefined
+                        }
+                      | {
+                            config: {
+                                day:
+                                    | (
+                                          | 'friday'
+                                          | 'monday'
+                                          | 'saturday'
+                                          | 'sunday'
+                                          | 'thursday'
+                                          | 'tuesday'
+                                          | 'wednesday'
+                                      )[]
+                                    | 'any'
+                                    | 'weekday'
+                                    | 'weekend'
+                                fallback_timezone?: string | null | undefined
+                                time: [string, string] | 'any'
+                                timezone: string | null
+                                use_person_timezone?: boolean | undefined
+                            }
+                            created_at?: number | undefined
+                            description: string
+                            filters?:
+                                | {
+                                      actions?: any[] | undefined
+                                      events?: any[] | undefined
+                                      properties?: any[] | undefined
+                                  }
+                                | null
+                                | undefined
+                            id: string
+                            name: string
+                            on_error?: 'abort' | 'continue' | null | undefined
+                            output_variable?:
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }[]
+                                | null
+                                | undefined
+                            type: 'wait_until_time_window'
+                            updated_at?: number | undefined
+                        }
+                      | {
+                            config: {
+                                inputs: Record<
+                                    string,
+                                    {
+                                        bytecode?: any
+                                        order?: number | undefined
+                                        secret?: boolean | undefined
+                                        templating?: 'hog' | 'liquid' | undefined
+                                        value: any
+                                    }
+                                >
+                                message_category_id?: string | undefined
+                                message_category_type?: 'marketing' | 'transactional' | undefined
+                                template_id: 'template-native-push'
+                                template_uuid?: string | undefined
+                            }
+                            created_at?: number | undefined
+                            description: string
+                            filters?:
+                                | {
+                                      actions?: any[] | undefined
+                                      events?: any[] | undefined
+                                      properties?: any[] | undefined
+                                  }
+                                | null
+                                | undefined
+                            id: string
+                            name: string
+                            on_error?: 'abort' | 'continue' | null | undefined
+                            output_variable?:
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }[]
+                                | null
+                                | undefined
+                            type: 'function_push'
+                            updated_at?: number | undefined
+                        }
+                      | {
+                            config: {
+                                inputs: Record<
+                                    string,
+                                    {
+                                        bytecode?: any
+                                        order?: number | undefined
+                                        secret?: boolean | undefined
+                                        templating?: 'hog' | 'liquid' | undefined
+                                        value: any
+                                    }
+                                >
+                                message_category_id?: string | undefined
+                                message_category_type?: 'marketing' | 'transactional' | undefined
+                                template_id: 'template-twilio'
+                                template_uuid?: string | undefined
+                            }
+                            created_at?: number | undefined
+                            description: string
+                            filters?:
+                                | {
+                                      actions?: any[] | undefined
+                                      events?: any[] | undefined
+                                      properties?: any[] | undefined
+                                  }
+                                | null
+                                | undefined
+                            id: string
+                            name: string
+                            on_error?: 'abort' | 'continue' | null | undefined
+                            output_variable?:
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }[]
+                                | null
+                                | undefined
+                            type: 'function_sms'
+                            updated_at?: number | undefined
+                        }
+                      | {
+                            config: {
+                                inputs: Record<
+                                    string,
+                                    {
+                                        bytecode?: any
+                                        order?: number | undefined
+                                        secret?: boolean | undefined
+                                        templating?: 'hog' | 'liquid' | undefined
+                                        value: any
+                                    }
+                                >
+                                message_category_id?: string | undefined
+                                message_category_type?: 'marketing' | 'transactional' | undefined
+                                template_id: 'template-email'
+                                template_uuid?: string | undefined
+                                tracking_enabled?: boolean | undefined
+                                utm_params?:
+                                    | {
+                                          utm_campaign?: string | undefined
+                                          utm_content?: string | undefined
+                                          utm_medium?: string | undefined
+                                          utm_source?: string | undefined
+                                      }
+                                    | undefined
+                                utm_params_from_default?:
+                                    | ('utm_campaign' | 'utm_content' | 'utm_medium' | 'utm_source')[]
+                                    | undefined
+                                utm_tags_enabled?: boolean | undefined
+                            }
+                            created_at?: number | undefined
+                            description: string
+                            filters?:
+                                | {
+                                      actions?: any[] | undefined
+                                      events?: any[] | undefined
+                                      properties?: any[] | undefined
+                                  }
+                                | null
+                                | undefined
+                            id: string
+                            name: string
+                            on_error?: 'abort' | 'continue' | null | undefined
+                            output_variable?:
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }[]
+                                | null
+                                | undefined
+                            type: 'function_email'
+                            updated_at?: number | undefined
+                        }
+                      | {
+                            config:
+                                | {
+                                      type: 'api'
+                                  }
+                                | {
+                                      type: 'schedule'
+                                  }
+                                | {
+                                      filters: {
+                                          events: any[]
+                                          properties?: any[] | undefined
+                                          source: 'internal-events'
+                                      }
+                                      type: 'internal-event'
+                                  }
+                                | {
+                                      filters: {
+                                          actions?: any[] | undefined
+                                          events?: any[] | undefined
+                                          filter_test_accounts?: boolean | undefined
+                                          properties?: any[] | undefined
+                                      }
+                                      type: 'event'
+                                  }
+                                | {
+                                      filters: {
+                                          all_roles_unassigned?: boolean | undefined
+                                          assigned_to_user_ids?: number[] | undefined
+                                          assignment_status?: 'all' | 'assigned' | 'unassigned' | undefined
+                                          audience_type?: 'accounts' | 'persons' | undefined
+                                          properties: any[]
+                                          tag_names?: string[] | undefined
+                                      }
+                                      type: 'batch'
+                                  }
+                                | {
+                                      cohort_id: number | null
+                                      transition: 'entered' | 'left'
+                                      type: 'cohort'
+                                  }
+                                | {
+                                      filters: {
+                                          properties?: any[] | undefined
+                                      }
+                                      key_property?: string | undefined
+                                      table_name: string
+                                      type: 'data-warehouse-table'
+                                  }
+                                | {
+                                      filters: {
+                                          properties?: any[] | undefined
+                                      }
+                                      key_property?: string | undefined
+                                      table_name: string
+                                      type: 'data-warehouse-view'
+                                  }
+                                | {
+                                      inputs: Record<
+                                          string,
+                                          {
+                                              bytecode?: any
+                                              order?: number | undefined
+                                              secret?: boolean | undefined
+                                              templating?: 'hog' | 'liquid' | undefined
+                                              value: any
+                                          }
+                                      >
+                                      template_id: string
+                                      template_uuid?: string | undefined
+                                      type: 'manual'
+                                  }
+                                | {
+                                      inputs: Record<
+                                          string,
+                                          {
+                                              bytecode?: any
+                                              order?: number | undefined
+                                              secret?: boolean | undefined
+                                              templating?: 'hog' | 'liquid' | undefined
+                                              value: any
+                                          }
+                                      >
+                                      template_id: string
+                                      template_uuid?: string | undefined
+                                      type: 'tracking_pixel'
+                                  }
+                                | {
+                                      inputs: Record<
+                                          string,
+                                          {
+                                              bytecode?: any
+                                              order?: number | undefined
+                                              secret?: boolean | undefined
+                                              templating?: 'hog' | 'liquid' | undefined
+                                              value: any
+                                          }
+                                      >
+                                      template_id: string
+                                      template_uuid?: string | undefined
+                                      type: 'webhook'
+                                  }
+                            created_at?: number | undefined
+                            description: string
+                            filters?:
+                                | {
+                                      actions?: any[] | undefined
+                                      events?: any[] | undefined
+                                      properties?: any[] | undefined
+                                  }
+                                | null
+                                | undefined
+                            id: string
+                            name: string
+                            on_error?: 'abort' | 'continue' | null | undefined
+                            output_variable?:
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }[]
+                                | null
+                                | undefined
+                            type: 'trigger'
+                            updated_at?: number | undefined
+                        }
+                  )[]
+                  conversion?:
+                      | {
+                            bytecode?: (number | string)[] | undefined
+                            events?:
+                                | {
+                                      filters?: any
+                                      name?: string | undefined
+                                  }[]
+                                | undefined
+                            filters: any
+                            window?: string | undefined
+                        }
+                      | undefined
+                  created_at: string
+                  created_by?: UserBasicType | null | undefined
+                  description?: string | undefined
+                  edges: {
+                      from: string
+                      index?: number | undefined
+                      to: string
+                      type: 'branch' | 'continue'
+                  }[]
+                  email_sending_rate_limit?:
+                      | {
+                            count: number
+                            period: 'hour' | 'minute'
+                        }
+                      | null
+                      | undefined
+                  exit_condition:
+                      | 'exit_on_conversion'
+                      | 'exit_on_trigger_not_matched'
+                      | 'exit_on_trigger_not_matched_or_conversion'
+                      | 'exit_only_at_end'
+                  id: string
+                  image_url?: string | null | undefined
+                  name: string
+                  scope?: 'global' | 'organization' | 'team' | null | undefined
+                  status: 'draft'
+                  tags: string[]
+                  team_id: number
+                  trigger?:
+                      | {
+                            type: 'api'
+                        }
+                      | {
+                            type: 'schedule'
+                        }
+                      | {
+                            filters: {
+                                events: any[]
+                                properties?: any[] | undefined
+                                source: 'internal-events'
+                            }
+                            type: 'internal-event'
+                        }
+                      | {
+                            filters: {
+                                actions?: any[] | undefined
+                                events?: any[] | undefined
+                                filter_test_accounts?: boolean | undefined
+                                properties?: any[] | undefined
+                            }
+                            type: 'event'
+                        }
+                      | {
+                            filters: {
+                                all_roles_unassigned?: boolean | undefined
+                                assigned_to_user_ids?: number[] | undefined
+                                assignment_status?: 'all' | 'assigned' | 'unassigned' | undefined
+                                audience_type?: 'accounts' | 'persons' | undefined
+                                properties: any[]
+                                tag_names?: string[] | undefined
+                            }
+                            type: 'batch'
+                        }
+                      | {
+                            cohort_id: number | null
+                            transition: 'entered' | 'left'
+                            type: 'cohort'
+                        }
+                      | {
+                            filters: {
+                                properties?: any[] | undefined
+                            }
+                            key_property?: string | undefined
+                            table_name: string
+                            type: 'data-warehouse-table'
+                        }
+                      | {
+                            filters: {
+                                properties?: any[] | undefined
+                            }
+                            key_property?: string | undefined
+                            table_name: string
+                            type: 'data-warehouse-view'
+                        }
+                      | {
+                            inputs: Record<
+                                string,
+                                {
+                                    bytecode?: any
+                                    order?: number | undefined
+                                    secret?: boolean | undefined
+                                    templating?: 'hog' | 'liquid' | undefined
+                                    value: any
+                                }
+                            >
+                            template_id: string
+                            template_uuid?: string | undefined
+                            type: 'manual'
+                        }
+                      | {
+                            inputs: Record<
+                                string,
+                                {
+                                    bytecode?: any
+                                    order?: number | undefined
+                                    secret?: boolean | undefined
+                                    templating?: 'hog' | 'liquid' | undefined
+                                    value: any
+                                }
+                            >
+                            template_id: string
+                            template_uuid?: string | undefined
+                            type: 'tracking_pixel'
+                        }
+                      | {
+                            inputs: Record<
+                                string,
+                                {
+                                    bytecode?: any
+                                    order?: number | undefined
+                                    secret?: boolean | undefined
+                                    templating?: 'hog' | 'liquid' | undefined
+                                    value: any
+                                }
+                            >
+                            template_id: string
+                            template_uuid?: string | undefined
+                            type: 'webhook'
+                        }
+                      | undefined
+                  trigger_masking?:
+                      | {
+                            bytecode: (number | string)[]
+                            hash: string
+                            threshold: number | null
+                            ttl: number | null
+                        }
+                      | null
+                      | undefined
+                  updated_at: string
+                  variables?:
+                      | {
+                            choices?:
+                                | {
+                                      label: string
+                                      value: string
+                                  }[]
+                                | undefined
+                            default?: any
+                            description?: string | undefined
+                            hidden?: boolean | undefined
+                            integration?: string | undefined
+                            integration_field?: string | undefined
+                            integration_key?: string | undefined
+                            key: string
+                            label: string
+                            required?: boolean | undefined
+                            requiredScopes?: string | undefined
+                            requires_field?: string | undefined
+                            secret?: boolean | undefined
+                            templating?: boolean | undefined
+                            type:
+                                | 'boolean'
+                                | 'choice'
+                                | 'customer_analytics_account_properties'
+                                | 'customer_analytics_account_relationships'
+                                | 'dictionary'
+                                | 'email'
+                                | 'integration'
+                                | 'integration_field'
+                                | 'integration_multi'
+                                | 'json'
+                                | 'native_email'
+                                | 'non_failure_status_codes'
+                                | 'number'
+                                | 'posthog_assignee'
+                                | 'posthog_business_hours'
+                                | 'posthog_ticket_tags'
+                                | 'replay_vision_scan'
+                                | 'signals_scout'
+                                | 'string'
+                                | 'task_mcp_installations'
+                                | 'task_model'
+                                | 'task_repository'
+                                | 'task_skills'
+                        }[]
+                      | null
+                      | undefined
+                  version: number
+              },
+        payload?: any
+    ) => {
+        originalWorkflow:
+            | HogFlow
+            | {
+                  abort_action?: string | undefined
+                  actions: (
+                      | {
+                            config: {
+                                cohorts: {
+                                    name?: string | undefined
+                                    percentage: number
+                                }[]
+                            }
+                            created_at?: number | undefined
+                            description: string
+                            filters?:
+                                | {
+                                      actions?: any[] | undefined
+                                      events?: any[] | undefined
+                                      properties?: any[] | undefined
+                                  }
+                                | null
+                                | undefined
+                            id: string
+                            name: string
+                            on_error?: 'abort' | 'continue' | null | undefined
+                            output_variable?:
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }[]
+                                | null
+                                | undefined
+                            type: 'random_cohort_branch'
+                            updated_at?: number | undefined
+                        }
+                      | {
+                            config: {
+                                conditions: {
+                                    filters: {
+                                        actions?: any[] | undefined
+                                        events?: any[] | undefined
+                                        properties?: any[] | undefined
+                                    }
+                                    name?: string | undefined
+                                }[]
+                            }
+                            created_at?: number | undefined
+                            description: string
+                            filters?:
+                                | {
+                                      actions?: any[] | undefined
+                                      events?: any[] | undefined
+                                      properties?: any[] | undefined
+                                  }
+                                | null
+                                | undefined
+                            id: string
+                            name: string
+                            on_error?: 'abort' | 'continue' | null | undefined
+                            output_variable?:
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }[]
+                                | null
+                                | undefined
+                            type: 'conditional_branch'
+                            updated_at?: number | undefined
+                        }
+                      | {
+                            config: {
+                                reason?: string | undefined
+                            }
+                            created_at?: number | undefined
+                            description: string
+                            filters?:
+                                | {
+                                      actions?: any[] | undefined
+                                      events?: any[] | undefined
+                                      properties?: any[] | undefined
+                                  }
+                                | null
+                                | undefined
+                            id: string
+                            name: string
+                            on_error?: 'abort' | 'continue' | null | undefined
+                            output_variable?:
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }[]
+                                | null
+                                | undefined
+                            type: 'exit'
+                            updated_at?: number | undefined
+                        }
+                      | {
+                            config: {
+                                condition: {
+                                    filters?:
+                                        | {
+                                              actions?: any[] | undefined
+                                              events?: any[] | undefined
+                                              properties?: any[] | undefined
+                                          }
+                                        | null
+                                        | undefined
+                                    name?: string | undefined
+                                }
+                                events?:
+                                    | {
+                                          filters?:
+                                              | {
+                                                    actions?: any[] | undefined
+                                                    events?: any[] | undefined
+                                                    properties?: any[] | undefined
+                                                }
+                                              | null
+                                              | undefined
+                                          name?: string | undefined
+                                      }[]
+                                    | undefined
+                                max_wait_duration: string
+                            }
+                            created_at?: number | undefined
+                            description: string
+                            filters?:
+                                | {
+                                      actions?: any[] | undefined
+                                      events?: any[] | undefined
+                                      properties?: any[] | undefined
+                                  }
+                                | null
+                                | undefined
+                            id: string
+                            name: string
+                            on_error?: 'abort' | 'continue' | null | undefined
+                            output_variable?:
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }[]
+                                | null
+                                | undefined
+                            type: 'wait_until_condition'
+                            updated_at?: number | undefined
+                        }
+                      | {
+                            config: {
+                                delay_duration?: string | undefined
+                                delay_until?:
+                                    | {
+                                          bytecode?: any
+                                          bytecode_error?: string | undefined
+                                          expression: string
+                                          fallback_timezone?: string | null | undefined
+                                          offset?: string | undefined
+                                          timezone?: string | null | undefined
+                                          use_person_timezone?: boolean | undefined
+                                      }
+                                    | undefined
+                                max_delay_duration?: string | undefined
+                            }
+                            created_at?: number | undefined
+                            description: string
+                            filters?:
+                                | {
+                                      actions?: any[] | undefined
+                                      events?: any[] | undefined
+                                      properties?: any[] | undefined
+                                  }
+                                | null
+                                | undefined
+                            id: string
+                            name: string
+                            on_error?: 'abort' | 'continue' | null | undefined
+                            output_variable?:
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }[]
+                                | null
+                                | undefined
+                            type: 'delay'
+                            updated_at?: number | undefined
+                        }
+                      | {
+                            config: {
+                                inputs: Record<
+                                    string,
+                                    {
+                                        bytecode?: any
+                                        order?: number | undefined
+                                        secret?: boolean | undefined
+                                        templating?: 'hog' | 'liquid' | undefined
+                                        value: any
+                                    }
+                                >
+                                mappings?:
+                                    | {
+                                          disabled?: boolean | undefined
+                                          filters?: any
+                                          inputs?:
+                                              | Record<
+                                                    string,
+                                                    {
+                                                        bytecode?: any
+                                                        order?: number | undefined
+                                                        secret?: boolean | undefined
+                                                        templating?: 'hog' | 'liquid' | undefined
+                                                        value: any
+                                                    }
+                                                >
+                                              | null
+                                              | undefined
+                                          inputs_schema?:
+                                              | {
+                                                    choices?:
+                                                        | {
+                                                              label: string
+                                                              value: string
+                                                          }[]
+                                                        | undefined
+                                                    default?: any
+                                                    description?: string | undefined
+                                                    hidden?: boolean | undefined
+                                                    integration?: string | undefined
+                                                    integration_field?: string | undefined
+                                                    integration_key?: string | undefined
+                                                    key: string
+                                                    label: string
+                                                    required?: boolean | undefined
+                                                    requiredScopes?: string | undefined
+                                                    requires_field?: string | undefined
+                                                    secret?: boolean | undefined
+                                                    templating?: boolean | undefined
+                                                    type:
+                                                        | 'boolean'
+                                                        | 'choice'
+                                                        | 'customer_analytics_account_properties'
+                                                        | 'customer_analytics_account_relationships'
+                                                        | 'dictionary'
+                                                        | 'email'
+                                                        | 'integration'
+                                                        | 'integration_field'
+                                                        | 'integration_multi'
+                                                        | 'json'
+                                                        | 'native_email'
+                                                        | 'non_failure_status_codes'
+                                                        | 'number'
+                                                        | 'posthog_assignee'
+                                                        | 'posthog_business_hours'
+                                                        | 'posthog_ticket_tags'
+                                                        | 'replay_vision_scan'
+                                                        | 'signals_scout'
+                                                        | 'string'
+                                                        | 'task_mcp_installations'
+                                                        | 'task_model'
+                                                        | 'task_repository'
+                                                        | 'task_skills'
+                                                }[]
+                                              | undefined
+                                          name: string
+                                      }[]
+                                    | undefined
+                                template_id: string
+                                template_uuid?: string | undefined
+                            }
+                            created_at?: number | undefined
+                            description: string
+                            filters?:
+                                | {
+                                      actions?: any[] | undefined
+                                      events?: any[] | undefined
+                                      properties?: any[] | undefined
+                                  }
+                                | null
+                                | undefined
+                            id: string
+                            name: string
+                            on_error?: 'abort' | 'continue' | null | undefined
+                            output_variable?:
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }[]
+                                | null
+                                | undefined
+                            type: 'function'
+                            updated_at?: number | undefined
+                        }
+                      | {
+                            config: {
+                                day:
+                                    | (
+                                          | 'friday'
+                                          | 'monday'
+                                          | 'saturday'
+                                          | 'sunday'
+                                          | 'thursday'
+                                          | 'tuesday'
+                                          | 'wednesday'
+                                      )[]
+                                    | 'any'
+                                    | 'weekday'
+                                    | 'weekend'
+                                fallback_timezone?: string | null | undefined
+                                time: [string, string] | 'any'
+                                timezone: string | null
+                                use_person_timezone?: boolean | undefined
+                            }
+                            created_at?: number | undefined
+                            description: string
+                            filters?:
+                                | {
+                                      actions?: any[] | undefined
+                                      events?: any[] | undefined
+                                      properties?: any[] | undefined
+                                  }
+                                | null
+                                | undefined
+                            id: string
+                            name: string
+                            on_error?: 'abort' | 'continue' | null | undefined
+                            output_variable?:
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }[]
+                                | null
+                                | undefined
+                            type: 'wait_until_time_window'
+                            updated_at?: number | undefined
+                        }
+                      | {
+                            config: {
+                                inputs: Record<
+                                    string,
+                                    {
+                                        bytecode?: any
+                                        order?: number | undefined
+                                        secret?: boolean | undefined
+                                        templating?: 'hog' | 'liquid' | undefined
+                                        value: any
+                                    }
+                                >
+                                message_category_id?: string | undefined
+                                message_category_type?: 'marketing' | 'transactional' | undefined
+                                template_id: 'template-native-push'
+                                template_uuid?: string | undefined
+                            }
+                            created_at?: number | undefined
+                            description: string
+                            filters?:
+                                | {
+                                      actions?: any[] | undefined
+                                      events?: any[] | undefined
+                                      properties?: any[] | undefined
+                                  }
+                                | null
+                                | undefined
+                            id: string
+                            name: string
+                            on_error?: 'abort' | 'continue' | null | undefined
+                            output_variable?:
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }[]
+                                | null
+                                | undefined
+                            type: 'function_push'
+                            updated_at?: number | undefined
+                        }
+                      | {
+                            config: {
+                                inputs: Record<
+                                    string,
+                                    {
+                                        bytecode?: any
+                                        order?: number | undefined
+                                        secret?: boolean | undefined
+                                        templating?: 'hog' | 'liquid' | undefined
+                                        value: any
+                                    }
+                                >
+                                message_category_id?: string | undefined
+                                message_category_type?: 'marketing' | 'transactional' | undefined
+                                template_id: 'template-twilio'
+                                template_uuid?: string | undefined
+                            }
+                            created_at?: number | undefined
+                            description: string
+                            filters?:
+                                | {
+                                      actions?: any[] | undefined
+                                      events?: any[] | undefined
+                                      properties?: any[] | undefined
+                                  }
+                                | null
+                                | undefined
+                            id: string
+                            name: string
+                            on_error?: 'abort' | 'continue' | null | undefined
+                            output_variable?:
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }[]
+                                | null
+                                | undefined
+                            type: 'function_sms'
+                            updated_at?: number | undefined
+                        }
+                      | {
+                            config: {
+                                inputs: Record<
+                                    string,
+                                    {
+                                        bytecode?: any
+                                        order?: number | undefined
+                                        secret?: boolean | undefined
+                                        templating?: 'hog' | 'liquid' | undefined
+                                        value: any
+                                    }
+                                >
+                                message_category_id?: string | undefined
+                                message_category_type?: 'marketing' | 'transactional' | undefined
+                                template_id: 'template-email'
+                                template_uuid?: string | undefined
+                                tracking_enabled?: boolean | undefined
+                                utm_params?:
+                                    | {
+                                          utm_campaign?: string | undefined
+                                          utm_content?: string | undefined
+                                          utm_medium?: string | undefined
+                                          utm_source?: string | undefined
+                                      }
+                                    | undefined
+                                utm_params_from_default?:
+                                    | ('utm_campaign' | 'utm_content' | 'utm_medium' | 'utm_source')[]
+                                    | undefined
+                                utm_tags_enabled?: boolean | undefined
+                            }
+                            created_at?: number | undefined
+                            description: string
+                            filters?:
+                                | {
+                                      actions?: any[] | undefined
+                                      events?: any[] | undefined
+                                      properties?: any[] | undefined
+                                  }
+                                | null
+                                | undefined
+                            id: string
+                            name: string
+                            on_error?: 'abort' | 'continue' | null | undefined
+                            output_variable?:
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }[]
+                                | null
+                                | undefined
+                            type: 'function_email'
+                            updated_at?: number | undefined
+                        }
+                      | {
+                            config:
+                                | {
+                                      type: 'api'
+                                  }
+                                | {
+                                      type: 'schedule'
+                                  }
+                                | {
+                                      filters: {
+                                          events: any[]
+                                          properties?: any[] | undefined
+                                          source: 'internal-events'
+                                      }
+                                      type: 'internal-event'
+                                  }
+                                | {
+                                      filters: {
+                                          actions?: any[] | undefined
+                                          events?: any[] | undefined
+                                          filter_test_accounts?: boolean | undefined
+                                          properties?: any[] | undefined
+                                      }
+                                      type: 'event'
+                                  }
+                                | {
+                                      filters: {
+                                          all_roles_unassigned?: boolean | undefined
+                                          assigned_to_user_ids?: number[] | undefined
+                                          assignment_status?: 'all' | 'assigned' | 'unassigned' | undefined
+                                          audience_type?: 'accounts' | 'persons' | undefined
+                                          properties: any[]
+                                          tag_names?: string[] | undefined
+                                      }
+                                      type: 'batch'
+                                  }
+                                | {
+                                      cohort_id: number | null
+                                      transition: 'entered' | 'left'
+                                      type: 'cohort'
+                                  }
+                                | {
+                                      filters: {
+                                          properties?: any[] | undefined
+                                      }
+                                      key_property?: string | undefined
+                                      table_name: string
+                                      type: 'data-warehouse-table'
+                                  }
+                                | {
+                                      filters: {
+                                          properties?: any[] | undefined
+                                      }
+                                      key_property?: string | undefined
+                                      table_name: string
+                                      type: 'data-warehouse-view'
+                                  }
+                                | {
+                                      inputs: Record<
+                                          string,
+                                          {
+                                              bytecode?: any
+                                              order?: number | undefined
+                                              secret?: boolean | undefined
+                                              templating?: 'hog' | 'liquid' | undefined
+                                              value: any
+                                          }
+                                      >
+                                      template_id: string
+                                      template_uuid?: string | undefined
+                                      type: 'manual'
+                                  }
+                                | {
+                                      inputs: Record<
+                                          string,
+                                          {
+                                              bytecode?: any
+                                              order?: number | undefined
+                                              secret?: boolean | undefined
+                                              templating?: 'hog' | 'liquid' | undefined
+                                              value: any
+                                          }
+                                      >
+                                      template_id: string
+                                      template_uuid?: string | undefined
+                                      type: 'tracking_pixel'
+                                  }
+                                | {
+                                      inputs: Record<
+                                          string,
+                                          {
+                                              bytecode?: any
+                                              order?: number | undefined
+                                              secret?: boolean | undefined
+                                              templating?: 'hog' | 'liquid' | undefined
+                                              value: any
+                                          }
+                                      >
+                                      template_id: string
+                                      template_uuid?: string | undefined
+                                      type: 'webhook'
+                                  }
+                            created_at?: number | undefined
+                            description: string
+                            filters?:
+                                | {
+                                      actions?: any[] | undefined
+                                      events?: any[] | undefined
+                                      properties?: any[] | undefined
+                                  }
+                                | null
+                                | undefined
+                            id: string
+                            name: string
+                            on_error?: 'abort' | 'continue' | null | undefined
+                            output_variable?:
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }
+                                | {
+                                      key: string
+                                      label?: string | null | undefined
+                                      result_path?: string | null | undefined
+                                      spread?: boolean | null | undefined
+                                  }[]
+                                | null
+                                | undefined
+                            type: 'trigger'
+                            updated_at?: number | undefined
+                        }
+                  )[]
+                  conversion?:
+                      | {
+                            bytecode?: (number | string)[] | undefined
+                            events?:
+                                | {
+                                      filters?: any
+                                      name?: string | undefined
+                                  }[]
+                                | undefined
+                            filters: any
+                            window?: string | undefined
+                        }
+                      | undefined
+                  created_at: string
+                  created_by?: UserBasicType | null | undefined
+                  description?: string | undefined
+                  edges: {
+                      from: string
+                      index?: number | undefined
+                      to: string
+                      type: 'branch' | 'continue'
+                  }[]
+                  email_sending_rate_limit?:
+                      | {
+                            count: number
+                            period: 'hour' | 'minute'
+                        }
+                      | null
+                      | undefined
+                  exit_condition:
+                      | 'exit_on_conversion'
+                      | 'exit_on_trigger_not_matched'
+                      | 'exit_on_trigger_not_matched_or_conversion'
+                      | 'exit_only_at_end'
+                  id: string
+                  image_url?: string | null | undefined
+                  name: string
+                  scope?: 'global' | 'organization' | 'team' | null | undefined
+                  status: 'draft'
+                  tags: string[]
+                  team_id: number
+                  trigger?:
+                      | {
+                            type: 'api'
+                        }
+                      | {
+                            type: 'schedule'
+                        }
+                      | {
+                            filters: {
+                                events: any[]
+                                properties?: any[] | undefined
+                                source: 'internal-events'
+                            }
+                            type: 'internal-event'
+                        }
+                      | {
+                            filters: {
+                                actions?: any[] | undefined
+                                events?: any[] | undefined
+                                filter_test_accounts?: boolean | undefined
+                                properties?: any[] | undefined
+                            }
+                            type: 'event'
+                        }
+                      | {
+                            filters: {
+                                all_roles_unassigned?: boolean | undefined
+                                assigned_to_user_ids?: number[] | undefined
+                                assignment_status?: 'all' | 'assigned' | 'unassigned' | undefined
+                                audience_type?: 'accounts' | 'persons' | undefined
+                                properties: any[]
+                                tag_names?: string[] | undefined
+                            }
+                            type: 'batch'
+                        }
+                      | {
+                            cohort_id: number | null
+                            transition: 'entered' | 'left'
+                            type: 'cohort'
+                        }
+                      | {
+                            filters: {
+                                properties?: any[] | undefined
+                            }
+                            key_property?: string | undefined
+                            table_name: string
+                            type: 'data-warehouse-table'
+                        }
+                      | {
+                            filters: {
+                                properties?: any[] | undefined
+                            }
+                            key_property?: string | undefined
+                            table_name: string
+                            type: 'data-warehouse-view'
+                        }
+                      | {
+                            inputs: Record<
+                                string,
+                                {
+                                    bytecode?: any
+                                    order?: number | undefined
+                                    secret?: boolean | undefined
+                                    templating?: 'hog' | 'liquid' | undefined
+                                    value: any
+                                }
+                            >
+                            template_id: string
+                            template_uuid?: string | undefined
+                            type: 'manual'
+                        }
+                      | {
+                            inputs: Record<
+                                string,
+                                {
+                                    bytecode?: any
+                                    order?: number | undefined
+                                    secret?: boolean | undefined
+                                    templating?: 'hog' | 'liquid' | undefined
+                                    value: any
+                                }
+                            >
+                            template_id: string
+                            template_uuid?: string | undefined
+                            type: 'tracking_pixel'
+                        }
+                      | {
+                            inputs: Record<
+                                string,
+                                {
+                                    bytecode?: any
+                                    order?: number | undefined
+                                    secret?: boolean | undefined
+                                    templating?: 'hog' | 'liquid' | undefined
+                                    value: any
+                                }
+                            >
+                            template_id: string
+                            template_uuid?: string | undefined
+                            type: 'webhook'
+                        }
+                      | undefined
+                  trigger_masking?:
+                      | {
+                            bytecode: (number | string)[]
+                            hash: string
+                            threshold: number | null
+                            ttl: number | null
+                        }
+                      | null
+                      | undefined
+                  updated_at: string
+                  variables?:
+                      | {
+                            choices?:
+                                | {
+                                      label: string
+                                      value: string
+                                  }[]
+                                | undefined
+                            default?: any
+                            description?: string | undefined
+                            hidden?: boolean | undefined
+                            integration?: string | undefined
+                            integration_field?: string | undefined
+                            integration_key?: string | undefined
+                            key: string
+                            label: string
+                            required?: boolean | undefined
+                            requiredScopes?: string | undefined
+                            requires_field?: string | undefined
+                            secret?: boolean | undefined
+                            templating?: boolean | undefined
+                            type:
+                                | 'boolean'
+                                | 'choice'
+                                | 'customer_analytics_account_properties'
+                                | 'customer_analytics_account_relationships'
+                                | 'dictionary'
+                                | 'email'
+                                | 'integration'
+                                | 'integration_field'
+                                | 'integration_multi'
+                                | 'json'
+                                | 'native_email'
+                                | 'non_failure_status_codes'
+                                | 'number'
+                                | 'posthog_assignee'
+                                | 'posthog_business_hours'
+                                | 'posthog_ticket_tags'
+                                | 'replay_vision_scan'
+                                | 'signals_scout'
+                                | 'string'
+                                | 'task_mcp_installations'
+                                | 'task_model'
+                                | 'task_repository'
+                                | 'task_skills'
+                        }[]
+                      | null
+                      | undefined
+                  version: number
+              }
+        payload?: any
+    } // workflowLogic
+    setWorkflowAction: (
+        actionId: string,
+        action: HogFlowAction
+    ) => {
+        action: HogFlowAction
+        actionId: string
+    } // workflowLogic
+    setWorkflowActionEdges: (
+        actionId: string,
+        edges: {
+            from: string
+            index?: number | undefined
+            to: string
+            type: 'branch' | 'continue'
+        }[]
+    ) => {
+        actionId: string
+        edges: {
+            from: string
+            index?: number | undefined
+            to: string
+            type: 'branch' | 'continue'
+        }[]
+    } // workflowLogic
+    setWorkflowInfo: (workflow: Partial<HogFlow>) => {
+        workflow: Partial<HogFlow>
+    } // workflowLogic
+    clearAnimatingEdgePair: () => {
+        value: true
+    }
+    clearPanelWidth: () => {
+        value: true
+    }
+    copyNodeToHighlightedDropzone: () => {
+        value: true
+    }
+    duplicateNodeBelow: (actionId: string) => {
+        actionId: string
+    }
+    fitView: (options?: { duration?: number; noZoom?: boolean }) => {
+        duration?: number | undefined
+        noZoom?: boolean | undefined
+    }
+    handlePaneClick: () => {
+        value: true
+    }
+    hideDropzones: () => {
+        value: true
+    }
+    loadActionMetricsById: (
+        params: Pick<AppMetricsTotalsRequest, 'appSource' | 'appSourceId' | 'dateFrom' | 'dateTo'>,
+        timezone: string
+    ) => {
+        params: Pick<AppMetricsTotalsRequest, 'appSource' | 'appSourceId' | 'dateFrom' | 'dateTo'>
+        timezone: string
+    }
+    loadActionMetricsByIdFailure: (
+        error: string,
+        errorObject?: any
+    ) => {
+        error: string
+        errorObject?: any
+    }
+    loadActionMetricsByIdSuccess: (
+        actionMetricsById: Record<string, HogFlowEditorActionMetrics>,
+        payload?: {
+            params: Pick<AppMetricsTotalsRequest, 'appSource' | 'appSourceId' | 'dateFrom' | 'dateTo'>
+            timezone: string
+        }
+    ) => {
+        actionMetricsById: Record<string, HogFlowEditorActionMetrics>
+        payload?: {
+            params: Pick<AppMetricsTotalsRequest, 'appSource' | 'appSourceId' | 'dateFrom' | 'dateTo'>
+            timezone: string
+        }
+    }
+    markUtmSavedAsTeamDefault: (
+        actionId: string,
+        saved: UtmTagValues
+    ) => {
+        actionId: string
+        saved: Partial<Record<UtmTagKey, string>>
+    }
+    moveNodeToEdge: (
+        movingNodeId: string,
+        targetEdge: HogFlowEdge,
+        isBranchJoinDropzone: boolean,
+        joinEdges?: HogFlowEdge[]
+    ) => {
+        isBranchJoinDropzone: boolean
+        joinEdges: HogFlowEdge[] | undefined
+        movingNodeId: string
+        targetEdge: HogFlowEdge
+    }
+    moveNodeToHighlightedDropzone: () => {
+        value: true
+    }
+    onDragOver: (event: DragEvent) => {
+        event: DragEvent<Element>
+    }
+    onDrop: (
+        event?: DragEvent,
+        targetEdge?: HogFlowEdge,
+        joinEdges?: HogFlowEdge[]
+    ) => {
+        event: DragEvent<Element> | undefined
+        joinEdges: HogFlowEdge[] | undefined
+        targetEdge: HogFlowEdge | undefined
+    }
+    onEdgesChange: (edges: EdgeChange<HogFlowActionEdge>[]) => {
+        edges: EdgeChange<HogFlowActionEdge>[]
+    }
+    onNodesChange: (nodes: NodeChange<HogFlowActionNode>[]) => {
+        nodes: NodeChange<HogFlowActionNode>[]
+    }
+    onNodesDelete: (deleted: HogFlowActionNode[]) => {
+        deleted: HogFlowActionNode[]
+    }
+    resetFlowFromHogFlow: (hogFlow: HogFlow) => {
+        hogFlow: HogFlow
+    }
+    setAnimatingEdgePair: (
+        from: string,
+        to: string
+    ) => {
+        from: string
+        to: string
+    }
+    setDropzoneNodes: (dropzoneNodes: DropzoneNode[]) => {
+        dropzoneNodes: DropzoneNode[]
+    }
+    setEdges: (edges: HogFlowActionEdge[]) => {
+        edges: HogFlowActionEdge[]
+    }
+    setEditorLayout: (editorLayout: HogFlowEditorLayout) => {
+        editorLayout: HogFlowEditorLayout
+    }
+    setHighlightedDropzoneNodeId: (highlightedDropzoneNodeId: string | null) => {
+        highlightedDropzoneNodeId: string | null
+    }
+    setIsZoomedOutFar: (isZoomedOutFar: boolean) => {
+        isZoomedOutFar: boolean
+    }
+    setMode: (mode: HogFlowEditorMode) => {
+        mode: 'build' | 'logs' | 'metrics' | 'test' | 'variables'
+    }
+    setNodeToBeAdded: (nodeToBeAdded: CreateActionType | HogFlowActionNode | null) => {
+        nodeToBeAdded: CreateActionType | HogFlowActionNode | null
+    }
+    setNodes: (nodes: HogFlowActionNode[]) => {
+        nodes: HogFlowActionNode[]
+    }
+    setNodesRaw: (nodes: HogFlowActionNode[]) => {
+        nodes: HogFlowActionNode[]
+    }
+    setPanelWidth: (panelWidth: number) => {
+        panelWidth: number
+    }
+    setReactFlowInstance: (reactFlowInstance: ReactFlowInstance<Node, Edge>) => {
+        reactFlowInstance: ReactFlowInstance<Node, Edge>
+    }
+    setReactFlowWrapper: (reactFlowWrapper: RefObject<HTMLDivElement>) => {
+        reactFlowWrapper: RefObject<HTMLDivElement>
+    }
+    setSelectedNodeId: (selectedNodeId: string | null) => {
+        selectedNodeId: string | null
+    }
+    setTreePathsCollapsedByDefault: (collapsed: boolean) => {
+        collapsed: boolean
+    }
+    showDropzones: () => {
+        value: true
+    }
+    startCopyingNode: (node: HogFlowActionNode) => {
+        node: HogFlowActionNode
+    }
+    startMovingNode: (node: HogFlowActionNode) => {
+        node: HogFlowActionNode
+    }
+    stopCopyingNode: () => {
+        value: true
+    }
+    stopMovingNode: () => {
+        value: true
+    }
+}
+
+// Generated by kea-typegen. Update if you're an agent, ignore if you're human.
+export interface hogFlowEditorLogicMeta {
+    key: string
+    __keaTypeGenInternalSelectorTypes: {
+        isTileCanvas: (featureFlags: FeatureFlagsSet) => boolean
+        isTreeView: (featureFlags: FeatureFlagsSet, editorLayout: HogFlowEditorLayout, isTileCanvas: boolean) => boolean
+        nodesById: (nodes: HogFlowActionNode[]) => Record<string, HogFlowActionNode>
+        selectedNode: (
+            nodes: HogFlowActionNode[],
+            selectedNodeId: string | null,
+            workflow: HogFlow
+        ) => HogFlowActionNode | null
+        selectedNodeCanBeDeleted: (
+            selectedNode: HogFlowActionNode | null,
+            nodes: HogFlowActionNode[],
+            edges: HogFlowActionEdge[]
+        ) => boolean
+        selectedNodeCanBeCopiedOrMoved: (
+            selectedNode: HogFlowActionNode | null,
+            selectedNodeCanBeDeleted: boolean
+        ) => boolean
+    }
+}
+
+export type hogFlowEditorLogicType = MakeLogicType<
+    hogFlowEditorLogicValues,
+    hogFlowEditorLogicActions,
+    WorkflowLogicProps,
+    hogFlowEditorLogicMeta
+>
+
+export const hogFlowEditorLogic = kea<hogFlowEditorLogicType>([
+    props({} as WorkflowLogicProps),
+    path((key) => ['scenes', 'hogflows', 'hogFlowEditorLogic', key]),
+    key((props) => `hog-flow-editor-${props.id}-${props.templateId || 'default'}-${props.editTemplateId || 'default'}`),
+    connect(() => ({
+        values: [
+            workflowLogic,
+            ['workflow', 'edgesByActionId', 'hogFunctionTemplatesById'],
+            optOutCategoriesLogic(),
+            ['categories', 'categoriesLoading'],
+            integrationsLogic,
+            ['integrations'],
+            teamLogic,
+            ['currentTeam'],
+            featureFlagLogic,
+            ['featureFlags'],
+        ],
+        actions: [
+            workflowLogic,
+            ['setWorkflowInfo', 'setWorkflowAction', 'setWorkflowActionEdges', 'loadWorkflowSuccess'],
+            optOutCategoriesLogic(),
+            ['loadCategories'],
+        ],
+    })),
+    actions({
+        onEdgesChange: (edges: EdgeChange<HogFlowActionEdge>[]) => ({ edges }),
+        onNodesChange: (nodes: NodeChange<HogFlowActionNode>[]) => ({ nodes }),
+        onNodesDelete: (deleted: HogFlowActionNode[]) => ({ deleted }),
+        setNodes: (nodes: HogFlowActionNode[]) => ({ nodes }),
+        setDropzoneNodes: (dropzoneNodes: DropzoneNode[]) => ({
+            dropzoneNodes,
+        }),
+        showDropzones: true,
+        hideDropzones: true,
+        setNodesRaw: (nodes: HogFlowActionNode[]) => ({ nodes }),
+        setEdges: (edges: HogFlowActionEdge[]) => ({ edges }),
+        setSelectedNodeId: (selectedNodeId: string | null) => ({ selectedNodeId }),
+        resetFlowFromHogFlow: (hogFlow: HogFlow) => ({ hogFlow }),
+        setReactFlowInstance: (reactFlowInstance: ReactFlowInstance<Node, Edge>) => ({
+            reactFlowInstance,
+        }),
+        setReactFlowWrapper: (reactFlowWrapper: RefObject<HTMLDivElement>) => ({ reactFlowWrapper }),
+        onDragOver: (event: DragEvent) => ({ event }),
+        onDrop: (event?: DragEvent, targetEdge?: HogFlowEdge, joinEdges?: HogFlowEdge[]) => ({
+            event,
+            targetEdge,
+            joinEdges,
+        }),
+        setNodeToBeAdded: (nodeToBeAdded: CreateActionType | HogFlowActionNode | null) => ({ nodeToBeAdded }),
+        setHighlightedDropzoneNodeId: (highlightedDropzoneNodeId: string | null) => ({ highlightedDropzoneNodeId }),
+        setEditorLayout: (editorLayout: HogFlowEditorLayout) => ({ editorLayout }),
+        setMode: (mode: HogFlowEditorMode) => ({ mode }),
+        setPanelWidth: (panelWidth: number) => ({ panelWidth }),
+        setTreePathsCollapsedByDefault: (collapsed: boolean) => ({ collapsed }),
+        clearPanelWidth: true,
+        setAnimatingEdgePair: (from: string, to: string) => ({ from, to }),
+        clearAnimatingEdgePair: true,
+        startCopyingNode: (node: HogFlowActionNode) => ({ node }),
+        stopCopyingNode: true,
+        copyNodeToHighlightedDropzone: true,
+        startMovingNode: (node: HogFlowActionNode) => ({ node }),
+        stopMovingNode: true,
+        moveNodeToHighlightedDropzone: true,
+        moveNodeToEdge: (
+            movingNodeId: string,
+            targetEdge: HogFlowEdge,
+            isBranchJoinDropzone: boolean,
+            joinEdges?: HogFlowEdge[]
+        ) => ({
+            movingNodeId,
+            targetEdge,
+            isBranchJoinDropzone,
+            joinEdges,
+        }),
+        duplicateNodeBelow: (actionId: string) => ({ actionId }),
+        markUtmSavedAsTeamDefault: (actionId: string, saved: UtmTagValues) => ({ actionId, saved }),
+        loadActionMetricsById: (
+            params: Pick<AppMetricsTotalsRequest, 'appSource' | 'appSourceId' | 'dateFrom' | 'dateTo'>,
+            timezone: string
+        ) => ({ params, timezone }),
+        fitView: (options: { duration?: number; noZoom?: boolean } = {}) => options,
+        handlePaneClick: true,
+        setIsZoomedOutFar: (isZoomedOutFar: boolean) => ({ isZoomedOutFar }),
+    }),
+    reducers(() => ({
+        editorLayout: [
+            'simple' as HogFlowEditorLayout,
+            {
+                setEditorLayout: (_, { editorLayout }) => editorLayout,
+            },
+        ],
+        mode: [
+            'build' as HogFlowEditorMode,
+            {
+                setMode: (_, { mode }) => mode,
+            },
+        ],
+        panelWidth: [
+            null as number | null,
+            { persist: true, storageKey: 'hogFlowEditorPanelWidth' },
+            {
+                setPanelWidth: (_, { panelWidth }) => panelWidth,
+                clearPanelWidth: () => null,
+            },
+        ],
+        // A fixed storage key, so the choice carries to the next workflow rather than being
+        // remembered per workflow the way this logic's own key would store it.
+        treePathsCollapsedByDefault: [
+            false,
+            { persist: true, storageKey: 'hogFlowTreePathsCollapsedByDefault' },
+            {
+                setTreePathsCollapsedByDefault: (_, { collapsed }) => collapsed,
+            },
+        ],
+        nodes: [
+            [] as HogFlowActionNode[],
+            {
+                setNodesRaw: (_, { nodes }) => nodes,
+            },
+        ],
+        dropzoneNodes: [
+            [] as DropzoneNode[],
+            {
+                setDropzoneNodes: (_, { dropzoneNodes }) => dropzoneNodes,
+            },
+        ],
+        highlightedDropzoneNodeId: [
+            null as string | null,
+            {
+                setHighlightedDropzoneNodeId: (_, { highlightedDropzoneNodeId }) => highlightedDropzoneNodeId,
+            },
+        ],
+        edges: [
+            [] as HogFlowActionEdge[],
+            {
+                setEdges: (_, { edges }) => edges,
+            },
+        ],
+        selectedNodeId: [
+            null as string | null,
+            {
+                setSelectedNodeId: (_, { selectedNodeId }) => selectedNodeId,
+            },
+        ],
+        isCopyingNode: [
+            false,
+            {
+                startCopyingNode: () => true,
+                stopCopyingNode: () => false,
+            },
+        ],
+        isMovingNode: [
+            false,
+            {
+                startMovingNode: () => true,
+                stopMovingNode: () => false,
+            },
+        ],
+        isZoomedOutFar: [
+            false,
+            {
+                setIsZoomedOutFar: (_, { isZoomedOutFar }) => isZoomedOutFar,
+            },
+        ],
+        movingNodeId: [
+            null as string | null,
+            {
+                startMovingNode: (_, { node }) => node.id,
+                stopMovingNode: () => null,
+            },
+        ],
+        nodeToBeAdded: [
+            null as CreateActionType | HogFlowActionNode | null,
+            {
+                setNodeToBeAdded: (_, { nodeToBeAdded }) => nodeToBeAdded,
+                startCopyingNode: (_, { node }) => node.data,
+            },
+        ],
+        reactFlowInstance: [
+            null as ReactFlowInstance<Node, Edge> | null,
+            {
+                setReactFlowInstance: (_, { reactFlowInstance }) => reactFlowInstance,
+            },
+        ],
+        reactFlowWrapper: [
+            null as RefObject<HTMLDivElement> | null,
+            {
+                setReactFlowWrapper: (_, { reactFlowWrapper }) => reactFlowWrapper,
+            },
+        ],
+        animatingEdgePair: [
+            null as string | null,
+            {
+                setAnimatingEdgePair: (_: string | null, { from, to }: { from: string; to: string }) =>
+                    `${from}->${to}`,
+                clearAnimatingEdgePair: () => null,
+                setMode: () => null,
+            },
+        ],
+    })),
+
+    selectors({
+        /** The tile canvas replaces both the graph and the list view. */
+        isTileCanvas: [
+            (s) => [s.featureFlags],
+            (featureFlags: FeatureFlagsSet): boolean => !!featureFlags[FEATURE_FLAGS.WORKFLOWS_TILE_CANVAS],
+        ],
+        isTreeView: [
+            (s) => [s.featureFlags, s.editorLayout, s.isTileCanvas],
+            (featureFlags: FeatureFlagsSet, editorLayout: HogFlowEditorLayout, isTileCanvas: boolean): boolean =>
+                !isTileCanvas && !!featureFlags[FEATURE_FLAGS.WORKFLOWS_LINEAR_VIEW] && editorLayout === 'simple',
+        ],
+        nodesById: [
+            (s) => [s.nodes],
+            (nodes: HogFlowActionNode[]): Record<string, HogFlowActionNode> => {
+                return nodes.reduce(
+                    (acc, node) => {
+                        acc[node.id] = node
+                        return acc
+                    },
+                    {} as Record<string, HogFlowActionNode>
+                )
+            },
+        ],
+        selectedNode: [
+            (s) => [s.nodes, s.selectedNodeId, s.workflow],
+            (
+                nodes: HogFlowActionNode[],
+                selectedNodeId: string | null,
+                workflow: HogFlow
+            ): HogFlowActionNode | null => {
+                const node = nodes.find((node) => node.id === selectedNodeId)
+                if (node || !selectedNodeId) {
+                    return node ?? null
+                }
+
+                const action = workflow.actions.find((action) => action.id === selectedNodeId)
+                return action
+                    ? ({
+                          id: action.id,
+                          type: 'action',
+                          data: action,
+                          position: { x: 0, y: 0 },
+                          deletable: !['trigger', 'exit'].includes(action.type),
+                          selectable: true,
+                          draggable: false,
+                          connectable: false,
+                      } satisfies HogFlowActionNode)
+                    : null
+            },
+        ],
+        selectedNodeCanBeDeleted: [
+            (s) => [s.selectedNode, s.nodes, s.edges],
+            (selectedNode: HogFlowActionNode | null, nodes: HogFlowActionNode[], edges: HogFlowActionEdge[]) => {
+                if (!selectedNode) {
+                    return false
+                }
+
+                const outgoingNodes = getOutgoers(selectedNode, nodes, edges)
+                if (outgoingNodes.length === 1) {
+                    return true
+                }
+
+                return new Set(outgoingNodes.map((node) => node.id)).size === 1
+            },
+        ],
+        selectedNodeCanBeCopiedOrMoved: [
+            (s) => [s.selectedNode, s.selectedNodeCanBeDeleted],
+            (selectedNode: HogFlowActionNode | null, selectedNodeCanBeDeleted: boolean) => {
+                if (!selectedNodeCanBeDeleted) {
+                    return false
+                }
+
+                const branchingTypes = ['conditional_branch', 'random_cohort_branch', 'wait_until_condition']
+                return !branchingTypes.includes(selectedNode?.data.type ?? '')
+            },
+        ],
+    }),
+    loaders(() => ({
+        actionMetricsById: [
+            null as Record<string, HogFlowEditorActionMetrics> | null,
+            {
+                loadActionMetricsById: async ({ params, timezone }, breakpoint) => {
+                    await breakpoint(10)
+                    const _params: AppMetricsTotalsRequest = {
+                        ...params,
+                        breakdownBy: ['instance_id', 'metric_name'],
+                        metricName: ['succeeded', 'failed', 'rate_limited', 'triggered'],
+                    }
+                    const response = await loadAppMetricsTotals(_params, timezone)
+                    await breakpoint(10)
+
+                    return actionMetricsFromTotals(response)
+                },
+            },
+        ],
+    })),
+    listeners(({ values, actions }) => {
+        let animationTimeout: ReturnType<typeof setTimeout> | null = null
+        return {
+            onEdgesChange: ({ edges }) => {
+                actions.setEdges(applyEdgeChanges(edges, values.edges))
+            },
+            onNodesChange: ({ nodes }) => {
+                actions.setNodes(applyNodeChanges(nodes, values.nodes))
+            },
+            setAnimatingEdgePair: () => {
+                if (animationTimeout) {
+                    clearTimeout(animationTimeout)
+                }
+                animationTimeout = setTimeout(() => {
+                    animationTimeout = null
+                    actions.clearAnimatingEdgePair()
+                }, 1500)
+            },
+
+            resetFlowFromHogFlow: ({ hogFlow }) => {
+                try {
+                    const edgeCountBySource = new Map<string, number>()
+                    hogFlow.edges.forEach((edge) =>
+                        edgeCountBySource.set(edge.from, (edgeCountBySource.get(edge.from) ?? 0) + 1)
+                    )
+                    const actionsById = new Map(hogFlow.actions.map((action) => [action.id, action]))
+                    const edges: HogFlowActionEdge[] = hogFlow.edges.map((edge) => {
+                        const isOnlyEdgeForNode = edgeCountBySource.get(edge.from) === 1
+                        const edgeSourceAction = actionsById.get(edge.from)
+
+                        return {
+                            // Only these values are set by the user
+                            source: edge.from,
+                            target: edge.to,
+
+                            // All other values are derived
+                            id: getEdgeId(edge),
+                            type: 'smart',
+                            deletable: false,
+                            reconnectable: false,
+                            selectable: false,
+                            focusable: false,
+                            markerEnd: {
+                                type: MarkerType.ArrowClosed,
+                            },
+                            data: {
+                                edge,
+                                label: isOnlyEdgeForNode
+                                    ? undefined
+                                    : edge.type === 'continue'
+                                      ? `No match`
+                                      : getBranchLabel(edgeSourceAction, edge),
+                            },
+                            labelShowBg: false,
+                            targetHandle: `target_${edge.to}`,
+                            sourceHandle:
+                                edge.type === 'continue'
+                                    ? `continue_${edge.from}`
+                                    : `branch_${edge.from}_${edge.index}`,
+                        }
+                    })
+
+                    const handlesByIdByNodeId: Record<string, Record<string, StepViewNodeHandle>> = {}
+
+                    edges.forEach((edge) => {
+                        if (!handlesByIdByNodeId[edge.source]) {
+                            handlesByIdByNodeId[edge.source] = {}
+                        }
+                        if (!handlesByIdByNodeId[edge.target]) {
+                            handlesByIdByNodeId[edge.target] = {}
+                        }
+
+                        handlesByIdByNodeId[edge.source][edge.sourceHandle ?? ''] = {
+                            id: edge.sourceHandle,
+                            type: 'source',
+                            position: Position.Bottom,
+                            ...BOTTOM_HANDLE_POSITION,
+                        }
+
+                        handlesByIdByNodeId[edge.target][edge.targetHandle ?? ''] = {
+                            id: edge.targetHandle,
+                            type: 'target',
+                            position: Position.Top,
+                            ...TOP_HANDLE_POSITION,
+                        }
+                    })
+
+                    const nodes: HogFlowActionNode[] = hogFlow.actions.map((action: HogFlowAction) => {
+                        const step = getHogFlowStep(action, values.hogFunctionTemplatesById)
+
+                        // Migrate old function actions to the basic function action type without
+                        // writing back onto workflowLogic's action: an in-place mutation corrupts
+                        // the workflow subscription's previous-value snapshot, so legacy flows
+                        // would never compare deep-equal and would rebuild on every poll.
+                        const migratedAction: HogFlowAction =
+                            !step && action.type.startsWith('function_')
+                                ? ({ ...action, type: 'function' } as HogFlowAction)
+                                : action
+
+                        return {
+                            id: migratedAction.id,
+                            type: 'action',
+                            data: migratedAction,
+                            position: { x: 0, y: 0 },
+                            handles: Object.values(handlesByIdByNodeId[migratedAction.id] ?? {}),
+                            deletable: !['trigger', 'exit'].includes(migratedAction.type),
+                            selectable: true,
+                            draggable: false,
+                            connectable: false,
+                        }
+                    })
+
+                    // Reuse unchanged edge references so ReactFlow only reprocesses edges that
+                    // actually changed (matching its own applyEdgeChanges contract).
+                    actions.setEdges(reconcileById(values.edges, edges, (edge) => edge.id))
+                    actions.setNodes(nodes)
+                } catch (error) {
+                    console.error('Error resetting flow from hog flow', error)
+                    lemonToast.error('Error updating workflow')
+                }
+            },
+
+            setNodes: async ({ nodes }, breakpoint) => {
+                // The tile canvas lays out its own tiles and reads only the steps and edges, so skip ELK under it.
+                const formattedNodes = values.isTileCanvas ? nodes : await getFormattedNodes(nodes, values.edges)
+                // Drop this layout run if a newer setNodes was dispatched while elk was working,
+                // so overlapping rebuilds can't finish out of order and let a stale layout win.
+                breakpoint()
+
+                // Reconcile after layout so positions participate in the equality check: a node
+                // that moved gets a fresh reference, an untouched one keeps its identity and its
+                // ReactFlow subtree doesn't re-render.
+                actions.setNodesRaw(reconcileById(values.nodes, formattedNodes, (node) => node.id))
+            },
+
+            onNodesDelete: ({ deleted }) => {
+                if (deleted.some((node) => node.id === values.selectedNodeId)) {
+                    actions.setSelectedNodeId(null)
+                }
+
+                const deletedNodeIds = deleted.map((node) => node.id)
+
+                // Find all edges connected to the deleted node then reconnect them to avoid orphaned nodes
+                const updatedEdges = values.workflow.edges
+                    .map((hogFlowEdge) => {
+                        if (deletedNodeIds.includes(hogFlowEdge.to)) {
+                            // Find the deleted node
+                            const deletedNode = deleted.find((node) => node.id === hogFlowEdge.to)
+                            if (deletedNode) {
+                                // The React Flow layout may still be pending, so rewire from the canonical workflow.
+                                const outgoer = values.workflow.edges.find((edge) => edge.from === deletedNode.id)
+                                if (outgoer) {
+                                    // Change target to the first outgoer
+                                    return {
+                                        ...hogFlowEdge,
+                                        to: outgoer.to,
+                                    }
+                                }
+                            }
+                        }
+                        return hogFlowEdge
+                    })
+                    .filter(
+                        (hogFlowEdge) =>
+                            !deletedNodeIds.includes(hogFlowEdge.from) && !deletedNodeIds.includes(hogFlowEdge.to)
+                    )
+
+                // Update workflow actions to match the new flow
+                const updatedActions = values.workflow.actions.filter((action) => !deletedNodeIds.includes(action.id))
+
+                actions.setWorkflowInfo({ actions: updatedActions, edges: updatedEdges })
+            },
+
+            showDropzones: () => {
+                const { nodesById, edges, isMovingNode, movingNodeId } = values
+
+                const dropzoneNodes: DropzoneNode[] = []
+
+                const skipEdgeIds: Set<string> = new Set()
+                if (isMovingNode && movingNodeId) {
+                    const incomingEdges = edges.filter((e) => e.target === movingNodeId)
+                    const outgoingEdges = edges.filter((e) => e.source === movingNodeId)
+                    // Only skip in the simple linear case (1 incoming, 1 outgoing)
+                    // where placing on adjacent edges would result in the same position
+                    if (incomingEdges.length === 1 && outgoingEdges.length === 1) {
+                        skipEdgeIds.add(incomingEdges[0].id)
+                        skipEdgeIds.add(outgoingEdges[0].id)
+                    }
+                }
+
+                edges.forEach((edge) => {
+                    if (skipEdgeIds.has(edge.id)) {
+                        return
+                    }
+                    const sourceNode = nodesById[edge.source]
+                    const targetNode = nodesById[edge.target]
+
+                    if (sourceNode && targetNode) {
+                        const sourceHandle = sourceNode.handles?.find((h) => h.id === edge.sourceHandle)
+                        const targetHandle = targetNode.handles?.find((h) => h.id === edge.targetHandle)
+
+                        // The tile canvas finds a dropzone by its edge and draws its own +, so it needs no position.
+                        const [, labelX, labelY] = values.isTileCanvas
+                            ? [undefined, 0, 0]
+                            : getSmartStepPath({
+                                  sourceX: sourceNode.position.x + (sourceHandle?.x || 0),
+                                  sourceY: sourceNode.position.y + (sourceHandle?.y || 0),
+                                  targetX: targetNode.position.x + (targetHandle?.x || 0),
+                                  targetY: targetNode.position.y + (targetHandle?.y || 0),
+                                  edges,
+                                  currentEdgeId: edge.id,
+                              })
+
+                        dropzoneNodes.push({
+                            id: `dropzone_edge_${edge.id}`,
+                            type: 'dropzone',
+                            position: { x: labelX - NODE_WIDTH / 2, y: labelY - NODE_HEIGHT / 2 },
+                            data: {
+                                edge,
+                            },
+                            draggable: false,
+                            selectable: false,
+                        })
+
+                        // If multiple edges share the same target, add a single dropzone near the target node
+                        // to allow branch convergence (fan-in). This covers both branch edges directly
+                        // from a conditional node and continue edges from downstream nodes in parallel paths.
+                        const hasSiblingEdges = edges.filter((e) => e.data?.edge.to === edge.target).length > 1
+                        if (hasSiblingEdges) {
+                            // Use an ID that we can consistently look up for the branch join point to avoid duplicate dropzones
+                            const branchJoinDropzoneTargetId = `dropzone_target_${edge.target}_branch_join`
+                            // Avoid duplicating dropzones for multiple branch edges to the same target
+                            if (dropzoneNodes.find((n) => n.id === branchJoinDropzoneTargetId)) {
+                                return
+                            }
+
+                            // Add a dropzone near the target node to allow merging parallel branches
+                            dropzoneNodes.push({
+                                id: branchJoinDropzoneTargetId,
+                                type: 'dropzone',
+                                position: {
+                                    x: targetNode.position.x,
+                                    y: targetNode.position.y - NODE_HEIGHT,
+                                },
+                                data: {
+                                    edge,
+                                    isBranchJoinDropzone: true,
+                                },
+                                draggable: false,
+                                selectable: false,
+                            })
+                        }
+                    }
+                })
+
+                actions.setDropzoneNodes(dropzoneNodes)
+            },
+
+            hideDropzones: () => {
+                actions.setDropzoneNodes([])
+            },
+
+            onDragOver: ({ event }) => {
+                event.preventDefault()
+                event.dataTransfer.dropEffect = 'move'
+            },
+
+            onDrop: ({ event, targetEdge, joinEdges }) => {
+                event?.preventDefault()
+                const dropzoneNode = values.dropzoneNodes.find((x) => x.id === values.highlightedDropzoneNodeId)
+
+                if (values.nodeToBeAdded && (dropzoneNode || targetEdge)) {
+                    const edgeToInsertNodeInto = targetEdge
+                        ? ({
+                              id: getEdgeId(targetEdge),
+                              source: targetEdge.from,
+                              target: targetEdge.to,
+                          } as HogFlowActionEdge)
+                        : dropzoneNode!.data.edge
+
+                    // Check if nodeToBeAdded is a HogFlowActionNode (has 'data' property) or CreateActionType
+                    const isHogFlowActionNode = 'data' in values.nodeToBeAdded
+                    const partialNewAction = isHogFlowActionNode
+                        ? (values.nodeToBeAdded as HogFlowActionNode).data
+                        : (values.nodeToBeAdded as CreateActionType)
+
+                    let config = partialNewAction.config
+                    if (!isHogFlowActionNode) {
+                        // pinned: analytics event name
+                        posthog.capture('workflow step added', {
+                            step_type: partialNewAction.type,
+                            template_id: 'template_id' in config ? config.template_id : undefined,
+                        })
+                        const dynamicInputs = (partialNewAction as CreateActionType).getDefaultInputs?.()
+                        if (dynamicInputs && 'inputs' in config) {
+                            config = { ...config, inputs: { ...config.inputs, ...dynamicInputs } }
+                        }
+                    }
+                    // Seed the step's inputs with the template defaults at creation time. The input renderer
+                    // snapshots its values on mount, so applying defaults after mount leaves the fields blank.
+                    if ('template_id' in config && config.template_id) {
+                        const template = values.hogFunctionTemplatesById[config.template_id]
+                        if (template) {
+                            const defaults = templateToConfiguration(template).inputs ?? {}
+                            config = {
+                                ...config,
+                                inputs: { ...defaults, ...('inputs' in config ? config.inputs : {}) },
+                            }
+                        }
+                    }
+
+                    // A copied email keeps its own UTM choice. Without the team loaded the UTM keys stay out, so
+                    // the API copies the team defaults on save.
+                    if (
+                        !isHogFlowActionNode &&
+                        partialNewAction.type === 'function_email' &&
+                        !('utm_tags_enabled' in config) &&
+                        values.currentTeam
+                    ) {
+                        config = {
+                            ...config,
+                            ...newEmailUtmConfig(getTeamUtmDefaults(values.currentTeam.workflows_config)),
+                        }
+                    }
+
+                    if (!isHogFlowActionNode && 'template_id' in config && config.template_id === 'template-email') {
+                        const emailInput = config.inputs?.email
+                        const team = values.currentTeam
+                        const sender = resolveDefaultEmailSender(
+                            values.integrations,
+                            team && 'workflows_config' in team
+                                ? team.workflows_config?.default_email_integration_id
+                                : null
+                        )
+                        if (sender && emailInput?.value && !emailInput.value.from?.integrationId) {
+                            config = {
+                                ...config,
+                                inputs: {
+                                    ...config.inputs,
+                                    email: {
+                                        ...emailInput,
+                                        value: {
+                                            ...emailInput.value,
+                                            from: { ...emailInput.value.from, integrationId: sender.integrationId },
+                                        },
+                                    },
+                                },
+                            }
+                            // pinned: analytics event name
+                            posthog.capture('email sender preselected', { surface: 'workflow', reason: sender.reason })
+                        }
+                    }
+
+                    const newAction = {
+                        id: isHogFlowActionNode
+                            ? (values.nodeToBeAdded as HogFlowActionNode).id
+                            : `action_${partialNewAction.type}_${uuid()}`,
+                        type: partialNewAction.type,
+                        name: partialNewAction.name,
+                        description: partialNewAction.description,
+                        config,
+                        created_at: Date.now(),
+                        updated_at: Date.now(),
+                        ...(!isHogFlowActionNode && (partialNewAction as CreateActionType).output_variable
+                            ? { output_variable: (partialNewAction as CreateActionType).output_variable }
+                            : {}),
+                        ...(!isHogFlowActionNode && (partialNewAction as CreateActionType).on_error
+                            ? { on_error: (partialNewAction as CreateActionType).on_error }
+                            : {}),
+                    } as HogFlowAction
+
+                    const step = getHogFlowStep(newAction, values.hogFunctionTemplatesById)
+
+                    const branchEdges = isHogFlowActionNode
+                        ? 0
+                        : ((partialNewAction as CreateActionType).branchEdges ?? 0)
+                    const isBranchJoinDropzone =
+                        !!joinEdges || (!targetEdge && (dropzoneNode?.data.isBranchJoinDropzone ?? false))
+
+                    if (!step) {
+                        throw new Error(`Step not found for action type: ${newAction}`)
+                    }
+
+                    const edgesToBeReplaced = joinEdges
+                        ? values.workflow.edges.filter((edge) =>
+                              joinEdges.some((joinEdge) => getEdgeId(edge) === getEdgeId(joinEdge))
+                          )
+                        : isBranchJoinDropzone
+                          ? values.workflow.edges.filter((edge) => edge.to === edgeToInsertNodeInto.target)
+                          : values.workflow.edges.filter((edge) => getEdgeId(edge) === edgeToInsertNodeInto.id)
+                    const newEdges = computeInsertEdges(
+                        values.workflow.edges,
+                        newAction.id,
+                        branchEdges,
+                        edgesToBeReplaced
+                    )
+
+                    if (!newEdges) {
+                        throw new Error('Edge to be replaced not found')
+                    }
+
+                    // Auto-create workflow variables if the action has a default output_variable
+                    let updatedVariables = values.workflow.variables
+                    const outputVars = Array.isArray(newAction.output_variable)
+                        ? newAction.output_variable
+                        : newAction.output_variable
+                          ? [newAction.output_variable]
+                          : []
+
+                    for (const outputVar of outputVars) {
+                        if (!outputVar.key) {
+                            continue
+                        }
+                        const prefix = outputVar.key
+                        if (outputVar.spread) {
+                            // Create individual variables for each expected property
+                            const spreadFields: [string, string][] = [
+                                ['status', 'Status'],
+                                ['priority', 'Priority'],
+                                ['number', 'Number'],
+                                ['channel_source', 'Channel source'],
+                                ['last_message_at', 'Last message at'],
+                                ['last_message_text', 'Last message text'],
+                                ['first_customer_message_text', 'First customer message text'],
+                                ['unread_team_count', 'Unread team'],
+                                ['unread_customer_count', 'Unread customer'],
+                                ['sla', 'SLA'],
+                                ['assignee', 'Assignee'],
+                                ['url', 'URL'],
+                                ['tags', 'Tags'],
+                                ['slack_channel_id', 'Slack channel ID'],
+                                ['slack_thread_ts', 'Slack thread timestamp'],
+                                ['slack_team_id', 'Slack team ID'],
+                                ['email_subject', 'Email subject'],
+                                ['email_from', 'Email from'],
+                                ['email_to', 'Email to'],
+                                ['cc_participants', 'CC participants'],
+                            ]
+
+                            const newVars = spreadFields
+                                .map(([prop, label]) => ({
+                                    key: `${prefix}_${prop}`,
+                                    label,
+                                    type: 'string' as const,
+                                    default: '',
+                                }))
+                                .filter(({ key }) => !updatedVariables?.some((v) => v.key === key))
+
+                            if (newVars.length > 0) {
+                                updatedVariables = [...(updatedVariables || []), ...newVars]
+                            }
+                        } else if (!updatedVariables?.some((v) => v.key === prefix)) {
+                            updatedVariables = [
+                                ...(updatedVariables || []),
+                                {
+                                    key: prefix,
+                                    label: outputVar.label ?? prefix,
+                                    type: 'string' as const,
+                                    default: '',
+                                },
+                            ]
+                        }
+                    }
+
+                    const oldActions = values.workflow.actions
+                    const newActions = [...oldActions.slice(0, -1), newAction, oldActions[oldActions.length - 1]]
+
+                    actions.setWorkflowInfo({ actions: newActions, edges: newEdges, variables: updatedVariables })
+                    actions.setNodeToBeAdded(null)
+                    actions.setSelectedNodeId(newAction.id)
+                }
+                // We can clear the dropzones now
+                actions.hideDropzones()
+            },
+            setReactFlowInstance: () => {
+                // TRICKY: Slight race condition here where the react flow instance is not set yet
+                setTimeout(() => {
+                    actions.fitView({ duration: 0 })
+                }, 100)
+            },
+            setSelectedNodeId: ({ selectedNodeId }) => {
+                if (selectedNodeId) {
+                    actions.fitView({ noZoom: true })
+                }
+            },
+            fitView: ({ duration, noZoom }) => {
+                const { reactFlowWrapper, reactFlowInstance } = values
+                if (!reactFlowWrapper?.current || !reactFlowInstance) {
+                    return
+                }
+                const wrapperRect = reactFlowWrapper.current.getBoundingClientRect()
+                const wrapperWidth = wrapperRect?.width ?? 0
+                const wrapperHeight = wrapperRect?.height ?? 0
+                const panel = reactFlowWrapper.current.parentElement?.querySelector<HTMLElement>(
+                    '[data-attr="workflow-editor-panel"]'
+                )
+                const panelWidth =
+                    panel && getComputedStyle(panel).position === 'absolute'
+                        ? Math.min(panel.getBoundingClientRect().width, wrapperWidth)
+                        : 0
+                const nodesToFit = values.selectedNode ? [values.selectedNode] : values.nodes
+                const nodesBounds = reactFlowInstance.getNodesBounds(nodesToFit)
+                const visibleWidth = wrapperWidth - panelWidth
+                // Size the padding for the zoom this fit lands on. With the current zoom each fit depends
+                // on the previous one, so the resize observer and the mount timeout leave a different
+                // viewport depending on how often they fire. fitView clamps its zoom to the instance limits,
+                // so clamp here too, or a small workflow gets padding for a zoom it never reaches.
+                const unclampedFitZoom = Math.min(visibleWidth / nodesBounds.width, wrapperHeight / nodesBounds.height)
+                const fitZoom =
+                    noZoom || !nodesBounds.width || !nodesBounds.height
+                        ? reactFlowInstance.getZoom()
+                        : Math.min(Math.max(unclampedFitZoom, MIN_ZOOM), MAX_ZOOM)
+                const nodesWidthAdjusted = nodesBounds.width * fitZoom
+                // Calculate the padding right to fit the panel width to the wrapper width
+                // Looks complicated but its basically the difference between the wrapper width and the nodes width adjusted for the zoom factor
+                const paddingRight = wrapperWidth - nodesWidthAdjusted / 2 - (wrapperWidth - panelWidth) / 2
+
+                reactFlowInstance.fitView({
+                    padding: panelWidth > 0 ? { right: `${paddingRight}px` } : 0.2,
+                    maxZoom: noZoom ? reactFlowInstance.getZoom() : undefined,
+                    minZoom: noZoom ? reactFlowInstance.getZoom() : undefined,
+                    nodes: nodesToFit,
+                    duration: duration ?? 100,
+                })
+            },
+            startCopyingNode: () => {
+                actions.showDropzones()
+            },
+            stopCopyingNode: () => {
+                actions.hideDropzones()
+            },
+            copyNodeToHighlightedDropzone: () => {
+                const dropzoneNode = values.dropzoneNodes.find((x) => x.id === values.highlightedDropzoneNodeId)
+                // Mirror onDrop's guard (both dropzone and node required) so the toast is reliable
+                if (!dropzoneNode || !values.nodeToBeAdded) {
+                    lemonToast.error("Couldn't copy this step there. Try dropping it on a highlighted spot.")
+                    actions.stopCopyingNode()
+                    return
+                }
+                actions.onDrop()
+                actions.stopCopyingNode()
+            },
+            startMovingNode: () => {
+                actions.showDropzones()
+            },
+            stopMovingNode: () => {
+                actions.hideDropzones()
+            },
+            moveNodeToHighlightedDropzone: () => {
+                // Uses computeMoveEdges (pure function) to manipulate edges in a single
+                // setWorkflowInfo call rather than onNodesDelete + onDrop (like copy does).
+                // This preserves node identity and avoids a race condition where two async
+                // layout computations from separate setWorkflowInfo calls complete out of order.
+                const movingNodeId = values.movingNodeId!
+                const dropzoneNode = values.dropzoneNodes.find((x) => x.id === values.highlightedDropzoneNodeId)
+                if (!dropzoneNode) {
+                    lemonToast.error("Couldn't move this step there. Try dropping it on a highlighted spot.")
+                    actions.stopMovingNode()
+                    return
+                }
+
+                const targetHogFlowEdge = dropzoneNode.data.edge.data?.edge
+                if (!targetHogFlowEdge) {
+                    lemonToast.error("Couldn't move this step there. Try a different spot.")
+                    actions.stopMovingNode()
+                    return
+                }
+
+                const isBranchJoinDropzone = dropzoneNode.data.isBranchJoinDropzone ?? false
+                actions.moveNodeToEdge(movingNodeId, targetHogFlowEdge, isBranchJoinDropzone)
+                actions.hideDropzones()
+                actions.stopMovingNode()
+            },
+            moveNodeToEdge: ({ movingNodeId, targetEdge, isBranchJoinDropzone, joinEdges }) => {
+                // Uses computeMoveEdges (pure function) to manipulate edges in a single
+                // setWorkflowInfo call. This preserves node identity while moving a step.
+                const newEdges = computeMoveEdges(
+                    values.workflow.edges,
+                    movingNodeId,
+                    targetEdge,
+                    isBranchJoinDropzone,
+                    joinEdges
+                )
+
+                if (!newEdges) {
+                    lemonToast.error("Couldn't move this step there. Try a different spot.")
+                    return
+                }
+
+                actions.setWorkflowInfo({ actions: values.workflow.actions, edges: newEdges })
+                actions.setSelectedNodeId(movingNodeId)
+            },
+            markUtmSavedAsTeamDefault: ({ actionId, saved }) => {
+                // The save takes a round trip, so start from the step as it is now to keep edits made meanwhile.
+                const latest = values.workflow.actions.find((action) => action.id === actionId)
+                if (!latest || latest.type !== 'function_email') {
+                    return
+                }
+                actions.setWorkflowAction(actionId, {
+                    ...latest,
+                    config: {
+                        ...latest.config,
+                        utm_params_from_default: utmKeysFollowingSavedDefault(latest.config.utm_params ?? {}, saved),
+                    },
+                })
+            },
+            duplicateNodeBelow: ({ actionId }) => {
+                const action = values.workflow.actions.find((action) => action.id === actionId)
+                const targetEdge = values.workflow.edges.find((edge) => edge.from === actionId)
+
+                if (!action || action.type === 'trigger' || action.type === 'exit' || !targetEdge) {
+                    return
+                }
+
+                actions.setNodeToBeAdded(action)
+                actions.onDrop(undefined, targetEdge)
+            },
+            handlePaneClick: () => {
+                actions.setSelectedNodeId(null)
+                if (values.isCopyingNode) {
+                    actions.stopCopyingNode()
+                }
+                if (values.isMovingNode) {
+                    actions.stopMovingNode()
+                }
+            },
+        }
+    }),
+
+    subscriptions(({ actions, values }) => ({
+        isTileCanvas: (isTileCanvas: boolean, wasTileCanvas: boolean | undefined) => {
+            // Leaving the tile canvas needs the positions it skipped.
+            if (wasTileCanvas && !isTileCanvas) {
+                actions.resetFlowFromHogFlow(values.workflow)
+            }
+        },
+        workflow: (hogFlow?: HogFlow, oldHogFlow?: HogFlow) => {
+            // Auto-save round-trips can emit a deep-equal workflow; skipping the rebuild avoids
+            // re-deriving every node and edge (including the async layout pass) for no change.
+            if (hogFlow && !objectsEqual(hogFlow, oldHogFlow)) {
+                if (values.editorLayout === 'simple' && !isWorkflowTreeComplete(hogFlow)) {
+                    actions.setEditorLayout('advanced')
+                }
+                actions.resetFlowFromHogFlow(hogFlow)
+            }
+        },
+    })),
+
+    trackedActionToUrl(({ values }) => {
+        const syncProperty = (
+            key: string,
+            value: string | null
+        ): [string, Record<string, any>, Record<string, any>] => {
+            return [
+                router.values.location.pathname,
+                {
+                    ...router.values.searchParams,
+                    [key]: value,
+                },
+                router.values.hashParams,
+            ]
+        }
+
+        return {
+            setSelectedNodeId: () => syncProperty('node', values.selectedNodeId ?? null),
+            setMode: () => syncProperty('mode', values.mode),
+            setEditorLayout: () => syncProperty('view', values.editorLayout === 'simple' ? 'linear' : 'graph'),
+        }
+    }),
+    urlToAction(({ actions, values }) => {
+        const reactToTabChange = (_: any, search: Record<string, string>): void => {
+            const { node = null, mode, view } = search
+            if (node !== values.selectedNodeId) {
+                actions.setSelectedNodeId(node ?? null)
+            }
+            if (mode && HOG_FLOW_EDITOR_MODES.includes(mode as HogFlowEditorMode) && mode !== values.mode) {
+                actions.setMode(mode as HogFlowEditorMode)
+            }
+            const requestedEditorLayout = view === 'graph' ? 'advanced' : 'simple'
+            const editorLayout =
+                requestedEditorLayout === 'simple' && !isWorkflowTreeComplete(values.workflow)
+                    ? 'advanced'
+                    : requestedEditorLayout
+            if (editorLayout !== values.editorLayout) {
+                actions.setEditorLayout(editorLayout)
+            }
+        }
+
+        return {
+            [urls.workflow(':id', ':tab')]: reactToTabChange,
+        }
+    }),
+    events(({ actions, values }) => ({
+        afterMount: () => {
+            if (values.editorLayout === 'simple' && !isWorkflowTreeComplete(values.workflow)) {
+                actions.setEditorLayout('advanced')
+            }
+            actions.resetFlowFromHogFlow(values.workflow)
+
+            const handleKeyDown = (e: KeyboardEvent): void => {
+                if (e.key === 'Escape') {
+                    if (values.isCopyingNode) {
+                        actions.stopCopyingNode()
+                    }
+                    if (values.isMovingNode) {
+                        actions.stopMovingNode()
+                    }
+                }
+            }
+
+            document.addEventListener('keydown', handleKeyDown)
+
+            // Store the handler so we can clean it up
+            ;(actions as any)._keydownHandler = handleKeyDown
+        },
+        beforeUnmount: () => {
+            const handler = (actions as any)._keydownHandler
+            if (handler) {
+                document.removeEventListener('keydown', handler)
+            }
+        },
+    })),
+])

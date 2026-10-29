@@ -1,0 +1,558 @@
+import { MOCK_DEFAULT_USER } from 'lib/api.mock'
+
+import { decodeParams, router } from 'kea-router'
+
+import { DEFAULT_OAUTH_SCOPES, getScopeGroupLabel, scopeGroupLevel, scopeGroupTooltip } from 'lib/scopes'
+import { userLogic } from 'scenes/userLogic'
+
+import { useMocks } from '~/mocks/jest'
+import { initKeaTests } from '~/test/init'
+import { AppContext } from '~/types'
+
+import { describeOAuthError, oauthAuthorizeLogic } from './oauthAuthorizeLogic'
+
+describe('oauthAuthorizeLogic', () => {
+    let logic: ReturnType<typeof oauthAuthorizeLogic.build>
+
+    beforeEach(() => {
+        useMocks({
+            get: {
+                '/api/users/@me/': MOCK_DEFAULT_USER,
+            },
+        })
+        initKeaTests()
+        userLogic.mount()
+        logic = oauthAuthorizeLogic()
+        logic.mount()
+    })
+
+    afterEach(() => {
+        logic.unmount()
+        delete (window as any).POSTHOG_APP_CONTEXT
+    })
+
+    const effectiveScopesCases: { name: string; scopes: string[]; apply?: () => void; expected: string[] }[] = [
+        {
+            name: 'grants both halves of the pair for an object at write level',
+            scopes: ['openid', 'feature_flag:read', 'feature_flag:write', 'insight:read'],
+            expected: ['openid', 'feature_flag:read', 'feature_flag:write', 'insight:read'],
+        },
+        {
+            name: 'keeps the write half alone when the read half was never requested',
+            scopes: ['openid', 'feature_flag:write', 'insight:read'],
+            expected: ['openid', 'feature_flag:write', 'insight:read'],
+        },
+        {
+            name: 'downgrades every write scope to read with the bulk read-only action',
+            scopes: ['openid', 'feature_flag:write', 'dashboard:write', 'query:read'],
+            apply: () => logic.actions.setAllScopeAccess('read'),
+            expected: ['openid', 'dashboard:read', 'feature_flag:read', 'query:read'],
+        },
+        {
+            name: 'drops an object set to no access and keeps identity scopes',
+            scopes: ['openid', 'email', 'feature_flag:write'],
+            apply: () => logic.actions.setScopeAccess('feature_flag', 'none'),
+            expected: ['openid', 'email'],
+        },
+        {
+            name: 'drops every optional object with the bulk deselect action',
+            scopes: ['openid', 'feature_flag:write', 'query:read'],
+            apply: () => logic.actions.setAllScopeAccess('none'),
+            expected: ['openid'],
+        },
+        {
+            name: 'clamps the bulk select-all action to each requested ceiling',
+            scopes: ['openid', 'feature_flag:write', 'query:read'],
+            apply: () => {
+                logic.actions.setAllScopeAccess('none')
+                logic.actions.setAllScopeAccess('write')
+            },
+            expected: ['openid', 'feature_flag:write', 'query:read'],
+        },
+        {
+            name: 'clamps a per-object write pick to read when only read was requested',
+            scopes: ['openid', 'query:read'],
+            apply: () => logic.actions.setScopeAccess('query', 'write'),
+            expected: ['openid', 'query:read'],
+        },
+        {
+            name: 'lets a per-object pick override a previous bulk action',
+            scopes: ['openid', 'feature_flag:write', 'dashboard:write'],
+            apply: () => {
+                logic.actions.setAllScopeAccess('read')
+                logic.actions.setScopeAccess('dashboard', 'write')
+            },
+            expected: ['openid', 'dashboard:write', 'feature_flag:read'],
+        },
+        {
+            name: 'grants the wildcard unchanged at write level',
+            scopes: ['openid', '*'],
+            expected: ['openid', '*'],
+        },
+    ]
+
+    it.each(effectiveScopesCases)('effectiveScopes $name', ({ scopes, apply, expected }) => {
+        logic.actions.setScopes(scopes)
+        apply?.()
+        expect(logic.values.effectiveScopes).toEqual(expected)
+    })
+
+    it('offers the bulk read-only action for wildcard requests', () => {
+        logic.actions.setScopes(['*'])
+        expect(logic.values.showReadOnlyBulkAction).toBe(true)
+    })
+
+    it('expands the wildcard to read scopes when set to read level', () => {
+        logic.actions.setScopes(['openid', '*'])
+        logic.actions.setScopeAccess('*', 'read')
+        const scopes = logic.values.effectiveScopes
+        expect(scopes).toContain('openid')
+        expect(scopes).toContain('feature_flag:read')
+        expect(scopes).not.toContain('*')
+        expect(scopes.some((scope) => scope.endsWith(':write'))).toBe(false)
+        // Privileged/hidden objects are never grantable via /authorize; including them
+        // would make the server reject the whole submit.
+        expect(scopes).not.toContain('llm_gateway:read')
+        expect(scopes).not.toContain('wizard_session:read')
+        // metrics is OAuth-grantable, so the fallback keeps it.
+        expect(scopes).toContain('metrics:read')
+    })
+
+    it('uses the server-computed read set when expanding the wildcard', () => {
+        logic.actions.setScopes(['openid', '*'])
+        logic.actions.loadOAuthApplicationSuccess({
+            name: 'Test App',
+            client_id: 'test-client',
+            is_verified: true,
+            logo_uri: null,
+            wildcard_read_scopes: ['insight:read', 'batch_import:read'],
+        })
+        logic.actions.setScopeAccess('*', 'read')
+        expect(logic.values.effectiveScopes).toEqual(['openid', 'insight:read', 'batch_import:read'])
+    })
+
+    it('drops a scope when its object is set to no access and re-adds it when selected again', () => {
+        logic.actions.setScopes(['openid', 'feature_flag:write', 'insight:read'])
+        logic.actions.setScopeAccess('feature_flag', 'none')
+        expect(logic.values.effectiveScopes).toEqual(['openid', 'insight:read'])
+        logic.actions.setScopeAccess('feature_flag', 'write')
+        expect(logic.values.effectiveScopes).toEqual(['openid', 'feature_flag:write', 'insight:read'])
+    })
+
+    const scopeSourceCases: {
+        name: string
+        urlScope?: string
+        resolution?: { scopes: string[]; was_defaulted: boolean }
+        mcpConsent?: { is_mcp_resource: boolean; scopes: string[] }
+        expected: string[]
+    }[] = [
+        {
+            name: 'prefers the resolved set over the URL',
+            urlScope: 'insight:read',
+            resolution: { scopes: ['openid', 'insight:read', 'dashboard:write'], was_defaulted: false },
+            expected: ['openid', 'insight:read', 'dashboard:write'],
+        },
+        {
+            name: 'uses the resolved set when the client sent no scope',
+            resolution: { scopes: ['openid', 'insight:write', 'query:read'], was_defaulted: true },
+            expected: ['openid', 'insight:write', 'query:read'],
+        },
+        {
+            name: 'narrows a defaulted request to the MCP set on an MCP resource',
+            resolution: { scopes: ['openid', 'insight:write', 'query:read'], was_defaulted: true },
+            mcpConsent: { is_mcp_resource: true, scopes: ['openid', 'query:read'] },
+            expected: ['openid', 'query:read'],
+        },
+        {
+            name: 'falls back to the identity scopes when the server resolved the request to nothing',
+            urlScope: 'made:up other:junk',
+            resolution: { scopes: [], was_defaulted: true },
+            expected: DEFAULT_OAUTH_SCOPES,
+        },
+        {
+            name: 'falls back to the URL when the server sent no resolution',
+            urlScope: 'insight:read',
+            expected: ['insight:read'],
+        },
+        {
+            name: 'falls back to the identity scopes when neither the server nor the URL names one',
+            expected: DEFAULT_OAUTH_SCOPES,
+        },
+    ]
+
+    it.each(scopeSourceCases)('scope source $name', ({ urlScope, resolution, mcpConsent, expected }) => {
+        window.POSTHOG_APP_CONTEXT = {
+            ...window.POSTHOG_APP_CONTEXT,
+            oauth_scope_resolution: resolution,
+            oauth_mcp_consent: mcpConsent,
+        } as AppContext
+        const params = new URLSearchParams({
+            client_id: 'test-client',
+            redirect_uri: 'https://example.com/callback',
+            response_type: 'code',
+            ...(urlScope ? { scope: urlScope } : {}),
+        })
+
+        router.actions.push(`/oauth/authorize?${params.toString()}`)
+
+        expect(logic.values.scopes).toEqual(expected)
+    })
+
+    const withRequiredScopes = (required_scopes: string[]): void => {
+        logic.actions.loadOAuthApplicationSuccess({
+            name: 'Test App',
+            client_id: 'test-client',
+            is_verified: true,
+            logo_uri: null,
+            required_scopes,
+        })
+    }
+
+    it('ignores a no-access pick on a fully required object and marks its row locked', () => {
+        logic.actions.setScopes(['openid', 'feature_flag:write', 'insight:read'])
+        withRequiredScopes(['feature_flag:write'])
+        logic.actions.setScopeAccess('feature_flag', 'none')
+        expect(logic.values.effectiveScopes).toEqual(['openid', 'feature_flag:write', 'insight:read'])
+        const row = logic.values.scopeRows.find((r) => r.key === 'feature_flag')
+        expect(row).toMatchObject({ locked: true, value: 'write' })
+    })
+
+    it('keeps a required write scope at write level under the bulk read-only action', () => {
+        logic.actions.setScopes(['openid', 'feature_flag:write', 'dashboard:write'])
+        withRequiredScopes(['feature_flag:write'])
+        logic.actions.setAllScopeAccess('read')
+        expect(logic.values.effectiveScopes).toEqual(['openid', 'dashboard:read', 'feature_flag:write'])
+    })
+
+    it('downgrades to read under the bulk read-only action when only the read level is required', () => {
+        logic.actions.setScopes(['openid', 'feature_flag:write'])
+        withRequiredScopes(['feature_flag:read'])
+        logic.actions.setAllScopeAccess('read')
+        expect(logic.values.effectiveScopes).toEqual(['openid', 'feature_flag:read'])
+    })
+
+    it('marks all scopes required when every requested scope is required', () => {
+        logic.actions.setScopes(['experiment:read', 'dashboard:write'])
+        withRequiredScopes(['experiment:read', 'dashboard:write'])
+        expect(logic.values.allScopesRequired).toBe(true)
+        expect(logic.values.adjustableScopeRows).toEqual([])
+        expect(logic.values.showReadOnlyBulkAction).toBe(false)
+    })
+
+    it('does not mark all required when a requested scope is declinable', () => {
+        logic.actions.setScopes(['experiment:read', 'dashboard:write'])
+        withRequiredScopes(['experiment:read'])
+        expect(logic.values.allScopesRequired).toBe(false)
+    })
+
+    it('renders a locked row for required scopes the client did not request and grants them', () => {
+        logic.actions.setScopes(['openid', 'insight:read'])
+        withRequiredScopes(['feature_flag:read'])
+        const row = logic.values.scopeRows.find((r) => r.key === 'feature_flag')
+        expect(row).toMatchObject({ locked: true, value: 'read' })
+        expect(logic.values.effectiveScopes).toEqual(
+            expect.arrayContaining(['openid', 'insight:read', 'feature_flag:read'])
+        )
+        expect(logic.values.effectiveScopes).toHaveLength(3)
+    })
+
+    it('clamps an optional write above a required read floor to the floor, never below', () => {
+        logic.actions.setScopes(['openid', 'feature_flag:write'])
+        withRequiredScopes(['feature_flag:read'])
+        const row = logic.values.scopeRows.find((r) => r.key === 'feature_flag')
+        expect(row).toMatchObject({ locked: false, minLevel: 'read', maxLevel: 'write', value: 'write' })
+        expect(logic.values.effectiveScopes).toContain('feature_flag:write')
+
+        logic.actions.setScopeAccess('feature_flag', 'none')
+        expect(logic.values.effectiveScopes).toEqual(['openid', 'feature_flag:read'])
+
+        logic.actions.setScopeAccess('feature_flag', 'write')
+        expect(logic.values.effectiveScopes).toContain('feature_flag:write')
+    })
+
+    it('renders the write level when a required write upgrades a requested read', () => {
+        logic.actions.setScopes(['openid', 'feature_flag:read'])
+        withRequiredScopes(['feature_flag:write'])
+        const row = logic.values.scopeRows.find((r) => r.key === 'feature_flag')
+        expect(row).toMatchObject({ locked: true, value: 'write' })
+        expect(row?.description).toContain('Write')
+        expect(logic.values.effectiveScopes).toContain('feature_flag:write')
+        expect(logic.values.effectiveScopes).toContain('feature_flag:read')
+    })
+
+    it('resets access selections when scopes are reloaded', () => {
+        logic.actions.setScopes(['openid', 'feature_flag:write'])
+        logic.actions.setAllScopeAccess('read')
+        logic.actions.setScopeAccess('feature_flag', 'none')
+        logic.actions.setScopes(['openid', 'insight:write'])
+        expect(logic.values.effectiveScopes).toEqual(['openid', 'insight:write'])
+    })
+
+    const HINT_TEAMS = [
+        { id: 11, organization: 'org-a', name: 'A project' },
+        { id: 22, organization: 'org-b', name: 'B project' },
+    ]
+    const CURRENT_TEAM = {
+        id: MOCK_DEFAULT_USER.team?.id,
+        organization: MOCK_DEFAULT_USER.organization?.id,
+        name: 'Current project',
+    }
+
+    // Once teams load, a team_id hint resolves to that project + its org; an
+    // inaccessible hint falls back to the user's current org/team.
+    const hintResolutionCases: {
+        name: string
+        hint: number
+        teams: any[]
+        expectedOrg: string | undefined
+        expectedTeams: (number | undefined)[]
+    }[] = [
+        {
+            name: 'resolves the hinted project and its org from the team_id param',
+            hint: 22,
+            teams: HINT_TEAMS,
+            expectedOrg: 'org-b',
+            expectedTeams: [22],
+        },
+        {
+            name: 'falls back to the current org/team when the hinted team is inaccessible',
+            hint: 999,
+            teams: [...HINT_TEAMS, CURRENT_TEAM],
+            expectedOrg: MOCK_DEFAULT_USER.organization?.id,
+            expectedTeams: [MOCK_DEFAULT_USER.team?.id],
+        },
+    ]
+
+    it.each(hintResolutionCases)('team_id hint $name', ({ hint, teams, expectedOrg, expectedTeams }) => {
+        logic.actions.setTeamHint(hint)
+        logic.actions.setRequiredAccessLevel('team')
+        logic.actions.loadAllTeamsSuccess(teams as any)
+        expect(logic.values.teamHint).toBeNull()
+        expect(logic.values.selectedOrganization).toBe(expectedOrg)
+        expect(logic.values.oauthAuthorization.scoped_teams).toEqual(expectedTeams)
+    })
+
+    // Before teams load, a pending hint suppresses the eager current-org selection
+    // (so a fast CTA click can't authorize the wrong project), while the no-hint
+    // path keeps pre-selecting the current org/team.
+    const eagerSelectionCases: {
+        name: string
+        hint: number | null
+        expectedOrg: string | null | undefined
+        expectedTeams: (number | undefined)[]
+    }[] = [
+        {
+            name: 'leaves the selection empty while a team_id hint is pending',
+            hint: 22,
+            expectedOrg: null,
+            expectedTeams: [],
+        },
+        {
+            name: 'pre-selects the current org/team when no team_id hint is given',
+            hint: null,
+            expectedOrg: MOCK_DEFAULT_USER.organization?.id,
+            expectedTeams: [MOCK_DEFAULT_USER.team?.id],
+        },
+    ]
+
+    it.each(eagerSelectionCases)('before teams load, $name', ({ hint, expectedOrg, expectedTeams }) => {
+        if (hint !== null) {
+            logic.actions.setTeamHint(hint)
+        }
+        logic.actions.setRequiredAccessLevel('team')
+        expect(logic.values.selectedOrganization).toBe(expectedOrg)
+        expect(logic.values.oauthAuthorization.scoped_teams).toEqual(expectedTeams)
+    })
+
+    // Opaque client-owned params must reach the API byte-for-byte, whatever they look like.
+    it.each([
+        { name: 'the server sets no flag', flag: undefined, expected: false },
+        { name: 'the server sets the flag to false', flag: false, expected: false },
+        { name: 'the server sets the flag to true', flag: true, expected: true },
+    ])('reports access controls as $expected when $name', ({ flag, expected }) => {
+        const original = window.POSTHOG_APP_CONTEXT
+        window.POSTHOG_APP_CONTEXT = { ...original, oauth_consent_access_controls_apply: flag } as AppContext
+        try {
+            logic.unmount()
+            logic = oauthAuthorizeLogic()
+            logic.mount()
+            expect(logic.values.accessControlsApply).toBe(expected)
+        } finally {
+            window.POSTHOG_APP_CONTEXT = original
+        }
+    })
+
+    describe('OAuth parameter passthrough', () => {
+        const JSON_STATE = '{"flow_id":"5a8f3d48-c841-4375-b06d-5c828c86282d","provider":"posthog"}'
+
+        let sentBody: Record<string, any>
+
+        beforeEach(() => {
+            sentBody = {}
+            useMocks({
+                post: {
+                    '/oauth/authorize/': async ({ request }) => {
+                        sentBody = (await request.json()) as Record<string, any>
+                        // No `redirect_to`, so the logic does not navigate the test page away.
+                        return {}
+                    },
+                },
+            })
+        })
+
+        const authorizeWithSearch = async (search: string): Promise<Record<string, any>> => {
+            // `replaceState` rather than `router.actions.push`: push rebuilds the search string
+            // from kea-router's decoded values, so it cannot reproduce a raw inbound URL.
+            window.history.replaceState({}, '', `/oauth/authorize${search}`)
+            await logic.asyncActions.cancel().catch(() => undefined)
+            return sentBody
+        }
+
+        it('sends a JSON state as the verbatim string the client provided', async () => {
+            const search = `?client_id=abc&state=${encodeURIComponent(JSON_STATE)}`
+            // This is what kea-router hands to `searchParams` — the value we must not send.
+            expect(decodeParams(search, '?').state).toEqual({
+                flow_id: '5a8f3d48-c841-4375-b06d-5c828c86282d',
+                provider: 'posthog',
+            })
+
+            const body = await authorizeWithSearch(search)
+            expect(body.state).toBe(JSON_STATE)
+            expect(body.client_id).toBe('abc')
+        })
+
+        it.each([
+            ['a boolean-like state', 'true'],
+            ['a numeric state with a leading zero', '0123'],
+            ['an array-like state', '[1,2]'],
+        ])('sends %s unchanged', async (_name, state) => {
+            const body = await authorizeWithSearch(`?state=${encodeURIComponent(state)}`)
+            expect(body.state).toBe(state)
+        })
+
+        it('sends null for a parameter the client omitted', async () => {
+            const body = await authorizeWithSearch('?client_id=abc')
+            expect(body.state).toBeNull()
+            expect(body.nonce).toBeNull()
+        })
+    })
+
+    describe('describeOAuthError', () => {
+        it('names the parameter that the serializer rejected', () => {
+            expect(describeOAuthError({ state: ['Not a valid string.'] })).toBe(
+                'The application sent an incorrect authorization request. ' +
+                    'The parameter "state" is not correct: Not a valid string.'
+            )
+        })
+
+        it('describes every rejected parameter', () => {
+            expect(describeOAuthError({ state: ['Not a valid string.'], scope: ['Unknown scope.'] })).toBe(
+                'The application sent an incorrect authorization request. ' +
+                    'The parameter "state" is not correct: Not a valid string. ' +
+                    'The parameter "scope" is not correct: Unknown scope.'
+            )
+        })
+
+        it('uses a non-field error as its own sentence', () => {
+            expect(describeOAuthError({ non_field_errors: ['The request expired.'] })).toBe(
+                'The application sent an incorrect authorization request. The request expired.'
+            )
+        })
+
+        // `/oauth/authorize/` also fails with the RFC 6749 envelope (views.py:1274). Its keys
+        // are not parameter names, and `ApiError.message` would show the code, not the prose.
+        it('prefers the description over the code in an OAuth error envelope', () => {
+            expect(
+                describeOAuthError({
+                    error: 'access_denied',
+                    error_description: 'This organization has disabled AI data processing.',
+                })
+            ).toBe('This organization has disabled AI data processing.')
+        })
+
+        it.each([
+            ['no body', undefined],
+            ['a null body', null],
+            ['a plain string body', 'Bad Request'],
+            ['an array body', ['Bad Request']],
+            ['a body without messages', { state: [] }],
+            // Would otherwise read as a parameter named "error".
+            ['an envelope with no description', { error: 'invalid_client' }],
+            // DRF always sends a list, so a bare string is not a field error.
+            ['a non-list field value', { state: 'Not a valid string.' }],
+        ])('returns null for %s, so the caller falls back', (_name, data) => {
+            expect(describeOAuthError(data)).toBeNull()
+        })
+    })
+    describe('grouping', () => {
+        it('keeps a short request flat and groups only past the threshold', () => {
+            logic.actions.setScopes(['openid', 'feature_flag:write', 'session_recording:write', 'insight:write'])
+            expect(logic.values.scopeRowsGrouped).toBe(false)
+            logic.actions.setScopes([
+                'openid',
+                ...[
+                    'insight',
+                    'dashboard',
+                    'query',
+                    'cohort',
+                    'action',
+                    'person',
+                    'survey',
+                    'experiment',
+                    'notebook',
+                    'logs',
+                    'error_tracking',
+                ].map((object) => `${object}:read`),
+            ])
+            expect(logic.values.scopeRowsGrouped).toBe(true)
+            const groups = logic.values.scopeGroups
+            expect(groups.flatMap((group) => group.rows)).toHaveLength(logic.values.adjustableScopeRows.length)
+            for (const group of groups) {
+                expect(group.rows.length).toBeGreaterThan(0)
+                expect(group.rows.map((row) => getScopeGroupLabel(row.key))).toEqual(group.rows.map(() => group.label))
+            }
+        })
+
+        it('sets every row of a group with one group action, clamped to each ceiling', () => {
+            logic.actions.loadOAuthApplicationSuccess({
+                name: 'Test app',
+                client_id: 'test-client',
+                is_verified: true,
+                logo_uri: null,
+            })
+            logic.actions.setScopes(['openid', 'session_recording:write', 'session_recording_playlist:read'])
+            logic.actions.setScopeGroupAccess(['session_recording', 'session_recording_playlist'], 'none')
+            expect(logic.values.effectiveScopes).toEqual(['openid'])
+            expect(scopeGroupLevel(logic.values.adjustableScopeRows)).toBe('none')
+            expect(scopeGroupTooltip(logic.values.adjustableScopeRows, 'none')).toBeUndefined()
+            const [recordingRow, playlistRow] = logic.values.adjustableScopeRows
+            const requiredRows = [
+                {
+                    ...recordingRow,
+                    minLevel: 'read' as const,
+                    value: 'read' as const,
+                    disabledReasons: { none: 'Test app requires at least read access' },
+                },
+                playlistRow,
+            ]
+            expect(scopeGroupLevel(requiredRows)).toBe('none')
+            expect(scopeGroupTooltip(requiredRows, 'none')).toBe(
+                '1 of these permissions stays at read: Test app requires at least read access.'
+            )
+            logic.actions.setScopeGroupAccess(['session_recording', 'session_recording_playlist'], 'write')
+            expect(logic.values.effectiveScopes).toEqual([
+                'openid',
+                'session_recording:write',
+                'session_recording_playlist:read',
+            ])
+            expect(scopeGroupLevel(logic.values.adjustableScopeRows)).toBe('write')
+            expect(scopeGroupTooltip(logic.values.adjustableScopeRows, 'write')).toBe(
+                '1 of these permissions stays at read: Not requested by Test app.'
+            )
+            logic.actions.setScopeAccess('session_recording', 'read')
+            expect(scopeGroupLevel(logic.values.adjustableScopeRows)).toBe('read')
+            logic.actions.setScopeAccess('session_recording_playlist', 'none')
+            expect(scopeGroupLevel(logic.values.adjustableScopeRows)).toBeUndefined()
+        })
+    })
+})

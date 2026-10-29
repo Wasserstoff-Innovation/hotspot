@@ -1,0 +1,115 @@
+import { Field as KeaField } from 'kea-forms'
+
+import { LemonInput } from '@posthog/lemon-ui'
+
+import { AnimatedCollapsible } from 'lib/components/AnimatedCollapsible'
+import { LemonField } from 'lib/lemon-ui/LemonField'
+
+// Used to trigger the AI prompt when the user enters an AI-related referral source. This is a simple heuristic and can be adjusted as needed.
+const AI_REFERRAL_PATTERNS = [
+    // AI labs
+    'open ?ai',
+    'anthropic',
+    'perplexity',
+    'x ?ai',
+    'mistral',
+    'eleven ?labs',
+    'meta ?ai',
+    'anysphere',
+    'groq',
+    'z.ai',
+    // AI models and tooling
+    'chat ?gpt',
+    'gpt',
+    'claude',
+    'claud', // common typo
+    'opus',
+    'sonnet',
+    'haiku',
+    'gemini',
+    'flash',
+    'bard',
+    'copilot',
+    'deep ?seek',
+    'grok',
+    'qwen',
+    'kimi',
+    'devstral',
+    'nemo',
+    'composer',
+    'codex',
+    'cursor',
+    'manus',
+    'windsurf',
+    'antigravity',
+    'cline',
+    'dia',
+    // LLM coding platforms
+    'repl ?it',
+    'lovable',
+    'hercules',
+    'vercel',
+    'v0',
+    'bolt',
+    'rork',
+    'retool',
+    'figma ?make',
+    'poke',
+    'clawdbot',
+    'moltbot',
+    'openclaw',
+    'ai.com',
+    // Adjacent words
+    'ai',
+    'llm',
+    'large language model',
+    'artificial intelligence',
+    'assistant',
+    'chat',
+    'vibe ?coding',
+    'mcp',
+    // Non-English equivalents
+    'ia', // Spanish, Italian, Portuguese, French abbreviation for AI
+    'ki', // German abbreviation (Künstliche Intelligenz)
+]
+const AI_REFERRAL_PATTERN = new RegExp(`\\b(${AI_REFERRAL_PATTERNS.join('|')})\\b`, 'i')
+
+export default function SignupReferralSource({ disabled }: { disabled: boolean }): JSX.Element {
+    return (
+        <>
+            <LemonField name="referral_source" label="Where did you hear about us?" showOptional>
+                {({ value, onChange }) => (
+                    <LemonInput
+                        className="ph-ignore-input"
+                        data-attr="signup-referral-source"
+                        placeholder="e.g. a colleague, or a web search"
+                        disabled={disabled}
+                        value={value ?? ''}
+                        onChange={onChange}
+                    />
+                )}
+            </LemonField>
+            {/* Subscribing here rather than in the parent keeps a keystroke from re-rendering the
+                whole signup panel. */}
+            <KeaField name="referral_source" noStyle>
+                {({ value }) => (
+                    <AnimatedCollapsible collapsed={!AI_REFERRAL_PATTERN.test(value ?? '')}>
+                        <LemonField
+                            name="referral_source_ai_prompt"
+                            label="What prompt or search led you to PostHog?"
+                            help="Paste the prompt or search queries if you remember, even roughly"
+                            showOptional
+                        >
+                            <LemonInput
+                                className="ph-ignore-input"
+                                data-attr="signup-referral-source-ai-prompt"
+                                placeholder="e.g. Product analytics tool with error tracking"
+                                disabled={disabled}
+                            />
+                        </LemonField>
+                    </AnimatedCollapsible>
+                )}
+            </KeaField>
+        </>
+    )
+}

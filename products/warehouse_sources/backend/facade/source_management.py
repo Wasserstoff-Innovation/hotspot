@@ -1,0 +1,124 @@
+"""
+Source-management wiring for warehouse_sources.
+
+Re-exports the source classes, source registry, CDC adapters, schema/config types, and
+row-filter helpers that the data_warehouse source/schema management API uses to validate,
+preview, and configure data sources. These live deep under ``temporal.data_imports.sources``
+and pull heavy dependencies (DB drivers, the source registry), so this module is loaded
+lazily (PEP 562): names resolve on first access, keeping it off the ``django.setup()``
+path and out of any import cycle.
+"""
+
+_B = "products.warehouse_sources.backend.temporal.data_imports."
+
+_LAZY = {
+    "SourceRegistry": "sources",
+    "load_all_sources_or_raise": "sources",
+    "DocsFetchError": "sources.custom.ai_builder",
+    "draft_manifest_sync": "sources.custom.ai_builder",
+    "fetch_docs_text": "sources.custom.ai_builder",
+    "CDCSourceAdapter": "cdc.adapters",
+    "add_table_failure_message": "cdc.adapters",
+    "get_cdc_adapter": "cdc.adapters",
+    "source_type_supports_cdc": "cdc.adapters",
+    "CDCRepairError": "cdc.repair",
+    "CDCRepairInProgress": "cdc.repair",
+    "repair_cdc_source": "cdc.repair",
+    "repair_is_running": "cdc.repair",
+    "SELF_MANAGED_LAG_REASON": "cdc.broken",
+    "tables_wait_for_repair": "cdc.broken",
+    "purge_buffer_prefix": "cdc.buffer",
+    "CDC_SEQ_COLUMN": "cdc.batcher",
+    "is_history_table_mode": "cdc.batcher",
+    "history_column_collisions": "cdc.batcher",
+    "BUFFER_LANE": "cdc.snapshot_lane",
+    "CDC_RESET_PENDING_KEY": "cdc.snapshot_lane",
+    "hand_reset_to_capture_if_sync_running": "cdc.snapshot_lane",
+    "resnapshot_stays_in_buffer": "cdc.snapshot_lane",
+    "bigquery_client": "sources.bigquery.bigquery",
+    "is_bigquery_auth_error": "sources.bigquery.bigquery",
+    "resolve_bigquery_auth": "sources.bigquery.bigquery",
+    "ClickHouseConnectionError": "sources.clickhouse.clickhouse",
+    "ClickHouseSource": "sources.clickhouse.source",
+    "AnySource": "sources.common.base",
+    "ExternalWebhookInfo": "sources.common.base",
+    "FieldType": "sources.common.base",
+    "WebhookCreationResult": "sources.common.base",
+    "WebhookDeletionResult": "sources.common.base",
+    "WebhookSource": "sources.common.base",
+    "WebhookSyncResult": "sources.common.base",
+    "Config": "sources.common.config",
+    "IntegrationAccountListingError": "sources.common.integration_accounts",
+    "filter_integration_accounts": "sources.common.integration_accounts",
+    "CredentialAccountsMixin": "sources.common.mixins",
+    "DATABASE_HOST_NOT_ALLOWED_GUIDANCE": "sources.common.mixins",
+    "HostNotAllowedError": "sources.common.mixins",
+    "is_team_allowlisted_for_internal_hosts": "sources.common.mixins",
+    "OAuthMixin": "sources.common.mixins",
+    "pinned_host_kwargs": "sources.common.mixins",
+    "TemporaryHostResolutionError": "sources.common.mixins",
+    "libpq_tls_kwargs": "sources.common.tls",
+    "tls_options": "sources.common.tls",
+    "SourceSchema": "sources.common.schema",
+    "discover_trino_catalog": "sources.trino.trino",
+    "build_default_schemas": "sources.common.schema",
+    "build_default_sync_settings": "sources.common.schema",
+    "RowFilterValidationError": "sources.common.sql",
+    "filter_dwh_columns_by_enabled_columns": "sources.common.sql",
+    "sql_schema_metadata": "sources.common.sql",
+    "validate_and_coerce_row_filters": "sources.common.sql",
+    "SQLSource": "sources.common.sql.base",
+    "extract_available_column_names": "sources.common.sql.metadata",
+    "DottedNameParts": "sources.common.sql.location",
+    "fill_missing_from_dotted_name": "sources.common.sql.location",
+    "normalize_namespace": "sources.common.sql.location",
+    "filter_columns_by_enabled_columns": "sources.common.sql.projection",
+    "prune_enabled_columns": "sources.common.sql.projection",
+    "template": "sources.common.default_webhook_template",
+    "MAX_CUSTOM_SOURCES_PER_TEAM": "sources.custom.source",
+    "PREVIEW_DEFAULT_ROWS": "sources.custom.source",
+    "PREVIEW_MAX_ROWS": "sources.custom.source",
+    "CustomSource": "sources.custom.source",
+    "manifest_request_hosts": "sources.custom.source",
+    "CustomSourceConfig": "sources.generated_configs.custom",
+    "GithubSource": "sources.github.source",
+    "GithubSourceConfig": "sources.generated_configs.github",
+    "MotherDuckConnectionError": "sources.motherduck.motherduck",
+    "MotherduckSource": "sources.motherduck.source",
+    "MotherduckSourceConfig": "sources.generated_configs.motherduck",
+    "translate_motherduck_error": "sources.motherduck.motherduck",
+    "MySQLSourceConfig": "sources.generated_configs.mysql",
+    "PostgresSourceConfig": "sources.generated_configs.postgres",
+    "SnowflakeSourceConfig": "sources.generated_configs.snowflake",
+    "MySQLSource": "sources.mysql.source",
+    "google_search_console_session": "sources.google_search_console.google_search_console",
+    "list_sites": "sources.google_search_console.google_search_console",
+    "DEFAULT_LAG_CRITICAL_THRESHOLD_MB": "sources.postgres.cdc.config",
+    "DEFAULT_LAG_WARNING_THRESHOLD_MB": "sources.postgres.cdc.config",
+    "cdc_pg_connection": "sources.postgres.cdc.slot_manager",
+    "SSLRequiredError": "sources.postgres.postgres",
+    "SSL_REQUIRED_AFTER_DATE": "sources.postgres.postgres",
+    "_get_sslmode": "sources.postgres.postgres",
+    "get_primary_key_columns": "sources.postgres.postgres",
+    "new_source_requires_ssl": "sources.postgres.postgres",
+    "source_requires_ssl": "sources.postgres.postgres",
+    "POSTGRES_HOST_CHECK_SOURCE_TYPE": "sources.postgres.source",
+    "PostgresSource": "sources.postgres.source",
+    "RedshiftSource": "sources.redshift.source",
+    "SnowflakeSource": "sources.snowflake.source",
+    "MANAGED_WAREHOUSE_TRINO_SOURCE_TYPE": "sources.trino.trino",
+    "connect_trino": "sources.trino.trino",
+    "is_posthog_managed_trino_host": "sources.trino.trino",
+    "trino_error_to_message": "sources.trino.trino",
+}
+
+__all__ = sorted(_LAZY)
+
+
+def __getattr__(name: str):
+    module = _LAZY.get(name)
+    if module is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    import importlib
+
+    return getattr(importlib.import_module(_B + module), name)

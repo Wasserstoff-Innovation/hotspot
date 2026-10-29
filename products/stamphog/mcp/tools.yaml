@@ -1,0 +1,170 @@
+# MCP tool definitions. Tools are opt-in: an operation is exposed only when it has an entry here.
+# List operations without an entry: pnpm --filter=@posthog/mcp run scaffold-yaml -- --candidates --product stamphog
+# Add one: pnpm --filter=@posthog/mcp run scaffold-yaml -- --add <operationId> --product stamphog
+# To keep an operation off on purpose, set enabled: false and give a disabled_reason.
+category: Stamphog
+feature: stamphog
+url_prefix: /stamphog
+ui_apps: {}
+tools:
+    stamphog-digest-runs-list:
+        operation: stamphog_digest_runs_list
+        enabled: true
+        scopes:
+            - stamphog:read
+        annotations:
+            readOnly: true
+            destructive: false
+            idempotent: true
+        list: true
+        title: List stamphog digest runs
+        description: >
+            List posted (or attempted) daily digest runs, newest first. Each run reports the audience it drained (a team
+            slug, or `repo:owner/name`), the Slack channel it went to and why routing chose that channel, its status,
+            how many merged PRs it summarized, the Slack message timestamp, and the digest content (`summary`: the
+            headline and each listed PR's number, title, URL, author, repository and one-line summary). Filter by
+            `slack_channel_id` to see one channel's history.
+        feature_flag: stamphog
+    stamphog-digest-runs-retrieve:
+        operation: stamphog_digest_runs_retrieve
+        enabled: false
+        disabled_reason: stamphog-digest-runs-list returns the same serializer fields for every run
+        feature_flag: stamphog
+    stamphog-pull-requests-get:
+        operation: stamphog_pull_requests_retrieve
+        enabled: true
+        scopes:
+            - stamphog:read
+        annotations:
+            readOnly: true
+            destructive: false
+            idempotent: true
+        title: Get stamphog pull request
+        description:
+            Get one pull request record from stamphog (PostHog's automated PR review and merged-PR digest) by its
+            internal UUID — the `id` returned by `stamphog-pull-requests-list`, not the GitHub PR number. Returns the
+            repository, title, author, head branch, and merge details. To look a PR up by its GitHub number, use
+            `stamphog-pull-requests-list` with `pr_number`. For CI status or merge-timing analytics on a PR, use the
+            engineering analytics `pull-requests` or `pr-lifecycle` tools instead.
+        feature_flag: stamphog
+    stamphog-pull-requests-list:
+        operation: stamphog_pull_requests_list
+        enabled: true
+        scopes:
+            - stamphog:read
+        annotations:
+            readOnly: true
+            destructive: false
+            idempotent: true
+        list: true
+        title: List stamphog pull requests
+        description: >
+            List pull requests stamphog has seen in this project, newest first. Filter by `pr_number` for a specific PR,
+            or by `merged` (true/false) to separate open work from merged history. Each entry includes the repository,
+            author, head branch, merge state, and diff size (additions/deletions/changed_files) once merged.
+        feature_flag: stamphog
+    stamphog-repo-configs-delete:
+        operation: stamphog_repo_configs_destroy
+        enabled: true
+        scopes:
+            - stamphog:write
+        annotations:
+            readOnly: false
+            destructive: true
+            idempotent: true
+        title: Delete stamphog repo config
+        description: >
+            Delete a repo config by id. This removes stamphog's review and digest configuration for the repo entirely —
+            prefer `stamphog-repo-configs-update` with `enabled: false` if you only want to pause review temporarily.
+        feature_flag: stamphog
+    stamphog-repo-configs-get:
+        operation: stamphog_repo_configs_retrieve
+        enabled: true
+        scopes:
+            - stamphog:read
+        annotations:
+            readOnly: true
+            destructive: false
+            idempotent: true
+        title: Get stamphog repo config
+        description: >
+            Get a single repo config by id. Returns the provider, repository full name, installation id, and the enabled
+            / digest_enabled flags.
+        feature_flag: stamphog
+    stamphog-repo-configs-list:
+        operation: stamphog_repo_configs_list
+        enabled: true
+        scopes:
+            - stamphog:read
+        annotations:
+            readOnly: true
+            destructive: false
+            idempotent: true
+        list: true
+        title: List stamphog repo configs
+        description: >
+            List repos stamphog is configured for in this project. Each config controls whether stamphog reviews pull
+            requests for a repo (`enabled`), whether merged PRs feed the daily digest (`digest_enabled`), and which
+            GitHub App installation authorizes the calls. Use this to check whether a repo is already onboarded before
+            creating a new config.
+        feature_flag: stamphog
+    stamphog-review-runs-create:
+        operation: stamphog_review_runs_create
+        enabled: true
+        scopes:
+            - stamphog:write
+        annotations:
+            readOnly: false
+            destructive: false
+            idempotent: false
+        title: Request a stamphog review
+        description: >
+            Ask stamphog to review one pull request now, by `repository` (owner/name) and `pr_number`. The repository
+            must be connected and enabled in Stamphog. The request replaces the trigger label, so it works in label mode
+            too, but every other rule still applies: stamphog refuses drafts, closed PRs, bot-authored PRs, PRs from
+            outside the repository, and PRs whose author lacks write access, and the error message says why. Stamphog
+            decides the verdict itself: a passing review posts a real GitHub approval, anything else posts a comment.
+            The review runs in the background, so this returns the run right away (status `queued`). Poll
+            `stamphog-review-runs-get` with its id for the verdict and reasoning. When a run already covers the PR's
+            current head, that run is returned with `created: false` instead of starting another.
+        feature_flag: stamphog
+    stamphog-review-runs-get:
+        operation: stamphog_review_runs_retrieve
+        enabled: true
+        scopes:
+            - stamphog:read
+        annotations:
+            readOnly: true
+            destructive: false
+            idempotent: true
+        title: Get stamphog review run
+        description: >
+            Get a single review run by id — the record of one automated review pass over a pull request. Returns the
+            lifecycle `status`, final `verdict`, an allowlisted `gate_result` (gate_blocked, final_verdict), and the
+            reviewer's `reasoning` (its explanation, the showstoppers that blocked approval, the review text stamphog
+            posts on GitHub, and a plain-language change summary). The reasoning fields are null until the reviewer has
+            run. Poll this after `stamphog-review-runs-create` until `status` is completed, gated, failed, or
+            superseded. The raw reviewer transcript, PR payload, patches, and policy contents are not exposed.
+        feature_flag: stamphog
+    stamphog-review-runs-list:
+        operation: stamphog_review_runs_list
+        enabled: true
+        scopes:
+            - stamphog:read
+        annotations:
+            readOnly: true
+            destructive: false
+            idempotent: true
+        list: true
+        title: List stamphog review runs
+        description: >
+            List stamphog's automated review runs for pull requests in this project, newest first. Filter by
+            `repository`, `pr_number`, or `status` to find why a specific PR got its verdict. Leave `trigger` unset
+            unless you want one trigger only: `trigger: all` does not mean every trigger. Each run reports its lifecycle
+            `status`, final `verdict`, and the deterministic gate outcome (`gate_result`) computed before the reviewer
+            ran. The reviewer's reasoning is null in list results — use `stamphog-review-runs-get` on a run to read it.
+        feature_flag: stamphog
+        response:
+            exclude:
+                - output
+                - reasoning

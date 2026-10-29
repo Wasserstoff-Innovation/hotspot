@@ -1,0 +1,2542 @@
+import os
+import json
+from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
+from urllib.parse import unquote
+
+import time_machine
+from posthog.test.base import APIBaseTest
+from unittest.mock import ANY, Mock, patch
+
+from django.db import connection
+from django.test import SimpleTestCase
+from django.test.utils import CaptureQueriesContext
+from django.utils import timezone
+
+from boto3 import resource
+from botocore.config import Config
+from parameterized import parameterized
+from rest_framework import status
+
+from posthog.models import Team, User
+from posthog.models.activity_logging.activity_log import ActivityLog
+from posthog.models.integration import Integration
+from posthog.models.organization import OrganizationMembership
+from posthog.models.scoping import team_scope
+from posthog.models.utils import uuid7
+from posthog.settings import (
+    OBJECT_STORAGE_ACCESS_KEY_ID,
+    OBJECT_STORAGE_BUCKET,
+    OBJECT_STORAGE_ENDPOINT,
+    OBJECT_STORAGE_SECRET_ACCESS_KEY,
+)
+
+from products.access_control.backend.facade.testing import add_role_member, create_role
+from products.error_tracking.backend.facade import (
+    contracts,
+    summaries as summaries_facade,
+)
+from products.error_tracking.backend.models import (
+    ErrorTrackingAlert,
+    ErrorTrackingAlertThread,
+    ErrorTrackingIssue,
+    ErrorTrackingIssueAssignment,
+    ErrorTrackingIssueFingerprintV2,
+    ErrorTrackingRelease,
+    ErrorTrackingStackFrame,
+    ErrorTrackingSymbolSet,
+)
+from products.error_tracking.backend.presentation.views.issues import ErrorTrackingIssueAssignRequestSerializer
+from products.error_tracking.backend.presentation.views.symbol_sets import (
+    BULK_CHECK_UPLOAD_MAX_SYMBOL_SETS,
+    ErrorTrackingSymbolSetBulkCheckUploadSerializer,
+)
+
+TEST_BUCKET = "test_storage_bucket-TestErrorTracking"
+
+
+def get_path_to(fixture_file: str) -> str:
+    file_dir = os.path.dirname(__file__)
+    return os.path.join(file_dir, "fixtures", fixture_file)
+
+
+class TestErrorTrackingIssueAssignRequestSerializer(SimpleTestCase):
+    @parameterized.expand(
+        [
+            ("user", "not-a-user-id"),
+            ("role", "not-a-role-id"),
+        ]
+    )
+    def test_rejects_invalid_assignee_id(self, assignee_type: str, assignee_id: str) -> None:
+        serializer = ErrorTrackingIssueAssignRequestSerializer(
+            data={"assignee": {"id": assignee_id, "type": assignee_type}}
+        )
+
+        assert not serializer.is_valid()
+        assert "id" in serializer.errors["assignee"]
+
+
+class TestErrorTrackingSymbolSetBulkCheckUploadSerializer(SimpleTestCase):
+    @parameterized.expand(
+        [
+            ("at_limit", BULK_CHECK_UPLOAD_MAX_SYMBOL_SETS, True),
+            ("over_limit", BULK_CHECK_UPLOAD_MAX_SYMBOL_SETS + 1, False),
+        ]
+    )
+    def test_caps_the_symbol_sets_per_request(self, _name: str, count: int, expected_valid: bool) -> None:
+        serializer = ErrorTrackingSymbolSetBulkCheckUploadSerializer(
+            data={"symbol_sets": [{"chunk_id": f"chunk-{i}", "content_hash": "hash"} for i in range(count)]}
+        )
+
+        assert serializer.is_valid() == expected_valid
+        if not expected_valid:
+            assert "symbol_sets" in serializer.errors
+
+
+class TestErrorTracking(APIBaseTest):
+    def create_issue(self, fingerprints=None, status="active") -> ErrorTrackingIssue:
+        issue = ErrorTrackingIssue.objects.create(team=self.team, status=status)
+        fingerprints = fingerprints if fingerprints else []
+        for fingerprint in fingerprints:
+            ErrorTrackingIssueFingerprintV2.objects.create(team=self.team, issue=issue, fingerprint=fingerprint)
+        return issue
+
+    def test_external_reference_create_returns_provider_config_validation_error(self):
+        issue = self.create_issue()
+        integration = Integration.objects.create(
+            team=self.team,
+            kind=Integration.IntegrationKind.JIRA.value,
+            config={"cloud_id": "cloud-id"},
+            sensitive_config={"access_token": "access-token"},
+        )
+
+        response = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/external_references/",
+            data={
+                "issue": str(issue.id),
+                "integration_id": integration.id,
+                "config": {"title": "Checkout TypeError", "description": ""},
+            },
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json()["detail"] == "Missing required config fields for jira: project_key."
+
+    def teardown_method(self, method) -> None:
+        s3 = resource(
+            "s3",
+            endpoint_url=OBJECT_STORAGE_ENDPOINT,
+            aws_access_key_id=OBJECT_STORAGE_ACCESS_KEY_ID,
+            aws_secret_access_key=OBJECT_STORAGE_SECRET_ACCESS_KEY,
+            config=Config(signature_version="s3v4"),
+            region_name="us-east-1",
+        )
+        bucket = s3.Bucket(OBJECT_STORAGE_BUCKET)
+        bucket.objects.filter(Prefix=TEST_BUCKET).delete()
+
+    def test_issue_not_found_fingerprint_redirect(self):
+        deleted_issue_id = uuid7()
+        merged_fingerprint = "merged_fingerprint"
+
+        merged_issue = self.create_issue()
+        ErrorTrackingIssueFingerprintV2.objects.create(
+            team=self.team, issue=merged_issue, fingerprint=merged_fingerprint
+        )
+
+        # no fingerprint
+        response = self.client.get(
+            f"/api/environments/{self.team.id}/error_tracking/issues/{deleted_issue_id}",
+        )
+        assert response.status_code == 404
+
+        # with fingerprint hint
+        response = self.client.get(
+            f"/api/environments/{self.team.id}/error_tracking/issues/{deleted_issue_id}?fingerprint={merged_fingerprint}",
+        )
+        assert response.status_code == 308
+        assert response.json() == {"issue_id": str(merged_issue.id)}
+
+    def test_issue_fingerprint_does_not_redirect_when_not_merged(self):
+        issue = self.create_issue(fingerprints=["fingerprint"])
+
+        # with fingerprint hint
+        response = self.client.get(
+            f"/api/environments/{self.team.id}/error_tracking/issues/{issue.id}?fingerprint=fingerprint",
+        )
+        assert response.status_code == 200
+        assert response.json().get("id") == str(issue.id)
+
+    @time_machine.travel("2025-01-01", tick=False)
+    def test_issue_fetch(self):
+        issue = self.create_issue(["fingerprint"])
+
+        response = self.client.get(f"/api/environments/{self.team.id}/error_tracking/issues/{issue.id}")
+
+        assert response.status_code == 200
+        assert response.json() == {
+            "id": str(issue.id),
+            "name": None,
+            "cohort": None,
+            "description": None,
+            "status": "active",
+            "severity": None,
+            "assignee": None,
+            "first_seen": "2025-01-01T00:00:00Z",
+            "external_issues": [],
+        }
+
+    def test_issue_list_paginates_without_aggregating_all_fingerprints(self) -> None:
+        issues = [ErrorTrackingIssue.objects.create(team=self.team) for _ in range(3)]
+        expected_issue = sorted(issues, key=lambda issue: issue.id, reverse=True)[1]
+        later_fingerprint = ErrorTrackingIssueFingerprintV2.objects.create(
+            team=self.team, issue=expected_issue, fingerprint="later"
+        )
+        earlier_fingerprint = ErrorTrackingIssueFingerprintV2.objects.create(
+            team=self.team, issue=expected_issue, fingerprint="earlier"
+        )
+        ErrorTrackingIssueFingerprintV2.objects.filter(id=later_fingerprint.id).update(
+            first_seen=datetime(2025, 1, 2, tzinfo=UTC)
+        )
+        ErrorTrackingIssueFingerprintV2.objects.filter(id=earlier_fingerprint.id).update(
+            first_seen=datetime(2025, 1, 1, tzinfo=UTC)
+        )
+
+        with CaptureQueriesContext(connection) as queries:
+            response = self.client.get(
+                f"/api/environments/{self.team.id}/error_tracking/issues", data={"limit": 1, "offset": 1}
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        body = response.json()
+        assert body["count"] == 3
+        assert [issue["id"] for issue in body["results"]] == [str(expected_issue.id)]
+        assert body["results"][0]["first_seen"] == "2025-01-01T00:00:00Z"
+
+        issue_table = ErrorTrackingIssue._meta.db_table
+        fingerprint_table = ErrorTrackingIssueFingerprintV2._meta.db_table
+        count_query = next(
+            query["sql"]
+            for query in queries.captured_queries
+            if issue_table in query["sql"] and "COUNT(" in query["sql"].upper()
+        )
+        page_query = next(
+            query["sql"]
+            for query in queries.captured_queries
+            if issue_table in query["sql"] and "LIMIT 1" in query["sql"].upper()
+        )
+        assert fingerprint_table not in count_query
+        assert "GROUP BY" not in page_query.upper()
+        assert f'ORDER BY "{issue_table}"."id" DESC' in page_query
+
+    @parameterized.expand(["user", "role"])
+    def test_issue_fetch_assignee_id_preserves_type(self, assignee_type):
+        # The frontend resolves the assignee by strict-comparing the numeric member id with
+        # `assignee.id`; if retrieve serializes the user id as a string the issue renders as
+        # "Unassigned" despite being assigned. User ids must stay integers, role ids strings.
+        issue = self.create_issue(["fingerprint"])
+        expected_id: int | str
+        expected_python_type: type
+        if assignee_type == "user":
+            ErrorTrackingIssueAssignment.objects.create(issue=issue, user=self.user)
+            expected_id, expected_python_type = self.user.id, int
+        else:
+            role_id = create_role(organization_id=self.organization.id, name="Eng role")
+            ErrorTrackingIssueAssignment.objects.create(issue=issue, role_id=role_id)
+            expected_id, expected_python_type = str(role_id), str
+
+        response = self.client.get(f"/api/environments/{self.team.id}/error_tracking/issues/{issue.id}")
+
+        assert response.status_code == 200
+        assignee = response.json()["assignee"]
+        assert assignee == {"id": expected_id, "type": assignee_type}
+        assert isinstance(assignee["id"], expected_python_type)
+
+    @time_machine.travel("2025-01-01", tick=False)
+    def test_issue_update(self):
+        issue = self.create_issue(["fingerprint"])
+
+        with patch("posthog.event_usage.posthoganalytics.capture") as mock_capture:
+            response = self.client.patch(
+                f"/api/environments/{self.team.id}/error_tracking/issues/{issue.id}",
+                data={"status": "resolved", "severity": "high"},
+                headers={"X-Posthog-Client": "mcp"},
+            )
+        issue.refresh_from_db()
+
+        assert response.status_code == 200
+        changed_events = [
+            call.kwargs["properties"]
+            for call in mock_capture.call_args_list
+            if call.kwargs.get("event") == "error_tracking_issue_changed"
+        ]
+        assert changed_events == [
+            {
+                **changed_events[0],
+                "action": "update",
+                "source": "mcp",
+                "issue_id": str(issue.id),
+                "updated_fields": ["severity", "status"],
+                "status": "resolved",
+                "severity": "high",
+            }
+        ]
+        assert response.json() == {
+            "id": str(issue.id),
+            "name": None,
+            "cohort": None,
+            "description": None,
+            "status": "resolved",
+            "severity": "high",
+            "assignee": None,
+            "first_seen": "2025-01-01T00:00:00Z",
+            "external_issues": [],
+        }
+        assert issue.status == ErrorTrackingIssue.Status.RESOLVED
+        assert issue.severity == ErrorTrackingIssue.Severity.HIGH
+        assert issue.state_updated_at == datetime(2025, 1, 1, tzinfo=UTC)
+
+        self._assert_logs_the_activity(
+            issue.id,
+            [
+                {
+                    "activity": "updated",
+                    "created_at": ANY,
+                    "detail": {
+                        "changes": [
+                            {
+                                "action": "changed",
+                                "after": "resolved",
+                                "before": "active",
+                                "field": "status",
+                                "type": "ErrorTrackingIssue",
+                            },
+                            {
+                                "action": "changed",
+                                "after": "high",
+                                "before": None,
+                                "field": "severity",
+                                "type": "ErrorTrackingIssue",
+                            },
+                        ],
+                        "name": issue.name,
+                        "short_id": None,
+                        "trigger": None,
+                        "type": None,
+                    },
+                    "item_id": str(issue.id),
+                    "scope": "ErrorTrackingIssue",
+                    "user": {"email": "user1@posthog.com", "first_name": ""},
+                }
+            ],
+        )
+
+    def _issue_noop_update(self) -> tuple[str, str, dict]:
+        issue = self.create_issue(["fingerprint"])
+        return "patch", f"issues/{issue.id}", {"status": "active"}
+
+    def _issue_noop_unassign(self) -> tuple[str, str, dict]:
+        issue = self.create_issue(["fingerprint"])
+        return "patch", f"issues/{issue.id}/assign", {"assignee": None}
+
+    def _issue_assign(self) -> tuple[str, str, dict]:
+        issue = self.create_issue(["fingerprint"])
+        return "patch", f"issues/{issue.id}/assign", {"assignee": {"id": self.user.id, "type": "user"}}
+
+    def _issue_bulk_resolve_skips_resolved(self) -> tuple[str, str, dict]:
+        active = self.create_issue(["fingerprint_active"])
+        resolved = self.create_issue(["fingerprint_resolved"])
+        resolved.status = ErrorTrackingIssue.Status.RESOLVED
+        resolved.save()
+        return (
+            "post",
+            "issues/bulk",
+            {"ids": [str(active.id), str(resolved.id)], "action": "set_status", "status": "resolved"},
+        )
+
+    def _issue_merge_drops_missing_source(self) -> tuple[str, str, dict]:
+        target = self.create_issue(["fingerprint_target"])
+        source = self.create_issue(["fingerprint_source"])
+        return "post", f"issues/{target.id}/merge", {"ids": [str(source.id), str(uuid7())]}
+
+    def _issue_split(self) -> tuple[str, str, dict]:
+        issue = self.create_issue(["fingerprint_one", "fingerprint_two"])
+        return "post", f"issues/{issue.id}/split", {"fingerprints": [{"fingerprint": "fingerprint_two"}]}
+
+    @parameterized.expand(
+        [
+            ("update_without_change", _issue_noop_update, None),
+            ("unassign_when_unassigned", _issue_noop_unassign, None),
+            ("assign", _issue_assign, {"action": "assign", "assignee_type": "user"}),
+            (
+                "bulk_skips_unchanged",
+                _issue_bulk_resolve_skips_resolved,
+                {"action": "bulk_set_status", "issue_count": 1},
+            ),
+            (
+                "merge_skips_missing_source",
+                _issue_merge_drops_missing_source,
+                {"action": "merge", "merged_issue_count": 1},
+            ),
+            ("split", _issue_split, {"action": "split", "fingerprint_count": 1, "new_issue_count": 1}),
+        ]
+    )
+    def test_issue_changed_event_counts_actual_changes(
+        self, _name: str, build_request: Callable[["TestErrorTracking"], tuple[str, str, dict]], expected: dict | None
+    ) -> None:
+        method, path, data = build_request(self)
+
+        with patch("posthog.event_usage.posthoganalytics.capture") as mock_capture:
+            response = getattr(self.client, method)(
+                f"/api/environments/{self.team.id}/error_tracking/{path}", data=data, format="json"
+            )
+
+        assert response.status_code == 200, response.json()
+        changed_events = [
+            call.kwargs["properties"]
+            for call in mock_capture.call_args_list
+            if call.kwargs.get("event") == "error_tracking_issue_changed"
+        ]
+        if expected is None:
+            assert changed_events == []
+        else:
+            assert changed_events == [{**changed_events[0], "source": "web", **expected}]
+
+    @parameterized.expand(
+        [
+            ("severity", {"severity": "high"}),
+            ("name", {"name": "Updated issue"}),
+            ("description", {"description": "Updated description"}),
+        ]
+    )
+    @time_machine.travel("2025-01-02", tick=False)
+    def test_issue_update_stamps_clickhouse_visible_fields(self, _name: str, fields: dict[str, str]) -> None:
+        issue = self.create_issue(["fingerprint"])
+
+        response = self.client.patch(
+            f"/api/environments/{self.team.id}/error_tracking/issues/{issue.id}",
+            data=fields,
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        issue.refresh_from_db()
+        assert issue.state_updated_at == datetime(2025, 1, 2, tzinfo=UTC)
+
+    @time_machine.travel("2025-01-02", tick=False)
+    def test_issue_update_does_not_stamp_unchanged_state(self) -> None:
+        issue = self.create_issue(["fingerprint"])
+
+        response = self.client.patch(
+            f"/api/environments/{self.team.id}/error_tracking/issues/{issue.id}",
+            data={"status": "active", "severity": None, "name": None, "description": None},
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        issue.refresh_from_db()
+        assert issue.state_updated_at is None
+
+    def test_issue_update_rejects_deprecated_status(self):
+        issue = self.create_issue(["fingerprint"])
+
+        for deprecated_status in ("archived", "pending_release"):
+            response = self.client.patch(
+                f"/api/environments/{self.team.id}/error_tracking/issues/{issue.id}",
+                data={"status": deprecated_status},
+            )
+            assert response.status_code == 400, response.json()
+            body = response.json()
+            assert body["type"] == "validation_error", body
+            assert body["attr"] == "status", body
+            assert deprecated_status in body["detail"], body
+
+        issue.refresh_from_db()
+        assert issue.status == ErrorTrackingIssue.Status.ACTIVE
+
+    def test_issue_bulk_rejects_deprecated_status(self):
+        issue = self.create_issue()
+
+        for deprecated_status in ("archived", "pending_release"):
+            response = self.client.post(
+                f"/api/environments/{self.team.id}/error_tracking/issues/bulk",
+                data={"ids": [issue.id], "action": "set_status", "status": deprecated_status},
+            )
+            assert response.status_code == 400, response.json()
+
+        issue.refresh_from_db()
+        assert issue.status == ErrorTrackingIssue.Status.ACTIVE
+
+    def test_issue_update_serializes_legacy_status_for_reads(self):
+        # Legacy rows that still hold archived/pending_release should still serialize OK on read,
+        # so the cleanup is decoupled from the backfill.
+        issue = self.create_issue()
+        ErrorTrackingIssue.objects.filter(id=issue.id).update(status=ErrorTrackingIssue.Status.ARCHIVED)
+
+        response = self.client.get(f"/api/environments/{self.team.id}/error_tracking/issues/{issue.id}")
+        assert response.status_code == 200, response.json()
+        assert response.json()["status"] == "archived"
+
+    def test_issue_merge(self):
+        issue_one = self.create_issue(fingerprints=["fingerprint_one"])
+        issue_two = self.create_issue(fingerprints=["fingerprint_two"])
+
+        assert ErrorTrackingIssue.objects.count() == 2
+
+        repsonse = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/issues/{issue_one.id}/merge", data={"ids": [issue_two.id]}
+        )
+
+        assert repsonse.status_code == 200
+        assert ErrorTrackingIssueFingerprintV2.objects.filter(issue_id=issue_one.id).count() == 2
+        assert ErrorTrackingIssueFingerprintV2.objects.filter(fingerprint="fingerprint_one", version=0).exists()
+        assert ErrorTrackingIssueFingerprintV2.objects.filter(fingerprint="fingerprint_two", version=1).exists()
+        assert ErrorTrackingIssue.objects.count() == 1
+
+    def test_issue_merge_drops_stale_source_and_merges_the_rest(self):
+        target = self.create_issue(fingerprints=["fingerprint_target"])
+        live_source = self.create_issue(fingerprints=["fingerprint_live"])
+        stale_source = self.create_issue(fingerprints=["fingerprint_stale"])
+        ErrorTrackingIssue.objects.filter(id=stale_source.id).delete()
+
+        response = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/issues/{target.id}/merge",
+            data={"ids": [live_source.id, stale_source.id]},
+        )
+
+        # A single stale issue in the selection no longer rejects the whole merge with a 404
+        assert response.status_code == 200
+        assert not ErrorTrackingIssue.objects.filter(id=live_source.id).exists()
+        assert ErrorTrackingIssueFingerprintV2.objects.get(fingerprint="fingerprint_live").issue_id == target.id
+
+    def test_issue_merge_returns_not_found_when_target_issue_is_stale(self):
+        target = self.create_issue(fingerprints=["fingerprint_target"])
+        source = self.create_issue(fingerprints=["fingerprint_source"])
+        ErrorTrackingIssue.objects.filter(id=target.id).delete()
+
+        response = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/issues/{target.id}/merge",
+            data={"ids": [source.id]},
+        )
+
+        assert response.status_code == 404
+        assert ErrorTrackingIssue.objects.filter(id=source.id).exists()
+        assert ErrorTrackingIssueFingerprintV2.objects.get(fingerprint="fingerprint_source").issue_id == source.id
+
+    def test_issue_merge_requires_ids(self):
+        issue = self.create_issue(fingerprints=["fingerprint_one"])
+
+        response = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/issues/{issue.id}/merge",
+            data={},
+            format="json",
+        )
+
+        assert response.status_code == 400
+        assert response.json() == {
+            "type": "validation_error",
+            "code": "required",
+            "detail": "This field is required.",
+            "attr": "ids",
+        }
+
+    def test_issue_split(self):
+        issue = self.create_issue(fingerprints=["fingerprint_one", "fingerprint_two"])
+
+        assert ErrorTrackingIssue.objects.count() == 1
+
+        response = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/issues/{issue.id}/split",
+            data={"fingerprints": [{"fingerprint": "fingerprint_two", "name": "Split issue"}]},
+            format="json",
+        )
+
+        assert response.status_code == 200
+        assert response.json()["success"] is True
+        assert len(response.json()["new_issue_ids"]) == 1
+        assert ErrorTrackingIssueFingerprintV2.objects.filter(issue_id=issue.id).count() == 1
+        assert ErrorTrackingIssueFingerprintV2.objects.filter(issue_id=issue.id, fingerprint="fingerprint_one").exists()
+        assert ErrorTrackingIssue.objects.count() == 2
+
+    def test_issue_split_requires_fingerprint_on_each_entry(self):
+        issue = self.create_issue(fingerprints=["fingerprint_one"])
+
+        response = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/issues/{issue.id}/split",
+            data={"fingerprints": [{"name": "Missing fingerprint"}]},
+            format="json",
+        )
+
+        assert response.status_code == 400
+        assert response.json()["type"] == "validation_error"
+        assert response.json()["code"] == "required"
+
+    def test_fingerprint_resolve_returns_issue(self):
+        fingerprint = "$uper/strange#fingerprint"
+        issue = self.create_issue(fingerprints=[fingerprint])
+
+        response = self.client.get(
+            f"/api/environments/{self.team.id}/error_tracking/fingerprints/resolve",
+            data={"fingerprint": fingerprint},
+        )
+
+        assert response.status_code == 200, response.json()
+        assert response.json()["issue_id"] == str(issue.id)
+        assert response.json()["fingerprint"] == fingerprint
+
+    @parameterized.expand(
+        [
+            ("missing_param", {}, 400),
+            ("unknown_fingerprint", {"fingerprint": "does_not_exist"}, 404),
+        ]
+    )
+    def test_fingerprint_resolve_error_cases(self, _name, params, expected_status):
+        self.create_issue(fingerprints=["fingerprint_one"])
+
+        response = self.client.get(
+            f"/api/environments/{self.team.id}/error_tracking/fingerprints/resolve",
+            data=params,
+        )
+
+        assert response.status_code == expected_status
+
+    def test_fingerprint_resolve_is_scoped_to_team(self):
+        other_team = Team.objects.create(organization=self.organization)
+        other_issue = ErrorTrackingIssue.objects.create(team=other_team)
+        ErrorTrackingIssueFingerprintV2.objects.create(
+            team=other_team, issue=other_issue, fingerprint="other_team_fingerprint"
+        )
+
+        response = self.client.get(
+            f"/api/environments/{self.team.id}/error_tracking/fingerprints/resolve",
+            data={"fingerprint": "other_team_fingerprint"},
+        )
+
+        assert response.status_code == 404
+
+    @parameterized.expand(
+        [
+            ("read_none_started", "get", "", False, True, "generating"),
+            ("read_none_blocked", "get", "", False, False, "unavailable"),
+            ("read_stale_refreshes", "get", "", True, True, "ready"),
+            ("read_fresh", "get", "", True, False, "ready"),
+            ("regenerate_started", "post", "/regenerate", True, True, "generating"),
+            ("regenerate_fresh", "post", "/regenerate", True, False, "ready"),
+            ("regenerate_blocked", "post", "/regenerate", False, False, "unavailable"),
+        ]
+    )
+    def test_issue_summary_status(
+        self, _name: str, method: str, suffix: str, stored: bool, started: bool, expected_status: str
+    ) -> None:
+        issue = self.create_issue()
+        summary = contracts.ErrorTrackingIssueSummary(
+            issue_id=issue.id,
+            what_happened="A TypeError in checkout.",
+            likely_cause="",
+            who_is_affected="Signed-in users on Safari.",
+            suggested_next_step="Guard the null cart.",
+            category=contracts.IssueSummaryCategory.OWN_CODE,
+            model="gpt-4.1-mini",
+            generated_at=datetime(2026, 10, 20, 12, 0, tzinfo=UTC),
+            checked_at=datetime(2026, 10, 21, 12, 0, tzinfo=UTC),
+        )
+        with (
+            patch.object(summaries_facade, "get_issue_summary", return_value=summary if stored else None) as get,
+            patch.object(summaries_facade, "start_issue_summary_generation", return_value=started) as start,
+        ):
+            response = getattr(self.client, method)(
+                f"/api/projects/{self.team.id}/error_tracking/issues/{issue.id}/summary{suffix}"
+            )
+
+        assert response.status_code == 200
+        get.assert_called_once_with(self.team.id, issue.id, user=self.user)
+        start.assert_called_once_with(self.team.id, issue.id, user=self.user)
+        expected_summary = (
+            {
+                "what_happened": "A TypeError in checkout.",
+                "likely_cause": "",
+                "who_is_affected": "Signed-in users on Safari.",
+                "suggested_next_step": "Guard the null cart.",
+                "category": "own_code",
+                "model": "gpt-4.1-mini",
+                "generated_at": "2026-10-20T12:00:00Z",
+                "checked_at": "2026-10-21T12:00:00Z",
+            }
+            if stored
+            else None
+        )
+        assert response.json() == {"status": expected_status, "summary": expected_summary}
+
+    @parameterized.expand(
+        [
+            ("other_team_get", "get", "", True),
+            ("other_team_post", "post", "/regenerate", True),
+            ("malformed_id_get", "get", "", False),
+            ("malformed_id_post", "post", "/regenerate", False),
+        ]
+    )
+    def test_issue_summary_is_scoped_to_team(self, _name: str, method: str, suffix: str, other_team: bool) -> None:
+        if other_team:
+            issue_id = str(
+                ErrorTrackingIssue.objects.create(team=Team.objects.create(organization=self.organization)).id
+            )
+        else:
+            issue_id = "not-a-uuid"
+
+        with patch.object(summaries_facade, "start_issue_summary_generation") as start:
+            response = getattr(self.client, method)(
+                f"/api/projects/{self.team.id}/error_tracking/issues/{issue_id}/summary{suffix}"
+            )
+
+        assert response.status_code == 404
+        start.assert_not_called()
+
+    @parameterized.expand(
+        [
+            ("active", "resolved", "$error_tracking_issue_resolved", "Resolved", "Active"),
+            ("active", "suppressed", "$error_tracking_issue_suppressed", "Suppressed", "Active"),
+            ("resolved", "active", "$error_tracking_issue_reopened", "Active", "Resolved"),
+            ("suppressed", "active", "$error_tracking_issue_reopened", "Active", "Suppressed"),
+        ]
+    )
+    def test_issue_status_update_produces_lifecycle_internal_event(
+        self, initial_status, new_status, event_name, status_prop, previous_prop
+    ):
+        issue = self.create_issue(fingerprints=["lifecycle_fingerprint"])
+        ErrorTrackingIssue.objects.filter(id=issue.id).update(status=initial_status, severity="critical")
+
+        with (
+            patch("products.error_tracking.backend.logic.lifecycle_events.produce_internal_event") as mock_produce,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            response = self.client.patch(
+                f"/api/environments/{self.team.id}/error_tracking/issues/{issue.id}",
+                data={"status": new_status},
+            )
+
+        assert response.status_code == 200, response.json()
+        mock_produce.assert_called_once()
+        kwargs = mock_produce.call_args.kwargs
+        assert kwargs["team_id"] == self.team.id
+        event = kwargs["event"]
+        assert event.event == event_name
+        assert event.distinct_id == str(issue.id)
+        assert event.properties["status"] == status_prop
+        assert event.properties["previous_status"] == previous_prop
+        # The issue-property set destination filters can reference, matching the
+        # ingestion-driven events.
+        assert event.properties["severity"] == "critical"
+        assert event.properties["issue_description"] == issue.description
+        assert event.properties["first_seen"] == issue.created_at.isoformat()
+        # Destination templates deep-link issues from the fingerprint; no
+        # exception_timestamp, so the issue scene falls back to the latest event.
+        assert event.properties["fingerprint"] == "lifecycle_fingerprint"
+        assert "exception_timestamp" not in event.properties
+        person = kwargs["person"]
+        assert person.id == str(self.user.id)
+        # The person block reaches customer webhooks verbatim: minimal actor only.
+        assert set(person.properties.keys()) == {"id", "distinct_id", "email", "first_name"}
+
+    def test_issue_status_lifecycle_event_survives_clickhouse_sync_failure(self):
+        issue = self.create_issue(fingerprints=["lifecycle_fingerprint"])
+
+        with (
+            patch("products.error_tracking.backend.logic.lifecycle_events.produce_internal_event") as mock_produce,
+            patch(
+                "products.error_tracking.backend.logic.issue_mutations.sync_issues_to_clickhouse",
+                side_effect=Exception("clickhouse down"),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            response = self.client.patch(
+                f"/api/environments/{self.team.id}/error_tracking/issues/{issue.id}",
+                data={"status": "resolved"},
+            )
+
+        assert response.status_code == 500
+        # The status committed, so a retry sees no transition: the event must
+        # already have been registered when the sync failed.
+        mock_produce.assert_called_once()
+        assert mock_produce.call_args.kwargs["event"].event == "$error_tracking_issue_resolved"
+        issue.refresh_from_db()
+        assert issue.status == ErrorTrackingIssue.Status.RESOLVED
+
+    def _enable_alerts(self) -> ErrorTrackingAlert:
+        with team_scope(self.team.id):
+            return ErrorTrackingAlert.objects.create(team=self.team, name="Notify", triggers=["issue_created"])
+
+    def _open_thread(self, alert: ErrorTrackingAlert, issue: ErrorTrackingIssue) -> None:
+        with team_scope(self.team.id):
+            integration = Integration.objects.create(
+                team=self.team, kind=Integration.IntegrationKind.SLACK.value, config={"team": {"id": "T1"}}
+            )
+            destination = alert.destinations.create(
+                team=self.team, channel_type="slack", integration=integration, config={"channel": "C1"}
+            )
+            ErrorTrackingAlertThread.objects.create(
+                team=self.team,
+                alert=alert,
+                issue=issue,
+                destination=destination,
+                external_ref={"channel": "C1", "ts": "1.2"},
+            )
+
+    def test_issue_status_update_queues_alert_dispatch_with_the_event_uuid(self):
+        issue = self.create_issue()
+        self._enable_alerts()
+
+        with (
+            patch("products.error_tracking.backend.logic.lifecycle_events.produce_internal_event") as mock_produce,
+            patch(
+                "products.error_tracking.backend.tasks.tasks.dispatch_error_tracking_alert_deliveries.delay"
+            ) as mock_dispatch,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            response = self.client.patch(
+                f"/api/environments/{self.team.id}/error_tracking/issues/{issue.id}",
+                data={"status": "resolved"},
+            )
+
+        assert response.status_code == 200, response.json()
+        mock_dispatch.assert_called_once()
+        kwargs = mock_dispatch.call_args.kwargs
+        assert kwargs["team_id"] == self.team.id
+        (notification,) = kwargs["notifications"]
+        assert notification["event"] == "$error_tracking_issue_resolved"
+        assert notification["issue_id"] == str(issue.id)
+        assert notification["status"] == "Resolved"
+        assert notification["actor_email"] == self.user.email
+        assert notification["opener_allowed"] is True
+        # The delivery workflow and the internal event share the notification id.
+        assert notification["notification_id"] == mock_produce.call_args.kwargs["event"].uuid
+
+    def test_issue_status_update_survives_a_broker_outage(self):
+        issue = self.create_issue()
+        self._enable_alerts()
+
+        with (
+            patch("products.error_tracking.backend.logic.lifecycle_events.produce_internal_event") as mock_produce,
+            patch(
+                "products.error_tracking.backend.tasks.tasks.dispatch_error_tracking_alert_deliveries.delay",
+                side_effect=ConnectionError("broker down"),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            response = self.client.patch(
+                f"/api/environments/{self.team.id}/error_tracking/issues/{issue.id}",
+                data={"status": "resolved"},
+            )
+
+        # The status committed before the enqueue ran, so the response reports success.
+        assert response.status_code == 200, response.json()
+        mock_produce.assert_called_once()
+        issue.refresh_from_db()
+        assert issue.status == ErrorTrackingIssue.Status.RESOLVED
+
+    def test_issue_bulk_assign_queues_one_dispatch_task_per_transaction(self):
+        issues = [self.create_issue() for _ in range(3)]
+        alert = self._enable_alerts()
+        # Bulk transitions only reply: issues without a thread queue nothing.
+        self._open_thread(alert, issues[0])
+
+        with (
+            patch("products.error_tracking.backend.logic.lifecycle_events.produce_internal_event") as mock_produce,
+            patch(
+                "products.error_tracking.backend.tasks.tasks.dispatch_error_tracking_alert_deliveries.delay"
+            ) as mock_dispatch,
+            patch("products.error_tracking.backend.logic.issue_mutations.send_error_tracking_issue_assigned"),
+            patch("products.error_tracking.backend.logic.issue_mutations.dispatch_issue_assigned_realtime"),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            response = self.client.post(
+                f"/api/environments/{self.team.id}/error_tracking/issues/bulk",
+                data={
+                    "ids": [issue.id for issue in issues],
+                    "action": "assign",
+                    "assignee": {"id": self.user.id, "type": "user"},
+                },
+            )
+
+        assert response.status_code == 200, response.json()
+        assert mock_produce.call_count == 3
+        mock_dispatch.assert_called_once()
+        (notification,) = mock_dispatch.call_args.kwargs["notifications"]
+        assert notification["event"] == "$error_tracking_issue_assigned"
+        assert notification["issue_id"] == str(issues[0].id)
+        assert notification["opener_allowed"] is False
+
+    def test_issue_status_update_queues_nothing_for_teams_without_alerts(self):
+        issue = self.create_issue()
+
+        with (
+            patch("products.error_tracking.backend.logic.lifecycle_events.produce_internal_event"),
+            patch(
+                "products.error_tracking.backend.tasks.tasks.dispatch_error_tracking_alert_deliveries.delay"
+            ) as mock_dispatch,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            response = self.client.patch(
+                f"/api/environments/{self.team.id}/error_tracking/issues/{issue.id}",
+                data={"status": "resolved"},
+            )
+
+        assert response.status_code == 200, response.json()
+        mock_dispatch.assert_not_called()
+
+    def test_issue_bulk_set_status_queues_one_dispatch_task_per_transaction(self):
+        issues = [self.create_issue() for _ in range(3)]
+        alert = self._enable_alerts()
+        for issue in issues:
+            self._open_thread(alert, issue)
+
+        with (
+            patch("products.error_tracking.backend.logic.lifecycle_events.produce_internal_event") as mock_produce,
+            patch(
+                "products.error_tracking.backend.tasks.tasks.dispatch_error_tracking_alert_deliveries.delay"
+            ) as mock_dispatch,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            response = self.client.post(
+                f"/api/environments/{self.team.id}/error_tracking/issues/bulk",
+                data={"ids": [issue.id for issue in issues], "action": "set_status", "status": "resolved"},
+            )
+
+        assert response.status_code == 200, response.json()
+        assert mock_produce.call_count == 3
+        mock_dispatch.assert_called_once()
+        notifications = mock_dispatch.call_args.kwargs["notifications"]
+        assert {n["issue_id"] for n in notifications} == {str(issue.id) for issue in issues}
+        assert all(n["opener_allowed"] is False for n in notifications)
+        assert {n["notification_id"] for n in notifications} == {
+            call.kwargs["event"].uuid for call in mock_produce.call_args_list
+        }
+
+    def test_issue_update_without_status_transition_produces_no_lifecycle_event(self):
+        issue = self.create_issue()
+
+        with (
+            patch("products.error_tracking.backend.logic.lifecycle_events.produce_internal_event") as mock_produce,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            response = self.client.patch(
+                f"/api/environments/{self.team.id}/error_tracking/issues/{issue.id}",
+                data={"name": "Renamed issue"},
+            )
+
+        assert response.status_code == 200, response.json()
+        mock_produce.assert_not_called()
+
+    def test_issue_bulk_set_status_produces_lifecycle_events_only_for_transitions(self):
+        active_issue = self.create_issue()
+        resolved_issue = self.create_issue()
+        ErrorTrackingIssue.objects.filter(id=resolved_issue.id).update(status=ErrorTrackingIssue.Status.RESOLVED)
+
+        with (
+            patch("products.error_tracking.backend.logic.lifecycle_events.produce_internal_event") as mock_produce,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            response = self.client.post(
+                f"/api/environments/{self.team.id}/error_tracking/issues/bulk",
+                data={"ids": [active_issue.id, resolved_issue.id], "action": "set_status", "status": "resolved"},
+            )
+
+        assert response.status_code == 200, response.json()
+        mock_produce.assert_called_once()
+        event = mock_produce.call_args.kwargs["event"]
+        assert event.event == "$error_tracking_issue_resolved"
+        assert event.distinct_id == str(active_issue.id)
+        assert event.properties["status"] == "Resolved"
+        assert event.properties["previous_status"] == "Active"
+
+    @parameterized.expand([("user", "Jane"), ("user_without_name", ""), ("role", "Jane")])
+    def test_issue_assign_produces_lifecycle_internal_event(self, case, first_name):
+        assignee_type = "role" if case == "role" else "user"
+        issue = self.create_issue()
+        self.user.first_name = first_name
+        self.user.last_name = "Doe" if first_name else ""
+        self.user.save()
+        role_id = create_role(organization_id=self.organization.id, name="Backend")
+        assignee_id = self.user.id if assignee_type == "user" else str(role_id)
+
+        with (
+            patch("products.error_tracking.backend.logic.lifecycle_events.produce_internal_event") as mock_produce,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            response = self.client.patch(
+                f"/api/environments/{self.team.id}/error_tracking/issues/{issue.id}/assign",
+                data={"assignee": {"id": assignee_id, "type": assignee_type}},
+            )
+
+        assert response.status_code == 200, response.json()
+        mock_produce.assert_called_once()
+        event = mock_produce.call_args.kwargs["event"]
+        assert event.event == "$error_tracking_issue_assigned"
+        assert event.distinct_id == str(issue.id)
+        # Byte-identical to cymbal's compact serde output so exact-match filters work.
+        user_assignee = f'{{"type":"user","id":{self.user.id}}}'
+        expected_properties = {
+            "user": {"assignee": user_assignee, "assignee_name": "Jane Doe", "assignee_email": self.user.email},
+            "user_without_name": {
+                "assignee": user_assignee,
+                "assignee_name": self.user.email,
+                "assignee_email": self.user.email,
+            },
+            "role": {"assignee": f'{{"type":"role","id":"{role_id}"}}', "assignee_name": "Backend"},
+        }[case]
+        assert {key: value for key, value in event.properties.items() if key.startswith("assignee")} == (
+            expected_properties
+        )
+        assert json.loads(event.properties["assignee"]) == {"type": assignee_type, "id": assignee_id}
+
+    def test_issue_lifecycle_event_omits_former_member_assignee_details(self):
+        issue = self.create_issue()
+        former_member = User.objects.create_and_join(self.organization, "former@example.com", "password", "Former")
+        self.client.patch(
+            f"/api/environments/{self.team.id}/error_tracking/issues/{issue.id}/assign",
+            data={"assignee": {"id": former_member.id, "type": "user"}},
+        )
+        OrganizationMembership.objects.filter(user=former_member, organization=self.organization).delete()
+
+        with (
+            patch("products.error_tracking.backend.logic.lifecycle_events.produce_internal_event") as mock_produce,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            response = self.client.patch(
+                f"/api/environments/{self.team.id}/error_tracking/issues/{issue.id}",
+                data={"status": "resolved"},
+            )
+
+        assert response.status_code == 200, response.json()
+        properties = mock_produce.call_args.kwargs["event"].properties
+        assert properties["assignee"] == f'{{"type":"user","id":{former_member.id}}}'
+        assert "assignee_name" not in properties
+        assert "assignee_email" not in properties
+
+    def test_issue_unassign_produces_lifecycle_internal_event(self):
+        issue = self.create_issue()
+        self.client.patch(
+            f"/api/environments/{self.team.id}/error_tracking/issues/{issue.id}/assign",
+            data={"assignee": {"id": self.user.id, "type": "user"}},
+        )
+
+        with (
+            patch("products.error_tracking.backend.logic.lifecycle_events.produce_internal_event") as mock_produce,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            response = self.client.patch(
+                f"/api/environments/{self.team.id}/error_tracking/issues/{issue.id}/assign",
+                data={"assignee": None},
+                format="json",
+            )
+
+        assert response.status_code == 200, response.json()
+        mock_produce.assert_called_once()
+        event = mock_produce.call_args.kwargs["event"]
+        assert event.event == "$error_tracking_issue_unassigned"
+        assert event.distinct_id == str(issue.id)
+        assert event.properties["previous_assignee"] == f'{{"type":"user","id":{self.user.id}}}'
+
+    def test_issue_merge_produces_lifecycle_event_and_activity_log(self):
+        issue_one = self.create_issue(fingerprints=["fingerprint_one"])
+        issue_two = self.create_issue(fingerprints=["fingerprint_two"])
+
+        with (
+            patch("products.error_tracking.backend.logic.lifecycle_events.produce_internal_event") as mock_produce,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            response = self.client.post(
+                f"/api/environments/{self.team.id}/error_tracking/issues/{issue_one.id}/merge",
+                # A ghost id and a duplicate must not be reported as merged.
+                data={"ids": [issue_two.id, str(uuid7()), issue_two.id]},
+            )
+
+        assert response.status_code == 200, response.json()
+        mock_produce.assert_called_once()
+        event = mock_produce.call_args.kwargs["event"]
+        assert event.event == "$error_tracking_issue_merged"
+        assert event.distinct_id == str(issue_one.id)
+        assert event.properties["merged_issue_ids"] == [str(issue_two.id)]
+
+        activity = ActivityLog.objects.get(scope="ErrorTrackingIssue", activity="merged")
+        assert activity.item_id == str(issue_one.id)
+        assert activity.detail is not None
+        assert activity.detail["changes"][0]["after"] == [str(issue_two.id)]
+
+    def test_issue_merge_into_resolved_issue_reopens_and_reports_it(self):
+        target = self.create_issue(fingerprints=["fingerprint_one"], status="resolved")
+        source = self.create_issue(fingerprints=["fingerprint_two"])
+
+        with (
+            patch("products.error_tracking.backend.logic.lifecycle_events.produce_internal_event") as mock_produce,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            response = self.client.post(
+                f"/api/environments/{self.team.id}/error_tracking/issues/{target.id}/merge",
+                data={"ids": [source.id]},
+            )
+
+        assert response.status_code == 200, response.json()
+        target.refresh_from_db()
+        assert target.status == "active"
+        events = [call.kwargs["event"] for call in mock_produce.call_args_list]
+        reopened = [event for event in events if event.event == "$error_tracking_issue_reopened"]
+        assert len(reopened) == 1
+        assert reopened[0].distinct_id == str(target.id)
+        assert reopened[0].properties["previous_status"] == "Resolved"
+
+        status_activity = ActivityLog.objects.get(
+            scope="ErrorTrackingIssue", activity="updated", item_id=str(target.id)
+        )
+        assert status_activity.user == self.user
+        assert status_activity.detail is not None
+        assert status_activity.detail["changes"] == [
+            {
+                "type": "ErrorTrackingIssue",
+                "action": "changed",
+                "field": "status",
+                "before": "resolved",
+                "after": "active",
+            }
+        ]
+
+    def test_issue_merge_reports_the_reopen_when_the_clickhouse_sync_fails(self):
+        target = self.create_issue(fingerprints=["fingerprint_one"], status="resolved")
+        source = self.create_issue(fingerprints=["fingerprint_two"])
+
+        # The merge has committed by the time these run, and no retry can repair the sync,
+        # so a broker outage must not drop the activity entry or the reopened alert.
+        with (
+            patch("products.error_tracking.backend.logic.lifecycle_events.produce_internal_event") as mock_produce,
+            patch(
+                "products.error_tracking.backend.models.sync_issues_to_clickhouse",
+                side_effect=Exception("clickhouse sync failed"),
+            ),
+            patch(
+                "products.error_tracking.backend.models.update_error_tracking_issue_fingerprint_overrides",
+                side_effect=Exception("fingerprint override sync failed"),
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            response = self.client.post(
+                f"/api/environments/{self.team.id}/error_tracking/issues/{target.id}/merge",
+                data={"ids": [source.id]},
+            )
+
+        assert response.status_code == 200, response.json()
+        target.refresh_from_db()
+        assert target.status == "active"
+        events = [call.kwargs["event"].event for call in mock_produce.call_args_list]
+        assert events.count("$error_tracking_issue_reopened") == 1
+        assert ActivityLog.objects.filter(
+            scope="ErrorTrackingIssue", activity="updated", item_id=str(target.id)
+        ).exists()
+        assert ActivityLog.objects.filter(
+            scope="ErrorTrackingIssue", activity="merged", item_id=str(target.id)
+        ).exists()
+
+    def test_issue_merge_without_effect_logs_no_activity(self):
+        issue = self.create_issue(fingerprints=["fingerprint_one"])
+
+        with (
+            patch("products.error_tracking.backend.logic.lifecycle_events.produce_internal_event") as mock_produce,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            response = self.client.post(
+                f"/api/environments/{self.team.id}/error_tracking/issues/{issue.id}/merge",
+                data={"ids": [issue.id]},
+            )
+
+        assert response.status_code == 200, response.json()
+        mock_produce.assert_not_called()
+        assert not ActivityLog.objects.filter(scope="ErrorTrackingIssue", activity="merged").exists()
+
+    def test_issue_split_produces_lifecycle_event_and_activity_log(self):
+        issue = self.create_issue(fingerprints=["fingerprint_one", "fingerprint_two"])
+
+        with (
+            patch("products.error_tracking.backend.logic.lifecycle_events.produce_internal_event") as mock_produce,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            response = self.client.post(
+                f"/api/environments/{self.team.id}/error_tracking/issues/{issue.id}/split",
+                data={"fingerprints": [{"fingerprint": "fingerprint_two", "name": "Split issue"}]},
+                format="json",
+            )
+
+        assert response.status_code == 200, response.json()
+        mock_produce.assert_called_once()
+        event = mock_produce.call_args.kwargs["event"]
+        assert event.event == "$error_tracking_issue_split"
+        assert event.distinct_id == str(issue.id)
+        assert event.properties["split_issue_ids"] == response.json()["new_issue_ids"]
+        # The link fingerprint is one the source issue still owns after the split.
+        assert event.properties["fingerprint"] == "fingerprint_one"
+
+        activity = ActivityLog.objects.get(scope="ErrorTrackingIssue", activity="split")
+        assert activity.item_id == str(issue.id)
+        assert activity.detail is not None
+        assert activity.detail["changes"][0]["after"] == response.json()["new_issue_ids"]
+
+    def test_can_start_symbol_set_upload(self) -> None:
+        chunk_id = uuid7()
+        response = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets/start_upload?chunk_id={chunk_id}"
+        )
+        response_json = response.json()
+
+        assert response_json["presigned_url"] is not None
+
+        symbol_set = ErrorTrackingSymbolSet.objects.get(id=response_json["symbol_set_id"])
+        assert symbol_set.content_hash is None
+        assert symbol_set.last_used is None
+
+    def test_finish_upload_fails_if_file_not_found(self):
+        symbol_set = ErrorTrackingSymbolSet.objects.create(
+            team=self.team, ref=str(uuid7()), storage_ptr=f"symbolsets/{uuid7()}"
+        )
+
+        response = self.client.put(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets/{symbol_set.pk}/finish_upload",
+            data={"content_hash": "this_is_a_content_hash"},
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json()["code"] == "file_not_found"
+
+    @patch("posthog.storage.object_storage._client")
+    def test_finish_upload_fails_if_uploaded_file_is_too_large(self, patched_s3_client):
+        patched_s3_client.head_object.return_value = {"ContentLength": 1073741824}  # 1GB
+        symbol_set = ErrorTrackingSymbolSet.objects.create(
+            team=self.team, ref=str(uuid7()), storage_ptr=f"symbolsets/{uuid7()}"
+        )
+
+        response = self.client.put(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets/{symbol_set.pk}/finish_upload",
+            data={"content_hash": "this_is_a_content_hash"},
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json()["code"] == "file_too_large"
+
+    @patch("posthog.storage.object_storage._client")
+    def test_finish_upload_updates_the_content_hash(self, patched_s3_client):
+        patched_s3_client.head_object.return_value = {"ContentLength": 1048576}  # 1MB
+        symbol_set = ErrorTrackingSymbolSet.objects.create(
+            team=self.team, ref=str(uuid7()), storage_ptr=f"symbolsets/{uuid7()}"
+        )
+
+        response = self.client.put(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets/{symbol_set.pk}/finish_upload",
+            data={"content_hash": "this_is_a_content_hash"},
+        )
+
+        symbol_set.refresh_from_db()
+
+        assert response.status_code == status.HTTP_200_OK
+        assert symbol_set.content_hash == "this_is_a_content_hash"
+        assert symbol_set.last_used is None
+
+    def test_can_bulk_delete_symbol_sets(self) -> None:
+        ss1 = ErrorTrackingSymbolSet.objects.create(ref="source_1", team=self.team, storage_ptr=None)
+        ss2 = ErrorTrackingSymbolSet.objects.create(ref="source_2", team=self.team, storage_ptr=None)
+        ss3 = ErrorTrackingSymbolSet.objects.create(ref="source_3", team=self.team, storage_ptr=None)
+
+        response = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets/bulk_delete",
+            data={"ids": [str(ss1.id), str(ss2.id)]},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertGreaterEqual(response.json()["deleted"], 2)
+        self.assertFalse(ErrorTrackingSymbolSet.objects.filter(id=ss1.id).exists())
+        self.assertFalse(ErrorTrackingSymbolSet.objects.filter(id=ss2.id).exists())
+        self.assertTrue(ErrorTrackingSymbolSet.objects.filter(id=ss3.id).exists())
+
+    def test_bulk_delete_ignores_other_teams(self) -> None:
+        other_team = self.create_team_with_organization(organization=self.organization)
+        ss1 = ErrorTrackingSymbolSet.objects.create(ref="source_1", team=self.team, storage_ptr=None)
+        other_ss = ErrorTrackingSymbolSet.objects.create(ref="source_2", team=other_team, storage_ptr=None)
+
+        response = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets/bulk_delete",
+            data={"ids": [str(ss1.id), str(other_ss.id)]},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertGreaterEqual(response.json()["deleted"], 1)
+        self.assertTrue(ErrorTrackingSymbolSet.objects.filter(id=other_ss.id).exists())
+
+    def test_bulk_delete_requires_ids(self) -> None:
+        response = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets/bulk_delete",
+            data={},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_fetching_symbol_sets(self):
+        other_team = self.create_team_with_organization(organization=self.organization)
+        ErrorTrackingSymbolSet.objects.create(ref="source_1", team=self.team, storage_ptr=None)
+        ErrorTrackingSymbolSet.objects.create(
+            ref="source_2", team=self.team, storage_ptr="https://app-static-prod.posthog.com/static/chunk-BPTF6YBO.js"
+        )
+        ErrorTrackingSymbolSet.objects.create(
+            ref="source_2", team=other_team, storage_ptr="https://app-static-prod.posthog.com/static/chunk-BPTF6YBO.js"
+        )
+
+        self.assertEqual(ErrorTrackingSymbolSet.objects.count(), 3)
+
+        # it only fetches symbol sets for the specified team
+        response = self.client.get(f"/api/environments/{self.team.id}/error_tracking/symbol_sets")
+        self.assertEqual(len(response.json()["results"]), 2)
+
+    def test_fetching_symbol_sets_filters_by_status_ref_and_order(self) -> None:
+        ErrorTrackingSymbolSet.objects.create(ref="source_b", team=self.team, storage_ptr="symbolsets/source_b")
+        ErrorTrackingSymbolSet.objects.create(
+            ref="source_a", team=self.team, storage_ptr=None, failure_reason="Source map not found"
+        )
+
+        response = self.client.get(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets",
+            data={"status": "valid", "order_by": "ref"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual([symbol_set["ref"] for symbol_set in response.json()["results"]], ["source_b"])
+        self.assertEqual([symbol_set["has_uploaded_file"] for symbol_set in response.json()["results"]], [True])
+        self.assertNotIn("storage_ptr", response.json()["results"][0])
+        self.assertNotIn("content_hash", response.json()["results"][0])
+
+        response = self.client.get(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets",
+            data={"ref": "source_a"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual([symbol_set["ref"] for symbol_set in response.json()["results"]], ["source_a"])
+
+    def test_fetching_symbol_sets_defaults_to_newest_first(self) -> None:
+        for index in range(3):
+            symbol_set = ErrorTrackingSymbolSet.objects.create(
+                ref=f"source_{index}", team=self.team, storage_ptr=f"symbolsets/source_{index}"
+            )
+            ErrorTrackingSymbolSet.objects.filter(pk=symbol_set.pk).update(
+                created_at=datetime(2026, 1, 1, tzinfo=UTC) + timedelta(days=index)
+            )
+
+        response = self.client.get(f"/api/environments/{self.team.id}/error_tracking/symbol_sets")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            [symbol_set["ref"] for symbol_set in response.json()["results"]],
+            ["source_2", "source_1", "source_0"],
+        )
+
+    @parameterized.expand(
+        [
+            ("ref_substring", "chunk-abc123", ["frontend-chunk-abc123"]),
+            ("release_version", "special", ["set_b"]),
+            ("release_project", "checkout", ["set_c"]),
+            ("release_commit_sha", "feedface", ["set_d"]),
+            ("case_insensitive", "CHECKOUT", ["set_c"]),
+            ("no_match", "zzznope", []),
+        ]
+    )
+    def test_fetching_symbol_sets_search(self, _name: str, search: str, expected_refs: list[str]) -> None:
+        release_b = ErrorTrackingRelease.objects.create(
+            team=self.team, hash_id="hash_b", version="9.9.9-special", project="proj_b", metadata=None
+        )
+        release_c = ErrorTrackingRelease.objects.create(
+            team=self.team, hash_id="hash_c", version="1.0.0", project="checkout-service", metadata=None
+        )
+        release_d = ErrorTrackingRelease.objects.create(
+            team=self.team,
+            hash_id="hash_d",
+            version="2.0.0",
+            project="proj_d",
+            metadata={"git": {"commit_id": "feedface999abc"}},
+        )
+        ErrorTrackingSymbolSet.objects.create(ref="frontend-chunk-abc123", team=self.team, storage_ptr="symbolsets/a")
+        ErrorTrackingSymbolSet.objects.create(
+            ref="set_b", team=self.team, storage_ptr="symbolsets/b", release=release_b
+        )
+        ErrorTrackingSymbolSet.objects.create(
+            ref="set_c", team=self.team, storage_ptr="symbolsets/c", release=release_c
+        )
+        ErrorTrackingSymbolSet.objects.create(
+            ref="set_d", team=self.team, storage_ptr="symbolsets/d", release=release_d
+        )
+
+        response = self.client.get(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets",
+            data={"search": search},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(sorted(symbol_set["ref"] for symbol_set in response.json()["results"]), sorted(expected_refs))
+
+    def test_fetching_symbol_set_by_id(self) -> None:
+        other_team = self.create_team_with_organization(organization=self.organization)
+        symbol_set = ErrorTrackingSymbolSet.objects.create(ref="source_1", team=self.team, storage_ptr=None)
+        other_symbol_set = ErrorTrackingSymbolSet.objects.create(ref="source_2", team=other_team, storage_ptr=None)
+
+        response = self.client.get(f"/api/environments/{self.team.id}/error_tracking/symbol_sets/{symbol_set.id}")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()["id"], str(symbol_set.id))
+        self.assertEqual(response.json()["ref"], "source_1")
+        self.assertEqual(response.json()["has_uploaded_file"], False)
+        self.assertNotIn("storage_ptr", response.json())
+        self.assertNotIn("content_hash", response.json())
+
+        response = self.client.get(f"/api/environments/{self.team.id}/error_tracking/symbol_sets/{other_symbol_set.id}")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_symbol_set_list_query_validation_does_not_apply_to_retrieve(self) -> None:
+        symbol_set = ErrorTrackingSymbolSet.objects.create(
+            ref="source_1", team=self.team, storage_ptr="symbolsets/source_1"
+        )
+
+        response = self.client.get(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets",
+            data={"order_by": "storage_ptr"},
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        response = self.client.get(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets/{symbol_set.id}",
+            data={"order_by": "storage_ptr"},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_symbol_set_storage_ptr_is_read_only(self) -> None:
+        symbol_set = ErrorTrackingSymbolSet.objects.create(
+            ref="source_1", team=self.team, storage_ptr="symbolsets/source_1"
+        )
+
+        response = self.client.patch(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets/{symbol_set.id}",
+            data={"storage_ptr": "symbolsets/other_team_file"},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        symbol_set.refresh_from_db()
+        self.assertEqual(symbol_set.storage_ptr, "symbolsets/source_1")
+
+    @patch("products.error_tracking.backend.logic.symbol_sets.object_storage.get_presigned_url")
+    def test_download_symbol_set(self, patched_get_presigned_url: Mock) -> None:
+        patched_get_presigned_url.return_value = "https://example.com/source.map"
+        symbol_set = ErrorTrackingSymbolSet.objects.create(
+            ref="source_1", team=self.team, storage_ptr="symbolsets/source_1"
+        )
+
+        response = self.client.get(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets/{symbol_set.id}/download"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json(), {"url": "https://example.com/source.map"})
+        patched_get_presigned_url.assert_called_once_with(file_key="symbolsets/source_1", expiration=3600)
+
+    def test_download_symbol_set_without_file_returns_404(self) -> None:
+        symbol_set = ErrorTrackingSymbolSet.objects.create(ref="source_1", team=self.team, storage_ptr=None)
+
+        response = self.client.get(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets/{symbol_set.id}/download"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.json(), {"detail": "Symbol set has no uploaded file."})
+
+    def test_fetching_stack_frames(self):
+        other_team = self.create_team_with_organization(organization=self.organization)
+        symbol_set = ErrorTrackingSymbolSet.objects.create(ref="source_1", team=self.team, storage_ptr=None)
+        other_symbol_set = ErrorTrackingSymbolSet.objects.create(ref="source_2", team=self.team, storage_ptr=None)
+        ErrorTrackingStackFrame.objects.create(
+            raw_id="raw_id", team=self.team, symbol_set=symbol_set, resolved=True, contents={}
+        )
+        ErrorTrackingStackFrame.objects.create(
+            raw_id="other_raw_id", team=self.team, symbol_set=other_symbol_set, resolved=True, contents={}
+        )
+        ErrorTrackingStackFrame.objects.create(
+            raw_id="raw_id", team=other_team, symbol_set=symbol_set, resolved=True, contents={}
+        )
+
+        self.assertEqual(ErrorTrackingStackFrame.objects.count(), 3)
+
+        # it only fetches stack traces for the specified team
+        response = self.client.post(f"/api/environments/{self.team.id}/error_tracking/stack_frames/batch_get")
+        self.assertEqual(len(response.json()["results"]), 2)
+
+        # fetching can be filtered by raw_ids
+        data = {"raw_ids": ["raw_id"]}
+        response = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/stack_frames/batch_get", data=data
+        )
+        self.assertEqual(len(response.json()["results"]), 1)
+
+        # fetching can be filtered by symbol set
+        data = {"symbol_set": symbol_set.id}
+        response = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/stack_frames/batch_get", data=data
+        )
+        self.assertEqual(len(response.json()["results"]), 1)
+        self.assertEqual(response.json()["results"][0]["symbol_set_ref"], symbol_set.ref)
+
+        # a malformed raw_id (non-integer part) is handled gracefully, not a 500
+        data = {"raw_ids": ["abc/not-an-int"]}
+        response = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/stack_frames/batch_get", data=data
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json()["results"], [])
+
+    def test_assigning_issues(self):
+        issue = self.create_issue()
+
+        self.assertEqual(ErrorTrackingIssueAssignment.objects.count(), 0)
+        before_assignment = timezone.now()
+        self.client.patch(
+            f"/api/environments/{self.team.id}/error_tracking/issues/{issue.id}/assign",
+            data={"assignee": {"id": self.user.id, "type": "user"}},
+        )
+        after_assignment = timezone.now()
+        # assigns the issue
+        self.assertEqual(ErrorTrackingIssueAssignment.objects.count(), 1)
+        self.assertEqual(ErrorTrackingIssueAssignment.objects.filter(issue=issue, user_id=self.user.id).count(), 1)
+        issue.refresh_from_db()
+        assert issue.state_updated_at is not None
+        assert before_assignment <= issue.state_updated_at <= after_assignment
+
+        self._assert_logs_the_activity(
+            issue.id,
+            [
+                {
+                    "activity": "assigned",
+                    "created_at": ANY,
+                    "detail": {
+                        "changes": [
+                            {
+                                "action": "changed",
+                                "after": {"id": self.user.id, "type": "user"},
+                                "before": None,
+                                "field": "assignee",
+                                "type": "ErrorTrackingIssue",
+                            }
+                        ],
+                        "name": issue.name,
+                        "short_id": None,
+                        "trigger": None,
+                        "type": None,
+                    },
+                    "item_id": str(issue.id),
+                    "scope": "ErrorTrackingIssue",
+                    "user": {"email": "user1@posthog.com", "first_name": ""},
+                }
+            ],
+        )
+
+        before_unassignment = timezone.now()
+        self.client.patch(
+            f"/api/environments/{self.team.id}/error_tracking/issues/{issue.id}/assign",
+            data={"assignee": None},
+        )
+        after_unassignment = timezone.now()
+        # deletes the assignment
+        self.assertEqual(ErrorTrackingIssueAssignment.objects.count(), 0)
+        issue.refresh_from_db()
+        assert issue.state_updated_at is not None
+        assert before_unassignment <= issue.state_updated_at <= after_unassignment
+
+        other_team = self.create_team_with_organization(organization=self.organization)
+        response = self.client.patch(
+            f"/api/environments/{other_team.id}/error_tracking/issues/{issue.id}/assign",
+            data={"assignee": None},
+        )
+        # cannot assign issues from other teams
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_rejects_unknown_assignee_type(self) -> None:
+        issue = self.create_issue()
+
+        response = self.client.patch(
+            f"/api/environments/{self.team.id}/error_tracking/issues/{issue.id}/assign",
+            data={"assignee": {"id": self.user.id, "type": "team"}},
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert not ErrorTrackingIssueAssignment.objects.filter(issue=issue).exists()
+
+    @patch("products.error_tracking.backend.logic.issue_mutations.sync_issues_to_clickhouse")
+    @patch("products.error_tracking.backend.logic.issue_mutations.dispatch_issue_assigned_realtime")
+    @patch("products.error_tracking.backend.logic.issue_mutations.send_error_tracking_issue_assigned")
+    def test_assigning_same_user_with_string_id_does_not_mutate_issue(
+        self, mock_email: Mock, mock_realtime: Mock, mock_sync: Mock
+    ) -> None:
+        issue = self.create_issue()
+        ErrorTrackingIssueAssignment.objects.create(issue=issue, team=self.team, user=self.user)
+
+        response = self.client.patch(
+            f"/api/environments/{self.team.id}/error_tracking/issues/{issue.id}/assign",
+            data={"assignee": {"id": str(self.user.id), "type": "user"}},
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        issue.refresh_from_db()
+        assert issue.state_updated_at is None
+        self._assert_logs_the_activity(issue.id, [])
+        mock_email.delay.assert_not_called()
+        mock_realtime.assert_not_called()
+        mock_sync.assert_not_called()
+
+    def test_unassigning_unassigned_issue_does_not_mutate_issue(self) -> None:
+        issue = self.create_issue()
+
+        response = self.client.patch(
+            f"/api/environments/{self.team.id}/error_tracking/issues/{issue.id}/assign",
+            data={"assignee": None},
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        issue.refresh_from_db()
+        assert issue.state_updated_at is None
+        self._assert_logs_the_activity(issue.id, [])
+
+    @patch("products.error_tracking.backend.logic.issue_mutations.dispatch_issue_assigned_realtime")
+    @patch("products.error_tracking.backend.logic.issue_mutations.send_error_tracking_issue_assigned")
+    def test_assign_issue_dispatches_realtime_after_assignment(self, _send_email, mock_realtime):
+        issue = self.create_issue()
+        other_user = User.objects.create_and_join(self.organization, "other@test.com", "password")
+        response = self.client.patch(
+            f"/api/environments/{self.team.id}/error_tracking/issues/{issue.id}/assign",
+            data={"assignee": {"id": other_user.id, "type": "user"}},
+        )
+        assert response.status_code in (200, 202), response.json()
+        mock_realtime.assert_called_once()
+
+    def test_error_tracking_issue_bulk_resolve(self):
+        issue_one = self.create_issue()
+        issue_two = self.create_issue()
+        unchanged_issue = self.create_issue()
+        ErrorTrackingIssue.objects.filter(id=unchanged_issue.id).update(status=ErrorTrackingIssue.Status.RESOLVED)
+
+        self.assertEqual(issue_one.status, ErrorTrackingIssue.Status.ACTIVE)
+        self.assertEqual(issue_two.status, ErrorTrackingIssue.Status.ACTIVE)
+
+        before_update = timezone.now()
+        self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/issues/bulk",
+            data={
+                "ids": [issue_one.id, issue_two.id, unchanged_issue.id],
+                "action": "set_status",
+                "status": "resolved",
+            },
+        )
+        after_update = timezone.now()
+
+        issue_one.refresh_from_db()
+        issue_two.refresh_from_db()
+        unchanged_issue.refresh_from_db()
+
+        self.assertEqual(issue_one.status, ErrorTrackingIssue.Status.RESOLVED)
+        self.assertEqual(issue_two.status, ErrorTrackingIssue.Status.RESOLVED)
+        assert issue_one.state_updated_at is not None
+        assert before_update <= issue_one.state_updated_at <= after_update
+        assert issue_two.state_updated_at == issue_one.state_updated_at
+        assert unchanged_issue.state_updated_at is None
+
+    def test_error_tracking_issue_bulk_assign(self):
+        issue_one = self.create_issue()
+        issue_two = self.create_issue()
+
+        ErrorTrackingIssueAssignment.objects.create(issue=issue_one, user=self.user)
+        role_id = create_role(organization_id=self.organization.id, name="Team role")
+        add_role_member(role_id=role_id, user_id=self.user.id)
+
+        before_update = timezone.now()
+        self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/issues/bulk",
+            data={
+                "ids": [issue_one.id, issue_two.id],
+                "action": "assign",
+                "assignee": {"id": role_id, "type": "role"},
+            },
+        )
+        after_update = timezone.now()
+
+        self.assertEqual(len(ErrorTrackingIssueAssignment.objects.filter(issue=issue_one, user=self.user)), 0)
+        self.assertEqual(
+            len(ErrorTrackingIssueAssignment.objects.filter(issue__in=[issue_one, issue_two], role_id=role_id)), 2
+        )
+        issue_one.refresh_from_db()
+        issue_two.refresh_from_db()
+        assert issue_one.state_updated_at is not None
+        assert before_update <= issue_one.state_updated_at <= after_update
+        assert issue_two.state_updated_at == issue_one.state_updated_at
+
+    def test_can_start_bulk_symbol_set_upload(self) -> None:
+        chunk_id_one = uuid7()
+        chunk_id_two = uuid7()
+        response = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets/bulk_start_upload",
+            data={"chunk_ids": [chunk_id_one, chunk_id_two]},
+        )
+        response_json = response.json()
+        id_map = response_json["id_map"]
+
+        assert len(id_map.keys()) == 2
+
+        symbol_set = ErrorTrackingSymbolSet.objects.get(ref=chunk_id_one)
+        symbol_set_upload_response = id_map[str(chunk_id_one)]
+
+        assert str(symbol_set.id) == symbol_set_upload_response["symbol_set_id"]
+        assert symbol_set_upload_response["presigned_url"]["fields"]["key"] == symbol_set.storage_ptr
+        assert "fallback_presigned_url" not in symbol_set_upload_response
+        assert symbol_set.last_used is not None
+
+    def test_bulk_start_upload_includes_fallback_presigned_url_when_accelerated(self) -> None:
+        chunk_id = str(uuid7())
+        with (
+            self.settings(OBJECT_STORAGE_TRANSFER_ACCELERATION=True),
+            patch("posthog.storage.object_storage._accelerated_presigned_client", None),
+        ):
+            response = self.client.post(
+                f"/api/environments/{self.team.id}/error_tracking/symbol_sets/bulk_start_upload",
+                data={"chunk_ids": [chunk_id]},
+            )
+
+        entry = response.json()["id_map"][chunk_id]
+        symbol_set = ErrorTrackingSymbolSet.objects.get(ref=chunk_id)
+        assert "s3-accelerate" in entry["presigned_url"]["url"]
+        assert "s3-accelerate" not in entry["fallback_presigned_url"]["url"]
+        assert entry["fallback_presigned_url"]["fields"]["key"] == symbol_set.storage_ptr
+
+    def test_bulk_start_upload_omits_presigned_put_without_content_length(self) -> None:
+        chunk_id = str(uuid7())
+        response = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets/bulk_start_upload",
+            data={"symbol_sets": [{"chunk_id": chunk_id, "content_hash": "hash"}]},
+        )
+
+        entry = response.json()["id_map"][chunk_id]
+        assert "presigned_put_url" not in entry
+        assert entry["presigned_url"]["fields"]["key"] is not None
+
+    def test_bulk_start_upload_signs_presigned_put_for_declared_content_length(self) -> None:
+        chunk_id = str(uuid7())
+        response = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets/bulk_start_upload",
+            data={"symbol_sets": [{"chunk_id": chunk_id, "content_hash": "hash", "content_length": 1234}]},
+        )
+
+        entry = response.json()["id_map"][chunk_id]
+        symbol_set = ErrorTrackingSymbolSet.objects.get(ref=chunk_id)
+        put_url = entry["presigned_put_url"]
+        # The PUT addresses the object itself, unlike the POST, which addresses the bucket root.
+        assert symbol_set.storage_ptr in put_url
+        # Only a signed content-length stops an oversized body, so it must reach the signature.
+        assert "content-length" in unquote(put_url)
+        assert "fallback_presigned_put_url" not in entry
+        # The POST form stays for clients that predate the PUT.
+        assert entry["presigned_url"]["fields"]["key"] == symbol_set.storage_ptr
+
+    def test_bulk_start_upload_includes_fallback_presigned_put_when_accelerated(self) -> None:
+        chunk_id = str(uuid7())
+        with (
+            self.settings(OBJECT_STORAGE_TRANSFER_ACCELERATION=True),
+            patch("posthog.storage.object_storage._accelerated_presigned_client", None),
+        ):
+            response = self.client.post(
+                f"/api/environments/{self.team.id}/error_tracking/symbol_sets/bulk_start_upload",
+                data={"symbol_sets": [{"chunk_id": chunk_id, "content_hash": "hash", "content_length": 10}]},
+            )
+
+        entry = response.json()["id_map"][chunk_id]
+        assert "s3-accelerate" in entry["presigned_put_url"]
+        assert "s3-accelerate" not in entry["fallback_presigned_put_url"]
+
+    def test_bulk_start_upload_rejects_oversized_content_length(self) -> None:
+        chunk_id = str(uuid7())
+        response = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets/bulk_start_upload",
+            data={
+                "symbol_sets": [{"chunk_id": chunk_id, "content_hash": "hash", "content_length": 100 * 1024 * 1024 + 1}]
+            },
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json()["code"] == "file_too_large"
+        # The row must not exist: a rejected upload leaves nothing for retention to clean up.
+        assert not ErrorTrackingSymbolSet.objects.filter(ref=chunk_id).exists()
+
+    @patch("products.error_tracking.backend.presentation.views.symbol_sets.posthoganalytics.capture")
+    def test_bulk_start_upload_skips_uploaded_symbol_sets(self, patched_capture: Mock) -> None:
+        release = ErrorTrackingRelease.objects.create(
+            team=self.team,
+            hash_id="test-release",
+            version="1.0.0",
+            project="test",
+        )
+        existing_chunk_id = str(uuid7())
+        existing_symbol_set = ErrorTrackingSymbolSet.objects.create(
+            team=self.team,
+            ref=existing_chunk_id,
+            storage_ptr="existing",
+            content_hash="already_uploaded",
+            release=release,
+        )
+
+        new_chunk_id = str(uuid7())
+        upload_attempt_id = str(uuid7())
+        upload_run_id = str(uuid7())
+
+        response = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets/bulk_start_upload",
+            data={
+                "upload_attempt_id": upload_attempt_id,
+                "upload_run_id": upload_run_id,
+                "symbol_sets": [
+                    {
+                        "chunk_id": existing_chunk_id,
+                        "release_id": str(release.id),
+                        "content_hash": existing_symbol_set.content_hash,
+                    },
+                    {
+                        "chunk_id": new_chunk_id,
+                        "release_id": str(release.id),
+                        "content_hash": "new_hash",
+                    },
+                ],
+            },
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        id_map = response.json()["id_map"]
+
+        assert str(new_chunk_id) in id_map
+        assert existing_chunk_id not in id_map
+
+        existing_symbol_set.refresh_from_db()
+        assert existing_symbol_set.storage_ptr == "existing"
+        assert existing_symbol_set.release_id == release.id
+        assert existing_symbol_set.last_used is not None
+
+        new_symbol_set = ErrorTrackingSymbolSet.objects.get(ref=new_chunk_id)
+        assert new_symbol_set.release_id == release.id
+        assert new_symbol_set.last_used is not None
+        assert id_map[str(new_chunk_id)]["symbol_set_id"] == str(new_symbol_set.id)
+
+        assert patched_capture.call_args.args[0] == "error_tracking_symbol_set_upload_started"
+        assert patched_capture.call_args.kwargs["properties"] == {
+            **patched_capture.call_args.kwargs["properties"],
+            "source": "web",
+            "team_id": self.team.id,
+            "endpoint": "bulk_start_upload",
+            "force": False,
+            "skip_on_conflict": False,
+            "total_chunks": 2,
+            "chunks_skipped": 1,
+            "chunks_to_upload": 1,
+            "upload_attempt_id": upload_attempt_id,
+            "upload_run_id": upload_run_id,
+        }
+
+    @parameterized.expand(
+        [
+            ("never_used", None, True),
+            ("used_before_the_refresh_interval", timedelta(hours=13), True),
+            ("used_within_the_refresh_interval", timedelta(hours=1), False),
+        ]
+    )
+    @patch("products.error_tracking.backend.presentation.views.symbol_sets.posthoganalytics.capture")
+    def test_bulk_start_upload_marks_unchanged_symbol_sets_as_used(
+        self, _name: str, last_used_age: timedelta | None, expect_refresh: bool, patched_capture: Mock
+    ) -> None:
+        chunk_id = str(uuid7())
+        last_used = None if last_used_age is None else timezone.now() - last_used_age
+        symbol_set = ErrorTrackingSymbolSet.objects.create(
+            team=self.team,
+            ref=chunk_id,
+            storage_ptr="existing",
+            content_hash="already_uploaded",
+            last_used=last_used,
+        )
+
+        before_upload = timezone.now()
+        upload_run_id = str(uuid7())
+        response = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets/bulk_start_upload",
+            data={
+                "upload_run_id": upload_run_id,
+                "symbol_sets": [{"chunk_id": chunk_id, "content_hash": "already_uploaded"}],
+            },
+            format="json",
+        )
+        after_upload = timezone.now()
+
+        assert response.status_code == status.HTTP_201_CREATED
+        assert response.json()["id_map"] == {}
+        assert patched_capture.call_args.args[0] == "error_tracking_symbol_set_upload_skipped"
+        assert patched_capture.call_args.kwargs["properties"]["chunks_to_upload"] == 0
+        assert patched_capture.call_args.kwargs["properties"]["chunks_skipped"] == 1
+        assert patched_capture.call_args.kwargs["properties"]["upload_run_id"] == upload_run_id
+
+        symbol_set.refresh_from_db()
+        if expect_refresh:
+            assert symbol_set.last_used is not None
+            assert before_upload <= symbol_set.last_used <= after_upload
+        else:
+            assert symbol_set.last_used == last_used
+
+    @parameterized.expand(
+        [
+            ("default_rejects", {}, status.HTTP_400_BAD_REQUEST, "content_hash_mismatch", "unchanged"),
+            ("skip_on_conflict", {"skip_on_conflict": True}, status.HTTP_201_CREATED, None, "unchanged"),
+            ("force", {"force": True}, status.HTTP_201_CREATED, None, "overwritten"),
+            (
+                "force_and_skip_rejected",
+                {"force": True, "skip_on_conflict": True},
+                status.HTTP_400_BAD_REQUEST,
+                "invalid_conflict_handling",
+                "unchanged",
+            ),
+        ]
+    )
+    def test_bulk_start_upload_handles_content_mismatch(
+        self,
+        _name: str,
+        request_flags: dict[str, bool],
+        expected_status: int,
+        expected_code: str | None,
+        expected_outcome: str,
+    ) -> None:
+        chunk_id = str(uuid7())
+        symbol_set = ErrorTrackingSymbolSet.objects.create(
+            team=self.team,
+            ref=chunk_id,
+            storage_ptr="existing",
+            content_hash="already_uploaded",
+        )
+
+        response = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets/bulk_start_upload",
+            data={
+                "symbol_sets": [
+                    {
+                        "chunk_id": chunk_id,
+                        "content_hash": "different_hash",
+                    }
+                ],
+                **request_flags,
+            },
+            format="json",
+        )
+
+        assert response.status_code == expected_status
+        if expected_code:
+            assert response.json()["code"] == expected_code
+        if expected_outcome == "overwritten":
+            assert response.json()["id_map"][chunk_id]["symbol_set_id"] == str(symbol_set.id)
+
+        symbol_set.refresh_from_db()
+        if expected_outcome == "unchanged":
+            assert symbol_set.storage_ptr == "existing"
+            assert symbol_set.content_hash == "already_uploaded"
+        else:
+            assert symbol_set.storage_ptr != "existing"
+            assert symbol_set.content_hash is None
+
+    def test_bulk_start_upload_fail_restart_with_no_content_hash(self) -> None:
+        existing_chunk_id = str(uuid7())
+        _ = ErrorTrackingSymbolSet.objects.create(
+            team=self.team,
+            ref=existing_chunk_id,
+            storage_ptr="existing",
+            content_hash="already_uploaded",
+        )
+
+        response = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets/bulk_start_upload",
+            data={"chunk_ids": [existing_chunk_id]},
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    @parameterized.expand(
+        [
+            # (name, endpoint, release ID the client sends)
+            ("start_upload_unknown", "bulk_start_upload", "01920000-0000-7000-8000-000000000000"),
+            ("start_upload_malformed", "bulk_start_upload", "not-a-uuid"),
+            ("check_upload_unknown", "bulk_check_upload", "01920000-0000-7000-8000-000000000000"),
+            ("check_upload_malformed", "bulk_check_upload", "not-a-uuid"),
+        ]
+    )
+    def test_bulk_upload_rejects_bad_release(self, _name: str, endpoint: str, release_id: str) -> None:
+        chunk_id = str(uuid7())
+
+        response = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets/{endpoint}",
+            data={
+                "symbol_sets": [
+                    {
+                        "chunk_id": chunk_id,
+                        "release_id": release_id,
+                        "content_hash": "hash",
+                    }
+                ]
+            },
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json()["code"] == "invalid_release_id"
+        assert not ErrorTrackingSymbolSet.objects.filter(ref=chunk_id).exists()
+
+    def test_bulk_start_upload_allows_no_release(self) -> None:
+        response = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets/bulk_start_upload",
+            data={
+                "symbol_sets": [
+                    {
+                        "chunk_id": str(uuid7()),
+                        "release_id": None,
+                        "content_hash": "hash",
+                    },
+                    {
+                        "chunk_id": str(uuid7()),
+                        "content_hash": "hash",
+                    },
+                    {
+                        "chunk_id": str(uuid7()),
+                        "content_hash": None,
+                    },
+                    {
+                        "chunk_id": str(uuid7()),
+                    },
+                ]
+            },
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED
+
+    def test_bulk_start_upload_updates_release_for_pending_symbol_set(self) -> None:
+        chunk_id = str(uuid7())
+
+        initial_response = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets/bulk_start_upload",
+            data={"chunk_ids": [chunk_id]},
+            format="json",
+        )
+
+        assert initial_response.status_code == status.HTTP_201_CREATED
+
+        symbol_set = ErrorTrackingSymbolSet.objects.get(ref=chunk_id)
+        initial_storage_ptr = symbol_set.storage_ptr
+
+        release = ErrorTrackingRelease.objects.create(
+            team=self.team,
+            hash_id="later-release",
+            version="1.0.1",
+            project="test",
+        )
+
+        updated_response = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets/bulk_start_upload",
+            data={
+                "symbol_sets": [
+                    {
+                        "chunk_id": str(chunk_id),
+                        "release_id": str(release.id),
+                        "content_hash": "pending_hash",
+                    }
+                ]
+            },
+            format="json",
+        )
+
+        assert updated_response.status_code == status.HTTP_201_CREATED
+        id_map = updated_response.json()["id_map"]
+
+        symbol_set.refresh_from_db()
+        assert symbol_set.release_id == release.id
+        assert symbol_set.storage_ptr != initial_storage_ptr
+        assert id_map[str(chunk_id)]["symbol_set_id"] == str(symbol_set.id)
+
+    def test_bulk_start_upload_updates_release_for_uploaded_symbol_set(self) -> None:
+        chunk_id = str(uuid7())
+        storage_ptr = "uploaded_ptr"
+        content_hash = "uploaded_hash"
+
+        symbol_set = ErrorTrackingSymbolSet.objects.create(
+            team=self.team,
+            ref=chunk_id,
+            storage_ptr=storage_ptr,
+            content_hash=content_hash,
+        )
+
+        release = ErrorTrackingRelease.objects.create(
+            team=self.team,
+            hash_id="retro-release",
+            version="1.0.2",
+            project="test",
+        )
+
+        response = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets/bulk_start_upload",
+            data={
+                "symbol_sets": [
+                    {
+                        "chunk_id": chunk_id,
+                        "release_id": str(release.id),
+                        "content_hash": content_hash,
+                    }
+                ]
+            },
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        id_map = response.json()["id_map"]
+
+        symbol_set.refresh_from_db()
+        assert symbol_set.release_id == release.id
+        assert symbol_set.storage_ptr == storage_ptr
+        assert chunk_id not in id_map
+
+    def test_bulk_start_upload_restarts_pending_upload(self) -> None:
+        chunk_id = str(uuid7())
+
+        first_response = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets/bulk_start_upload",
+            data={"chunk_ids": [chunk_id]},
+            format="json",
+        )
+
+        assert first_response.status_code == status.HTTP_201_CREATED
+
+        symbol_set = ErrorTrackingSymbolSet.objects.get(ref=chunk_id)
+        initial_storage_ptr = symbol_set.storage_ptr
+
+        second_response = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets/bulk_start_upload",
+            data={"chunk_ids": [chunk_id]},
+            format="json",
+        )
+
+        assert second_response.status_code == status.HTTP_201_CREATED
+        id_map = second_response.json()["id_map"]
+
+        symbol_set.refresh_from_db()
+        assert symbol_set.storage_ptr != initial_storage_ptr
+        assert id_map[str(chunk_id)]["symbol_set_id"] == str(symbol_set.id)
+
+    def test_bulk_start_upload_rejects_release_change(self) -> None:
+        chunk_id = str(uuid7())
+
+        first_release = ErrorTrackingRelease.objects.create(
+            team=self.team,
+            hash_id="first-release",
+            version="1.0.0",
+            project="test",
+        )
+        second_release = ErrorTrackingRelease.objects.create(
+            team=self.team,
+            hash_id="second-release",
+            version="1.0.1",
+            project="test",
+        )
+
+        symbol_set = ErrorTrackingSymbolSet.objects.create(
+            team=self.team,
+            ref=chunk_id,
+            storage_ptr="stored",
+            content_hash="hash",
+            release=first_release,
+        )
+
+        response = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets/bulk_start_upload",
+            data={
+                "symbol_sets": [
+                    {
+                        "chunk_id": chunk_id,
+                        "release_id": str(second_release.id),
+                        "content_hash": symbol_set.content_hash,
+                    }
+                ]
+            },
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+        symbol_set.refresh_from_db()
+        assert symbol_set.release_id == first_release.id
+
+    @parameterized.expand(
+        [
+            # (name, endpoint, the upload names the other release, expected rejection code)
+            ("start_upload", "bulk_start_upload", True, "release_id_mismatch"),
+            ("check_upload", "bulk_check_upload", False, "content_hash_mismatch"),
+        ]
+    )
+    @patch("products.error_tracking.backend.logic.symbol_sets.posthoganalytics.capture_exception")
+    def test_bulk_upload_conflict_is_not_reported_to_error_tracking(
+        self,
+        _name: str,
+        endpoint: str,
+        upload_names_other_release: bool,
+        expected_code: str,
+        patched_capture_exception: Mock,
+    ) -> None:
+        chunk_id = str(uuid7())
+        release = ErrorTrackingRelease.objects.create(
+            team=self.team,
+            hash_id="conflict-release",
+            version="1.0.0",
+            project="test",
+        )
+        other_release = ErrorTrackingRelease.objects.create(
+            team=self.team,
+            hash_id="conflict-other-release",
+            version="1.0.1",
+            project="test",
+        )
+        ErrorTrackingSymbolSet.objects.create(
+            team=self.team,
+            ref=chunk_id,
+            storage_ptr="existing",
+            content_hash="already_uploaded",
+            release=release,
+        )
+
+        upload = {
+            "chunk_id": chunk_id,
+            "content_hash": "already_uploaded" if upload_names_other_release else "different_hash",
+        }
+        if upload_names_other_release:
+            upload["release_id"] = str(other_release.id)
+
+        response = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets/{endpoint}",
+            data={"symbol_sets": [upload]},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json()["code"] == expected_code
+        patched_capture_exception.assert_not_called()
+
+    @parameterized.expand(
+        [
+            # (name, existing row (None = missing), upload names the release, request flags, expected to upload)
+            ("missing", None, False, {}, True),
+            ("unchanged", {"content_hash": "hash", "bound": False}, False, {}, False),
+            ("pending", {"content_hash": None, "bound": False}, False, {}, True),
+            ("changed_with_force", {"content_hash": "other", "bound": False}, False, {"force": True}, True),
+            (
+                "changed_with_skip_on_conflict",
+                {"content_hash": "other", "bound": False},
+                False,
+                {"skip_on_conflict": True},
+                False,
+            ),
+            ("unchanged_needing_release_bound", {"content_hash": "hash", "bound": False}, True, {}, True),
+            ("unchanged_with_release_bound", {"content_hash": "hash", "bound": True}, True, {}, False),
+        ]
+    )
+    @patch("products.error_tracking.backend.presentation.views.symbol_sets.posthoganalytics.capture")
+    def test_bulk_check_upload_reports_chunks_bulk_start_upload_needs(
+        self,
+        _name: str,
+        existing: dict | None,
+        upload_names_release: bool,
+        request_flags: dict[str, bool],
+        expected_to_upload: bool,
+        patched_capture: Mock,
+    ) -> None:
+        chunk_id = str(uuid7())
+        release = ErrorTrackingRelease.objects.create(
+            team=self.team,
+            hash_id="check-release",
+            version="1.0.0",
+            project="test",
+        )
+        if existing is not None:
+            ErrorTrackingSymbolSet.objects.create(
+                team=self.team,
+                ref=chunk_id,
+                storage_ptr="existing",
+                content_hash=existing["content_hash"],
+                release=release if existing["bound"] else None,
+            )
+        upload: dict[str, str | None] = {"chunk_id": chunk_id, "content_hash": "hash"}
+        if upload_names_release:
+            upload["release_id"] = str(release.id)
+
+        response = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets/bulk_check_upload",
+            data={"symbol_sets": [upload], **request_flags},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.json() == {"chunk_ids_to_upload": [chunk_id] if expected_to_upload else []}
+
+        symbol_set = ErrorTrackingSymbolSet.objects.filter(ref=chunk_id).first()
+        if existing is None:
+            assert symbol_set is None
+        else:
+            assert symbol_set is not None
+            assert symbol_set.storage_ptr == "existing"
+            assert symbol_set.content_hash == existing["content_hash"]
+            assert symbol_set.release_id == (release.id if existing["bound"] else None)
+            assert (symbol_set.last_used is not None) == (not expected_to_upload)
+
+        assert patched_capture.call_args.args[0] == "error_tracking_symbol_set_upload_checked"
+        assert patched_capture.call_args.kwargs["properties"]["chunks_skipped"] == (0 if expected_to_upload else 1)
+
+    @parameterized.expand(
+        [
+            # (name, uploaded content hash, upload names another release, chunk id repeated, expected code)
+            ("content_mismatch", "other", False, False, "content_hash_mismatch"),
+            ("release_mismatch", "hash", True, False, "release_id_mismatch"),
+            ("duplicate_chunk_ids", "hash", False, True, "invalid_chunk_ids"),
+        ]
+    )
+    def test_bulk_check_upload_rejects_conflicts_before_any_upload(
+        self,
+        _name: str,
+        upload_content_hash: str,
+        upload_names_other_release: bool,
+        chunk_id_repeated: bool,
+        expected_code: str,
+    ) -> None:
+        chunk_id = str(uuid7())
+        bound_release = ErrorTrackingRelease.objects.create(
+            team=self.team,
+            hash_id="bound-release",
+            version="1.0.0",
+            project="test",
+        )
+        other_release = ErrorTrackingRelease.objects.create(
+            team=self.team,
+            hash_id="other-release",
+            version="1.0.1",
+            project="test",
+        )
+        ErrorTrackingSymbolSet.objects.create(
+            team=self.team,
+            ref=chunk_id,
+            storage_ptr="existing",
+            content_hash="hash",
+            release=bound_release,
+        )
+        upload = {"chunk_id": chunk_id, "content_hash": upload_content_hash}
+        if upload_names_other_release:
+            upload["release_id"] = str(other_release.id)
+        symbol_sets = [upload, upload] if chunk_id_repeated else [upload]
+
+        response = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets/bulk_check_upload",
+            data={"symbol_sets": symbol_sets},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json()["code"] == expected_code
+
+    @patch("posthog.storage.object_storage.head_object")
+    def test_can_finish_bulk_symbol_set_upload(self, patched_object_storage) -> None:
+        symbol_set_one = ErrorTrackingSymbolSet.objects.create(
+            team=self.team, ref=str(uuid7()), storage_ptr="file/name1"
+        )
+        symbol_set_two = ErrorTrackingSymbolSet.objects.create(
+            team=self.team, ref=str(uuid7()), storage_ptr="file/name2"
+        )
+
+        patched_object_storage.return_value = {"ContentLength": 1000}  # 1KB
+
+        self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets/bulk_finish_upload",
+            data={"content_hashes": {str(symbol_set_one.id): "hash_one", str(symbol_set_two.id): "hash_two"}},
+        )
+
+        assert ErrorTrackingSymbolSet.objects.get(id=symbol_set_one.id).content_hash == "hash_one"
+        assert ErrorTrackingSymbolSet.objects.get(id=symbol_set_two.id).content_hash == "hash_two"
+
+    @patch("products.error_tracking.backend.logic.symbol_sets.posthoganalytics.capture")
+    def test_bulk_finish_upload_rejects_unknown_symbol_set_ids(self, patched_capture: Mock) -> None:
+        response = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets/bulk_finish_upload",
+            data={"content_hashes": {str(uuid7()): "hash"}},
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json()["code"] == "symbol_set_not_found"
+        assert patched_capture.call_args.args[0] == "error_tracking_symbol_set_uploaded"
+        assert patched_capture.call_args.kwargs["properties"] == {
+            **patched_capture.call_args.kwargs["properties"],
+            "source": "web",
+            "file_size": 0,
+            "success": False,
+            "file_count": 1,
+            "failure_reason": "ValidationError",
+            "failure_code": "symbol_set_not_found",
+        }
+
+    @patch("products.error_tracking.backend.logic.symbol_sets.posthoganalytics.capture")
+    @patch("posthog.storage.object_storage.head_object")
+    def test_bulk_finish_upload_preserves_pending_symbol_set_when_file_is_not_found(
+        self, patched_object_storage, patched_capture: Mock
+    ) -> None:
+        symbol_set = ErrorTrackingSymbolSet.objects.create(team=self.team, ref=str(uuid7()), storage_ptr="file/name")
+        upload_attempt_id = str(uuid7())
+        upload_run_id = str(uuid7())
+        request_data = {
+            "content_hashes": {str(symbol_set.id): "hash"},
+            "upload_attempt_id": upload_attempt_id,
+            "upload_run_id": upload_run_id,
+        }
+
+        patched_object_storage.side_effect = [None, {"ContentLength": 1000}]
+
+        response = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets/bulk_finish_upload",
+            data=request_data,
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json()["code"] == "file_not_found"
+        failure_call = patched_capture.call_args_list[0]
+        assert failure_call.args[0] == "error_tracking_symbol_set_uploaded"
+        assert failure_call.kwargs["properties"] == {
+            **failure_call.kwargs["properties"],
+            "source": "web",
+            "file_size": 0,
+            "success": False,
+            "file_count": 1,
+            "failure_reason": "ValidationError",
+            "failure_code": "file_not_found",
+            "upload_attempt_id": upload_attempt_id,
+            "upload_run_id": upload_run_id,
+        }
+
+        symbol_set.refresh_from_db()
+        assert symbol_set.content_hash is None
+
+        retry_response = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/symbol_sets/bulk_finish_upload",
+            data=request_data,
+            format="json",
+        )
+
+        assert retry_response.status_code == status.HTTP_201_CREATED
+        assert patched_capture.call_args.kwargs["properties"]["upload_attempt_id"] == upload_attempt_id
+        assert patched_capture.call_args.kwargs["properties"]["upload_run_id"] == upload_run_id
+        assert patched_capture.call_args.kwargs["properties"]["success"] is True
+        symbol_set.refresh_from_db()
+        assert symbol_set.content_hash == "hash"
+
+    def _assert_logs_the_activity(self, error_tracking_issue_id: int, expected: list[dict]) -> None:
+        activity_response = self._get_error_tracking_issue_activity(error_tracking_issue_id)
+        activity: list[dict] = activity_response["results"]
+        for item in activity:
+            item.pop("id", None)
+            for envelope_key in ("is_system", "was_impersonated", "client"):
+                item.pop(envelope_key, None)
+        self.maxDiff = None
+        self.assertEqual(activity, expected)
+
+    def _get_error_tracking_issue_activity(
+        self, error_tracking_issue_id: int, expected_status: int = status.HTTP_200_OK
+    ) -> dict:
+        url = f"/api/environments/{self.team.id}/error_tracking/issues/{error_tracking_issue_id}/activity"
+        activity = self.client.get(url)
+        self.assertEqual(activity.status_code, expected_status)
+        return activity.json()
+
+    def test_release_writes_strip_credentials_from_remote_url(self) -> None:
+        response = self.client.post(
+            f"/api/environments/{self.team.id}/error_tracking/releases",
+            data={
+                "version": "1.0.0",
+                "project": "my-project",
+                "hash_id": "test-hash-123",
+                "metadata": {
+                    "git": {
+                        "commit_id": "abc123",
+                        "remote_url": "https://user:password@example.com/repository.git?token=query#token=fragment",
+                    }
+                },
+            },
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_201_CREATED
+        release = ErrorTrackingRelease.objects.get(team=self.team, hash_id="test-hash-123")
+        assert release.metadata == {"git": {"commit_id": "abc123", "remote_url": "https://example.com/repository.git"}}
+
+        response = self.client.patch(
+            f"/api/environments/{self.team.id}/error_tracking/releases/{release.id}",
+            data={
+                "metadata": {
+                    "git": {
+                        "commit_id": "def456",
+                        "remote_url": "//x-access-token:secret@example.com/repository.git?access_token=query-secret",
+                    }
+                }
+            },
+            format="json",
+        )
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        release.refresh_from_db()
+        assert release.metadata == {"git": {"commit_id": "def456", "remote_url": "//example.com/repository.git"}}
+
+    def test_fetch_release_by_hash_id(self) -> None:
+        release = ErrorTrackingRelease.objects.create(
+            team=self.team,
+            hash_id="test-hash-123",
+            version="1.0.0",
+            project="my-project",
+            metadata={"commit": "abc123"},
+        )
+
+        response = self.client.get(f"/api/environments/{self.team.id}/error_tracking/releases/hash/{release.hash_id}")
+        assert response.status_code == status.HTTP_200_OK
+
+        response_json = response.json()
+        assert response_json["id"] == str(release.id)
+        assert response_json["hash_id"] == "test-hash-123"
+        assert response_json["version"] == "1.0.0"
+        assert response_json["project"] == "my-project"
+        assert response_json["metadata"] == {"commit": "abc123"}
+
+    def test_fetch_release_by_hash_id_not_found(self) -> None:
+        response = self.client.get(f"/api/environments/{self.team.id}/error_tracking/releases/hash/nonexistent-hash")
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_releases_list_paginates_in_sql(self) -> None:
+        for i in range(5):
+            ErrorTrackingRelease.objects.create(team=self.team, hash_id=f"hash-{i}", version=f"1.0.{i}", project="proj")
+
+        with CaptureQueriesContext(connection) as ctx:
+            response = self.client.get(
+                f"/api/environments/{self.team.id}/error_tracking/releases", data={"limit": 2, "offset": 1}
+            )
+
+        assert response.status_code == status.HTTP_200_OK
+        body = response.json()
+        assert body["count"] == 5
+        assert len(body["results"]) == 2
+
+        # The page is sliced in SQL (LIMIT 2), not by materializing all rows and slicing in Python.
+        table = ErrorTrackingRelease._meta.db_table
+        limited_selects = [
+            q["sql"] for q in ctx.captured_queries if table in q["sql"] and "LIMIT 2" in q["sql"].upper()
+        ]
+        assert limited_selects, "expected a LIMIT 2 SELECT on the release table"

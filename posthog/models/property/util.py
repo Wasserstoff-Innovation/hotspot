@@ -1,0 +1,274 @@
+import re
+from collections import (
+    Counter,
+    Counter as TCounter,
+)
+from collections.abc import Iterable
+from typing import Any, Literal, Optional, Union, cast
+
+from posthog.hogql import ast
+from posthog.hogql.database.s3_table import S3Table
+from posthog.hogql.escape_sql import escape_clickhouse_identifier
+from posthog.hogql.parser import parse_expr
+from posthog.hogql.visitor import TraversingVisitor
+
+from posthog.clickhouse.kafka_engine import trim_quotes_expr
+from posthog.clickhouse.materialized_columns import TableWithProperties, get_materialized_column_for_property
+from posthog.models.event import Selector
+from posthog.models.property import Property, PropertyGroup, PropertyIdentifier, PropertyName
+
+from products.actions.backend.models.action import Action
+from products.actions.backend.models.util import get_action_tables_and_properties
+
+
+def get_property_string_expr(
+    table: TableWithProperties,
+    property_name: PropertyName,
+    var: str,
+    column: str,
+    allow_denormalized_props: bool = True,
+    table_alias: Optional[str] = None,
+    materialised_table_column: str = "properties",
+    use_new_events_schema: bool = False,
+) -> tuple[str, bool]:
+    """
+
+    :param table:
+        the full name of the table in the database. used to look up which properties have been materialized
+    :param property_name:
+    :param var:
+        the value to template in from the data structure for the query e.g. %(key)s or a flat value e.g. ["Safari"].
+        If a flat value it should be escaped before being passed to this function
+    :param column:
+        the table column where JSON is stored or the name of a materialized column
+    :param allow_denormalized_props:
+    :param table_alias:
+        (optional) alias of the table being queried
+    :param use_new_events_schema:
+        read events properties as native-JSON subcolumns (events_json) instead of mat_* columns /
+        the String blob. Must match the table the surrounding query actually selects from.
+    :return:
+    """
+    table_string = f"{table_alias}." if table_alias is not None and table_alias != "" else ""
+
+    if use_new_events_schema and table == "events":
+        if materialised_table_column in ("properties", "person_properties"):
+            return _json_events_property_expr(property_name, var, f"{table_string}{column}")
+        # The JSON events table has no mat_* columns at all; group columns there stay String blobs.
+        allow_denormalized_props = False
+
+    if (
+        allow_denormalized_props
+        and (
+            materialized_column := get_materialized_column_for_property(
+                table,
+                cast(Literal["properties", "group_properties", "person_properties"], materialised_table_column),
+                property_name,
+            )
+        )
+        and not materialized_column.is_nullable
+        and "group" not in materialised_table_column
+    ):
+        return (
+            f'{table_string}"{materialized_column.name}"',
+            True,
+        )
+
+    return trim_quotes_expr(f"JSONExtractRaw({table_string}{column}, {var})"), False
+
+
+def _json_events_to_json_string_expr(value: str) -> str:
+    serialized = f"toJSONString({value})"
+    # With slash escaping disabled, a backslash before '/' belongs to the value and must survive.
+    return f"if(getSetting('output_format_json_escape_forward_slashes'), replaceAll({serialized}, '\\\\/', '/'), {serialized})"
+
+
+def _json_events_property_expr(property_name: PropertyName, var: str, column_ref: str) -> tuple[str, bool]:
+    scalar_value = _json_events_subcolumn_expr(property_name, var, column_ref)
+    object_value = _json_events_to_json_string_expr(
+        _json_events_subcolumn_expr(property_name, var, column_ref, sub_object=True)
+    )
+    scalar_string = f"toString({scalar_value})"
+    # Arrays and maps read as JSON text. Their plain text starts with '[' or '{', which a string can too, but a
+    # string's JSON form starts with '"' (see the HogQL resolver).
+    scalar_json = _json_events_to_json_string_expr(scalar_value)
+    # 91 and 123 are '[' and '{'; compared by code so no brace literal reaches callers that str.format the SQL.
+    is_container = f"ascii({scalar_string}) IN (91, 123) AND ascii({scalar_json}) IN (91, 123)"
+    raw_value = (
+        f"if({object_value} != '{{}}', {object_value}, "
+        f"if({is_container}, nullIf(nullIf({scalar_json}, '[]'), '{{}}'), {scalar_string}))"
+    )
+    return f"ifNull({raw_value}, '')", False
+
+
+def _json_events_subcolumn_expr(
+    property_name: PropertyName, var: str, column_ref: str, *, sub_object: bool = False
+) -> str:
+    if "%" not in property_name and "." not in property_name:
+        separator = ".^" if sub_object else "."
+        return f"{column_ref}{separator}{escape_clickhouse_identifier(property_name)}"
+
+    # A dot inside one key is stored as `%2E` (EVENTS_JSON_INSERT_SETTINGS), so it must not read as a path
+    # separator. `%` is spelled char(37) because callers run this SQL through parameter substitution, where a
+    # literal `%` is a format directive.
+    escaped_dots = f"replaceAll({var}, '.', concat(char(37), '2E'))"
+    escaped_backticks = f"replaceAll({escaped_dots}, char(96), concat(char(96), char(96)))"
+    quoted_subcolumn = f"concat(char(96), {escaped_backticks}, char(96))"
+    subcolumn = f"concat('^', {quoted_subcolumn})" if sub_object else escaped_dots
+    return f"getSubcolumn({column_ref}, {subcolumn})"
+
+
+def box_value(value: Any, remove_spaces=False) -> list[Any]:
+    if not isinstance(value, list):
+        value = [value]
+    return [str(value).replace(" ", "") if remove_spaces else str(value) for value in value]
+
+
+def _chain_escaped_value(value: str) -> str:
+    # A quoted value in the chain escapes double quotes as \" (_escape in
+    # posthog/models/element/element.py). A selector can write the quote either
+    # pre-escaped ([title="say \"hi\""]) or bare inside single quotes
+    # ([title='say "hi"']), so normalize to the chain's form to match both.
+    return value.replace(r"\"", '"').replace('"', r"\"")
+
+
+# Attribute keys the elements chain serializes without the attr__ prefix that custom
+# HTML attributes get. See elements_to_string in posthog/models/element/element.py.
+_UNPREFIXED_CHAIN_ATTRIBUTES = {"attr_id", "href", "text", "nth-child", "nth-of-type"}
+
+
+def _chain_attribute_order(key: str) -> str:
+    """The key this attribute sorts under in the elements chain.
+
+    elements_to_string sorts by serialized key, so a custom attribute sorts under
+    attr__<key>. Emit attributes in that order: the separators between them cannot
+    match backwards, so an order the chain never produces can never match.
+    """
+    return key if key in _UNPREFIXED_CHAIN_ATTRIBUTES else f"attr__{key}"
+
+
+# A semicolon separates elements only outside a quoted attribute value — an inline
+# style="display: flex; gap: 4px" carries its own. Quotes inside a value are escaped
+# as \" (see _escape in posthog/models/element/element.py), so an escaped quote must
+# not close the span. split_elements_chain draws the boundary the same way. A backslash
+# is consumed only together with the character after it, so a long run of backslashes
+# has one way to match and cannot cause catastrophic backtracking.
+_QUOTED_VALUE = r'"(?:\\.|[^"\\])*"'
+_WITHIN_ELEMENT = r'(?:[^;"]|' + _QUOTED_VALUE + r")*?"
+_WHOLE_ELEMENTS = r'(?:(?:[^;"]|' + _QUOTED_VALUE + r")*;)*"
+# ClickHouse runs these through RE2, which has no negative lookahead. A class that
+# excludes both whitespace and non-whitespace matches no character at all.
+_MATCHES_NOTHING = r"[^\s\S]"
+
+
+def build_selector_regex(selector: Selector) -> str:
+    if selector.is_unsatisfiable():
+        return _MATCHES_NOTHING
+    regex = r""
+    for index, tag in enumerate(selector.parts):
+        if index > 0 and not tag.direct_descendant:
+            # A descendant combinator (a space) matches through any number of
+            # intermediate elements. Skip whole elements only — an unanchored .*
+            # would let this part match inside a class name or attribute value.
+            regex += _WHOLE_ELEMENTS
+        if tag.data.get("tag_name") and isinstance(tag.data["tag_name"], str) and tag.data["tag_name"] != "*":
+            # The elements in the elements_chain are separated by the semicolon
+            regex += re.escape(tag.data["tag_name"])
+        if tag.data.get("attr_class__contains"):
+            # Every condition of one selector part has to land inside one element
+            regex += (
+                _WITHIN_ELEMENT
+                + r"\."
+                + (r"\." + _WITHIN_ELEMENT).join([re.escape(s) for s in sorted(tag.data["attr_class__contains"])])
+            )
+        if tag.ch_attributes:
+            regex += _WITHIN_ELEMENT
+            for key, value in sorted(tag.ch_attributes.items(), key=lambda kv: _chain_attribute_order(kv[0])):
+                # The full chain key stops [foo="1"] from matching inside attr__data-foo="1".
+                name = _chain_attribute_order(key) if tag.strict_attributes else key
+                regex += rf'{re.escape(name)}="{re.escape(_chain_escaped_value(str(value)))}"' + _WITHIN_ELEMENT
+        # The rest of the element can carry characters no allowlist anticipates
+        # (classes like w-1/2 or !mt-0), so skip anything within the element.
+        regex += _WITHIN_ELEMENT + r"($|;|:([^;^\s]*(;|$|\s)))"
+        if tag.direct_descendant:
+            regex += r".*"
+    if regex:
+        # Always start matching at the beginning of an element in the chain string
+        # This is to avoid issues like matching elements with class "foo" when looking for elements with tag name "foo"
+        return r"(^|;)" + regex
+    else:
+        return r""
+
+
+class HogQLPropertyChecker(TraversingVisitor):
+    def __init__(self):
+        self.event_properties: list[str] = []
+        self.person_properties: list[str] = []
+
+    def visit_field(self, node: ast.Field):
+        if len(node.chain) > 1 and node.chain[0] == "properties":
+            self.event_properties.append(str(node.chain[1]))
+
+        if len(node.chain) > 2 and node.chain[0] == "person" and node.chain[1] == "properties":
+            self.person_properties.append(str(node.chain[2]))
+
+        if (
+            len(node.chain) > 3
+            and node.chain[0] == "pdi"
+            and node.chain[1] == "person"
+            and node.chain[2] == "properties"
+        ):
+            self.person_properties.append(str(node.chain[3]))
+
+
+def extract_tables_and_properties(props: list[Property], team_id: int) -> TCounter[PropertyIdentifier]:
+    counters: list[tuple] = []
+    for prop in props:
+        if prop.type == "hogql":
+            counters.extend(count_hogql_properties(prop.key))
+        elif prop.type == "behavioral" and prop.event_type == "actions":
+            action = Action.objects.get(pk=prop.key, team_id=team_id)
+            action_counter = get_action_tables_and_properties(action)
+            counters.extend(action_counter)
+        else:
+            counters.append((prop.key, prop.type, prop.group_type_index))
+    return Counter(cast(Iterable, counters))
+
+
+def count_hogql_properties(
+    expr: str, counter: Optional[TCounter[PropertyIdentifier]] = None
+) -> TCounter[PropertyIdentifier]:
+    if not counter:
+        counter = Counter()
+    node = parse_expr(expr)
+    property_checker = HogQLPropertyChecker()
+    property_checker.visit(node)
+    for field in property_checker.event_properties:
+        counter[(field, "event", None)] += 1
+    for field in property_checker.person_properties:
+        counter[(field, "person", None)] += 1
+    return counter
+
+
+def clear_excess_levels(prop: Union["PropertyGroup", "Property"], skip=False):
+    if isinstance(prop, PropertyGroup):
+        if len(prop.values) == 1:
+            if skip:
+                prop.values = [clear_excess_levels(p) for p in prop.values]
+            else:
+                return clear_excess_levels(prop.values[0])
+        else:
+            prop.values = [clear_excess_levels(p, skip=True) for p in prop.values]
+
+    return prop
+
+
+class S3TableVisitor(TraversingVisitor):
+    def __init__(self):
+        super().__init__()
+        self.tables = set()
+
+    def visit_table_type(self, node):
+        if isinstance(node.table, S3Table):
+            self.tables.add(node.table.name)
+        super().visit_table_type(node)
