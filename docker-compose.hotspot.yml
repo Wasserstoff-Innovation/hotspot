@@ -106,9 +106,12 @@ services:
             - '8005:8000'
         volumes:
             - ./posthog:/code/posthog
+            - ./products:/code/products
+            - ./ee:/code/ee
             - ./frontend/src:/code/frontend/src
         environment:
             DEBUG: '1'
+            GRANIAN_WORKERS: '2'
             SITE_URL: ${SITE_URL:-http://localhost:8000}
             SECRET_KEY: ${SECRET_KEY:-hotspot-secure-local-secret-key-32chars}
             OPT_OUT_CAPTURE: 'true'
@@ -136,9 +139,12 @@ services:
         command: ./bin/docker-worker-celery --with-scheduler
         volumes:
             - ./posthog:/code/posthog
+            - ./products:/code/products
+            - ./ee:/code/ee
             - ./frontend/src:/code/frontend/src
         environment:
             DEBUG: '1'
+            GRANIAN_WORKERS: '2'
             SITE_URL: ${SITE_URL:-http://localhost:8000}
             SECRET_KEY: ${SECRET_KEY:-hotspot-secure-local-secret-key-32chars}
             OPT_OUT_CAPTURE: 'true'

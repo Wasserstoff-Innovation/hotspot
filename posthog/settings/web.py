@@ -243,7 +243,11 @@ DJANGO_STRUCTLOG_CELERY_ENABLED = True
 
 if DEBUG:
     # rebase_migration command
-    INSTALLED_APPS.append("django_linear_migrations")
+    try:
+        import django_linear_migrations  # noqa: F401
+        INSTALLED_APPS.append("django_linear_migrations")
+    except ImportError:
+        pass
 
 # Append Enterprise Edition as an app if available
 try:

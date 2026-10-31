@@ -18,6 +18,8 @@ Commands:
     restart           Restart Hotspot containers
     status            Check health and status of Hotspot containers
     logs [service]    View container logs (e.g. ./bin/hotspot logs web)
+    migrate           Run database migrations
+    createsuperuser   Create a new admin superuser
     shell             Open a Django shell in the Hotspot web container
     dev               Start local native development stack using hogli
     help              Show this help message
@@ -51,6 +53,13 @@ case "$COMMAND" in
         ;;
     logs)
         docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" logs -f "$@"
+        ;;
+    migrate)
+        echo "🔄 Running migrations..."
+        docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec web python manage.py migrate "$@"
+        ;;
+    createsuperuser|create-admin)
+        docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec web python manage.py createsuperuser "$@"
         ;;
     shell)
         echo "🐚 Opening Hotspot Django shell..."
