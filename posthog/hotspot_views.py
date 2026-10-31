@@ -10,8 +10,10 @@ import structlog
 
 logger = structlog.get_logger(__name__)
 
-# Path to static hotspot.js SDK
+# Path to static hotspot.js SDK and animations
 HOTSPOT_JS_PATH = os.path.join(settings.BASE_DIR, "posthog", "static", "hotspot.js")
+GSAP_JS_PATH = os.path.join(settings.BASE_DIR, "posthog", "static", "gsap.min.js")
+SCROLL_TRIGGER_JS_PATH = os.path.join(settings.BASE_DIR, "posthog", "static", "ScrollTrigger.min.js")
 
 
 def _add_cors_headers(response: HttpResponse) -> HttpResponse:
@@ -22,6 +24,36 @@ def _add_cors_headers(response: HttpResponse) -> HttpResponse:
     )
     response["Access-Control-Allow-Credentials"] = "true"
     return response
+
+
+@csrf_exempt
+def gsap_js(request: HttpRequest) -> HttpResponse:
+    """Serves local GSAP animation library with CORS headers."""
+    if request.method == "OPTIONS":
+        return _add_cors_headers(HttpResponse(status=200))
+    try:
+        with open(GSAP_JS_PATH, "r", encoding="utf-8") as f:
+            content = f.read()
+    except Exception:
+        content = "// GSAP unavailable"
+    response = HttpResponse(content, content_type="application/javascript; charset=utf-8")
+    response["Cache-Control"] = "public, max-age=86400"
+    return _add_cors_headers(response)
+
+
+@csrf_exempt
+def scroll_trigger_js(request: HttpRequest) -> HttpResponse:
+    """Serves local ScrollTrigger library with CORS headers."""
+    if request.method == "OPTIONS":
+        return _add_cors_headers(HttpResponse(status=200))
+    try:
+        with open(SCROLL_TRIGGER_JS_PATH, "r", encoding="utf-8") as f:
+            content = f.read()
+    except Exception:
+        content = "// ScrollTrigger unavailable"
+    response = HttpResponse(content, content_type="application/javascript; charset=utf-8")
+    response["Cache-Control"] = "public, max-age=86400"
+    return _add_cors_headers(response)
 
 
 @csrf_exempt

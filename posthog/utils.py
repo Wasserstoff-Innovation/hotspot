@@ -619,10 +619,11 @@ def _build_template_context(
             source_path = "src/exporter/index.tsx"
         elif template_name == "render_query.html":
             source_path = "src/render-query/index.tsx"
-        # Add vite dev scripts for development
+        # Add vite dev scripts for development only if a vite dev server is configured
         js_url = get_js_url(request)
-        csp_nonce = getattr(request, "csp_nonce", "")
-        context["vite_dev_scripts"] = f"""
+        if js_url:
+            csp_nonce = getattr(request, "csp_nonce", "")
+            context["vite_dev_scripts"] = f"""
         <script nonce="{csp_nonce}" type="module">
             import RefreshRuntime from '{js_url}/@react-refresh'
             RefreshRuntime.injectIntoGlobalHook(window)

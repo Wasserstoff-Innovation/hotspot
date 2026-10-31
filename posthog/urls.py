@@ -408,6 +408,8 @@ urlpatterns = [
     # Hotspot Single-script SDK and Ingestion Endpoints
     path("hotspot.js", hotspot_views.hotspot_js, name="hotspot_js"),
     path("static/hotspot.js", hotspot_views.hotspot_js, name="hotspot_js_static"),
+    path("gsap.js", hotspot_views.gsap_js, name="gsap_js"),
+    path("ScrollTrigger.js", hotspot_views.scroll_trigger_js, name="scroll_trigger_js"),
     opt_slash_path("capture", hotspot_views.hotspot_capture, name="hotspot_capture"),
     opt_slash_path("batch", hotspot_views.hotspot_capture, name="hotspot_batch"),
     opt_slash_path("e", hotspot_views.hotspot_capture, name="hotspot_e"),
