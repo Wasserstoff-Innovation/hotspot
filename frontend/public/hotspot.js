@@ -46,6 +46,7 @@
         debug: false,
         persistence: 'localStorage',
         sanitize_inputs: true,
+        visualizer: false,
     }
 
     // Auto-discover script tag config if present
@@ -66,11 +67,20 @@
         var scriptHost = currentScript.getAttribute('data-api-host')
         var scriptAuto = currentScript.getAttribute('data-autocapture')
         var scriptDebug = currentScript.getAttribute('data-debug')
+        var scriptVis = currentScript.getAttribute('data-visualizer')
 
         if (scriptKey) config.api_key = scriptKey
         if (scriptHost) config.api_host = scriptHost.replace(/\/+$/, '')
         if (scriptAuto === 'false') config.autocapture = false
         if (scriptDebug === 'true') config.debug = true
+        if (
+            scriptVis === 'true' ||
+            (window.location &&
+                (window.location.search.indexOf('hotspot=visualize') !== -1 ||
+                    window.location.search.indexOf('hotspot_hud=1') !== -1))
+        ) {
+            config.visualizer = true
+        }
 
         // Infer host from script source if host is not specified
         if (!config.api_host && currentScript.src) {
@@ -362,6 +372,26 @@
         return text.trim().substring(0, 80)
     }
 
+    function isPotentiallyDeadClick(el) {
+        if (!el || el.nodeType !== 1) return false
+        var interactiveTags = ['A', 'BUTTON', 'INPUT', 'TEXTAREA', 'SELECT', 'SUMMARY', 'LABEL', 'OPTION']
+        var curr = el
+        for (var i = 0; i < 4; i++) {
+            if (!curr || curr === document.body || curr === document.documentElement) break
+            if (interactiveTags.indexOf(curr.tagName) !== -1) return false
+            var role = curr.getAttribute ? curr.getAttribute('role') : null
+            if (role === 'button' || role === 'link' || role === 'tab' || role === 'menuitem') return false
+            if (curr.onclick || (curr.getAttribute && curr.getAttribute('onclick'))) return false
+            if (curr.tabIndex >= 0) return false
+            try {
+                var cursor = window.getComputedStyle ? window.getComputedStyle(curr).cursor : ''
+                if (cursor === 'pointer') return false
+            } catch (e) {}
+            curr = curr.parentElement
+        }
+        return true
+    }
+
     // Rage-click detection state
     var clickHistory = []
 
@@ -407,6 +437,8 @@
                     }
                 }
 
+                var isDeadClick = isPotentiallyDeadClick(target)
+
                 // Autocapture payload
                 var clickProps = {
                     $event_type: 'click',
@@ -416,6 +448,7 @@
                     $el_id: target.id || '',
                     $el_class: typeof target.className === 'string' ? target.className : '',
                     $el_href: target.href || (target.closest && target.closest('a') ? target.closest('a').href : ''),
+                    $is_dead_click: isDeadClick,
                     // Heatmap coordinates
                     $heatmap_x: Math.round(pageX),
                     $heatmap_y: Math.round(pageY),
@@ -431,6 +464,21 @@
 
                 if (isRageClick) {
                     recordEvent('$rageclick', clickProps)
+                }
+
+                // Feed into in-browser visualizer
+                if (typeof visualizer !== 'undefined') {
+                    visualizer.recordClick({
+                        x: Math.round(pageX),
+                        y: Math.round(pageY),
+                        clientX: clickX,
+                        clientY: clickY,
+                        time: now,
+                        selector: clickProps.$el_selector,
+                        text: clickProps.$el_text,
+                        isRage: isRageClick,
+                        isDead: isDeadClick,
+                    })
                 }
             },
             true
@@ -545,10 +593,340 @@
         })
     }
 
+    // ==========================================
+    // In-Browser Heatmap Visualizer (Option + H)
+    // ==========================================
+    var visualizer = (function () {
+        var clicks = []
+        var isVisible = false
+        var filterMode = 'all' // 'all', 'rage', 'dead'
+        var canvas = null
+        var ctx = null
+        var hudContainer = null
+        var hudPill = null
+        var hudExpanded = null
+        var animFrame = null
+
+        try {
+            var saved = sessionStorage.getItem('__hotspot_vis_clicks')
+            if (saved) clicks = JSON.parse(saved)
+        } catch (e) {}
+
+        function persistClicks() {
+            try {
+                if (clicks.length > 250) clicks = clicks.slice(-250)
+                sessionStorage.setItem('__hotspot_vis_clicks', JSON.stringify(clicks))
+            } catch (e) {}
+        }
+
+        function createOverlay() {
+            if (canvas || !document.body) return
+            canvas = document.createElement('canvas')
+            canvas.id = '__hotspot_vis_canvas'
+            canvas.style.cssText =
+                'position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:2147483640;display:none;'
+            document.body.appendChild(canvas)
+            ctx = canvas.getContext('2d')
+
+            window.addEventListener('resize', requestRender)
+            window.addEventListener('scroll', requestRender, { passive: true })
+        }
+
+        function createHud() {
+            if (hudContainer || !document.body) return
+            hudContainer = document.createElement('div')
+            hudContainer.id = '__hotspot_hud_root'
+            hudContainer.style.cssText =
+                'position:fixed;bottom:20px;right:20px;z-index:2147483645;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#fff;'
+
+            hudPill = document.createElement('div')
+            hudPill.id = '__hotspot_hud_pill'
+            hudPill.style.cssText =
+                'display:flex;align-items:center;gap:8px;background:#07080D;border:1px solid rgba(204,255,0,0.4);border-radius:24px;padding:8px 14px;box-shadow:0 8px 30px rgba(0,0,0,0.8), 0 0 15px rgba(204,255,0,0.15);cursor:pointer;user-select:none;font-size:12px;font-weight:600;letter-spacing:0.02em;transition:all 0.2s;'
+            hudPill.innerHTML =
+                '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#CCFF00;box-shadow:0 0 8px #CCFF00;animation:hsPulse 1.8s infinite;"></span>' +
+                '<span style="color:#CCFF00;">HOTSPOT</span>' +
+                '<span style="color:#8892B0;">|</span>' +
+                '<span id="__hotspot_hud_pill_count" style="color:#fff;">0 Clicks</span>' +
+                '<span style="background:rgba(204,255,0,0.12);color:#CCFF00;padding:2px 6px;border-radius:6px;font-size:10px;margin-left:4px;">⌥H</span>'
+
+            hudExpanded = document.createElement('div')
+            hudExpanded.id = '__hotspot_hud_expanded'
+            hudExpanded.style.cssText =
+                'display:none;width:320px;background:#07080D;border:1px solid rgba(204,255,0,0.3);border-radius:14px;padding:16px;box-shadow:0 20px 50px rgba(0,0,0,0.9), 0 0 25px rgba(204,255,0,0.12);backdrop-filter:blur(16px);'
+            hudExpanded.innerHTML =
+                '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.08);">' +
+                '  <div style="display:flex;align-items:center;gap:8px;">' +
+                '    <div style="width:10px;height:10px;border-radius:50%;background:#CCFF00;box-shadow:0 0 10px #CCFF00;"></div>' +
+                '    <span style="font-weight:700;font-size:13px;letter-spacing:0.04em;color:#fff;">HOTSPOT VISUALIZER</span>' +
+                '  </div>' +
+                '  <button id="__hotspot_hud_minimize" style="background:none;border:none;color:#8892B0;cursor:pointer;font-size:16px;padding:2px 6px;border-radius:4px;">✕</button>' +
+                '</div>' +
+                '<div style="grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;display:grid;">' +
+                '  <div style="background:#0C0F17;border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:8px;text-align:center;">' +
+                '    <div style="font-size:10px;color:#8892B0;text-transform:uppercase;margin-bottom:2px;">Clicks</div>' +
+                '    <div id="__hotspot_stat_total" style="font-size:16px;font-weight:700;color:#CCFF00;">0</div>' +
+                '  </div>' +
+                '  <div style="background:#0C0F17;border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:8px;text-align:center;">' +
+                '    <div style="font-size:10px;color:#8892B0;text-transform:uppercase;margin-bottom:2px;">Rage</div>' +
+                '    <div id="__hotspot_stat_rage" style="font-size:16px;font-weight:700;color:#FF007F;">0</div>' +
+                '  </div>' +
+                '  <div style="background:#0C0F17;border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:8px;text-align:center;">' +
+                '    <div style="font-size:10px;color:#8892B0;text-transform:uppercase;margin-bottom:2px;">Dead</div>' +
+                '    <div id="__hotspot_stat_dead" style="font-size:16px;font-weight:700;color:#00F0FF;">0</div>' +
+                '  </div>' +
+                '</div>' +
+                '<div style="display:flex;gap:4px;margin-bottom:14px;background:#0C0F17;padding:3px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);">' +
+                '  <button id="__hotspot_filter_all" style="flex:1;background:#CCFF00;color:#07080D;border:none;border-radius:6px;padding:6px 0;font-size:11px;font-weight:700;cursor:pointer;">All Clicks</button>' +
+                '  <button id="__hotspot_filter_rage" style="flex:1;background:none;color:#8892B0;border:none;border-radius:6px;padding:6px 0;font-size:11px;font-weight:600;cursor:pointer;">Rage</button>' +
+                '  <button id="__hotspot_filter_dead" style="flex:1;background:none;color:#8892B0;border:none;border-radius:6px;padding:6px 0;font-size:11px;font-weight:600;cursor:pointer;">Dead</button>' +
+                '</div>' +
+                '<div style="display:flex;gap:8px;">' +
+                '  <button id="__hotspot_action_clear" style="flex:1;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#fff;border-radius:8px;padding:7px 0;font-size:11px;font-weight:600;cursor:pointer;">Clear Heatmap</button>' +
+                '  <a id="__hotspot_action_dash" href="' + config.api_host + '" target="_blank" style="flex:1;display:flex;align-items:center;justify-content:center;text-decoration:none;background:rgba(204,255,0,0.12);border:1px solid rgba(204,255,0,0.3);color:#CCFF00;border-radius:8px;padding:7px 0;font-size:11px;font-weight:700;">Open Hotspot ↗</a>' +
+                '</div>'
+
+            hudContainer.appendChild(hudPill)
+            hudContainer.appendChild(hudExpanded)
+            document.body.appendChild(hudContainer)
+
+            if (!document.getElementById('__hotspot_styles')) {
+                var style = document.createElement('style')
+                style.id = '__hotspot_styles'
+                style.textContent =
+                    '@keyframes hsPulse { 0% { opacity: 0.5; transform: scale(0.95); } 50% { opacity: 1; transform: scale(1.1); } 100% { opacity: 0.5; transform: scale(0.95); } }' +
+                    '#__hotspot_hud_pill:hover { border-color:#CCFF00; transform: translateY(-2px); }'
+                document.head.appendChild(style)
+            }
+
+            hudPill.addEventListener('click', function () {
+                hudPill.style.display = 'none'
+                hudExpanded.style.display = 'block'
+                if (!isVisible) toggleOverlay(true)
+            })
+
+            var btnMinimize = document.getElementById('__hotspot_hud_minimize')
+            if (btnMinimize) {
+                btnMinimize.addEventListener('click', function () {
+                    hudExpanded.style.display = 'none'
+                    hudPill.style.display = 'flex'
+                })
+            }
+
+            var btnFilterAll = document.getElementById('__hotspot_filter_all')
+            var btnFilterRage = document.getElementById('__hotspot_filter_rage')
+            var btnFilterDead = document.getElementById('__hotspot_filter_dead')
+
+            function setFilter(mode) {
+                filterMode = mode
+                if (btnFilterAll) btnFilterAll.style.cssText = mode === 'all' ? 'flex:1;background:#CCFF00;color:#07080D;border:none;border-radius:6px;padding:6px 0;font-size:11px;font-weight:700;cursor:pointer;' : 'flex:1;background:none;color:#8892B0;border:none;border-radius:6px;padding:6px 0;font-size:11px;font-weight:600;cursor:pointer;'
+                if (btnFilterRage) btnFilterRage.style.cssText = mode === 'rage' ? 'flex:1;background:#FF007F;color:#fff;border:none;border-radius:6px;padding:6px 0;font-size:11px;font-weight:700;cursor:pointer;' : 'flex:1;background:none;color:#8892B0;border:none;border-radius:6px;padding:6px 0;font-size:11px;font-weight:600;cursor:pointer;'
+                if (btnFilterDead) btnFilterDead.style.cssText = mode === 'dead' ? 'flex:1;background:#00F0FF;color:#07080D;border:none;border-radius:6px;padding:6px 0;font-size:11px;font-weight:700;cursor:pointer;' : 'flex:1;background:none;color:#8892B0;border:none;border-radius:6px;padding:6px 0;font-size:11px;font-weight:600;cursor:pointer;'
+                requestRender()
+            }
+
+            if (btnFilterAll) btnFilterAll.addEventListener('click', function () { setFilter('all') })
+            if (btnFilterRage) btnFilterRage.addEventListener('click', function () { setFilter('rage') })
+            if (btnFilterDead) btnFilterDead.addEventListener('click', function () { setFilter('dead') })
+
+            var btnClear = document.getElementById('__hotspot_action_clear')
+            if (btnClear) {
+                btnClear.addEventListener('click', function () {
+                    clicks = []
+                    persistClicks()
+                    updateHudStats()
+                    requestRender()
+                })
+            }
+
+            updateHudStats()
+        }
+
+        function updateHudStats() {
+            var total = clicks.length
+            var rageCount = 0
+            var deadCount = 0
+            for (var i = 0; i < clicks.length; i++) {
+                if (clicks[i].isRage) rageCount++
+                if (clicks[i].isDead) deadCount++
+            }
+
+            var elPill = document.getElementById('__hotspot_hud_pill_count')
+            if (elPill) elPill.textContent = total + ' Clicks'
+            var elTotal = document.getElementById('__hotspot_stat_total')
+            if (elTotal) elTotal.textContent = total
+            var elRage = document.getElementById('__hotspot_stat_rage')
+            if (elRage) elRage.textContent = rageCount
+            var elDead = document.getElementById('__hotspot_stat_dead')
+            if (elDead) elDead.textContent = deadCount
+        }
+
+        function toggleOverlay(forceState) {
+            isVisible = typeof forceState === 'boolean' ? forceState : !isVisible
+            createOverlay()
+            createHud()
+            if (canvas) {
+                canvas.style.display = isVisible ? 'block' : 'none'
+            }
+            if (hudContainer) {
+                hudContainer.style.display = 'block'
+            }
+            if (isVisible) {
+                requestRender()
+            }
+        }
+
+        function requestRender() {
+            if (!isVisible || !canvas || !ctx) return
+            if (animFrame) cancelAnimationFrame(animFrame)
+            animFrame = requestAnimationFrame(renderCanvas)
+        }
+
+        function renderCanvas() {
+            if (!canvas || !ctx) return
+            var dpr = window.devicePixelRatio || 1
+            var w = window.innerWidth
+            var h = window.innerHeight
+
+            canvas.width = w * dpr
+            canvas.height = h * dpr
+            ctx.scale(dpr, dpr)
+            ctx.clearRect(0, 0, w, h)
+
+            var scrollX = window.scrollX || document.documentElement.scrollLeft || 0
+            var scrollY = window.scrollY || document.documentElement.scrollTop || 0
+
+            for (var i = 0; i < clicks.length; i++) {
+                var c = clicks[i]
+                if (filterMode === 'rage' && !c.isRage) continue
+                if (filterMode === 'dead' && !c.isDead) continue
+
+                var vx = c.x - scrollX
+                var vy = c.y - scrollY
+
+                if (vx < -60 || vx > w + 60 || vy < -60 || vy > h + 60) continue
+
+                if (c.isRage) {
+                    var gradR = ctx.createRadialGradient(vx, vy, 0, vx, vy, 45)
+                    gradR.addColorStop(0, 'rgba(255, 0, 127, 0.95)')
+                    gradR.addColorStop(0.3, 'rgba(255, 0, 127, 0.6)')
+                    gradR.addColorStop(1, 'rgba(255, 0, 127, 0)')
+                    ctx.fillStyle = gradR
+                    ctx.beginPath()
+                    ctx.arc(vx, vy, 45, 0, Math.PI * 2)
+                    ctx.fill()
+
+                    ctx.strokeStyle = '#FF007F'
+                    ctx.lineWidth = 2
+                    ctx.beginPath()
+                    ctx.arc(vx, vy, 24, 0, Math.PI * 2)
+                    ctx.stroke()
+                } else if (c.isDead) {
+                    var gradD = ctx.createRadialGradient(vx, vy, 0, vx, vy, 35)
+                    gradD.addColorStop(0, 'rgba(0, 240, 255, 0.9)')
+                    gradD.addColorStop(0.4, 'rgba(0, 240, 255, 0.4)')
+                    gradD.addColorStop(1, 'rgba(0, 240, 255, 0)')
+                    ctx.fillStyle = gradD
+                    ctx.beginPath()
+                    ctx.arc(vx, vy, 35, 0, Math.PI * 2)
+                    ctx.fill()
+
+                    ctx.strokeStyle = '#00F0FF'
+                    ctx.lineWidth = 1.5
+                    ctx.beginPath()
+                    ctx.moveTo(vx - 8, vy)
+                    ctx.lineTo(vx + 8, vy)
+                    ctx.moveTo(vx, vy - 8)
+                    ctx.lineTo(vx, vy + 8)
+                    ctx.stroke()
+                } else {
+                    var gradN = ctx.createRadialGradient(vx, vy, 0, vx, vy, 32)
+                    gradN.addColorStop(0, 'rgba(204, 255, 0, 0.85)')
+                    gradN.addColorStop(0.35, 'rgba(204, 255, 0, 0.45)')
+                    gradN.addColorStop(1, 'rgba(204, 255, 0, 0)')
+                    ctx.fillStyle = gradN
+                    ctx.beginPath()
+                    ctx.arc(vx, vy, 32, 0, Math.PI * 2)
+                    ctx.fill()
+                }
+            }
+        }
+
+        return {
+            init: function () {
+                window.addEventListener('keydown', function (e) {
+                    if ((e.altKey || (e.ctrlKey && e.shiftKey)) && (e.key === 'h' || e.key === 'H' || e.keyCode === 72)) {
+                        toggleOverlay()
+                    }
+                })
+
+                if (
+                    config.visualizer ||
+                    (window.location &&
+                        (window.location.search.indexOf('hotspot=visualize') !== -1 ||
+                            window.location.search.indexOf('hotspot_hud=1') !== -1))
+                ) {
+                    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+                        createOverlay()
+                        createHud()
+                        toggleOverlay(true)
+                    } else {
+                        document.addEventListener('DOMContentLoaded', function () {
+                            createOverlay()
+                            createHud()
+                            toggleOverlay(true)
+                        })
+                    }
+                }
+            },
+            recordClick: function (c) {
+                clicks.push(c)
+                persistClicks()
+                updateHudStats()
+                if (isVisible) requestRender()
+            },
+            toggle: function (force) {
+                toggleOverlay(force)
+            },
+            show: function () {
+                toggleOverlay(true)
+            },
+            hide: function () {
+                toggleOverlay(false)
+            },
+            getClicks: function () {
+                return clicks
+            },
+            clear: function () {
+                clicks = []
+                persistClicks()
+                updateHudStats()
+                requestRender()
+            },
+        }
+    })()
+
     // Public API
     var hotspot = {
         _config: config,
         _listeners: {},
+        visualize: {
+            toggle: function (force) {
+                visualizer.toggle(force)
+            },
+            show: function () {
+                visualizer.show()
+            },
+            hide: function () {
+                visualizer.hide()
+            },
+            clear: function () {
+                visualizer.clear()
+            },
+            getClicks: function () {
+                return visualizer.getClicks()
+            },
+        },
 
         init: function (apiKey, userConfig) {
             if (apiKey) config.api_key = apiKey
@@ -642,6 +1020,7 @@
     setupAutocapture()
     setupHistoryListeners()
     setupErrorCapture()
+    visualizer.init()
 
     window.addEventListener('beforeunload', capturePageleave)
     window.addEventListener('visibilitychange', function () {

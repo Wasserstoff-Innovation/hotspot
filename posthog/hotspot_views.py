@@ -168,3 +168,13 @@ def hotspot_landing(request: HttpRequest) -> HttpResponse:
         "demo_api_key": "hs_live_demo_sample_token",
     }
     return render(request, "landing.html", context)
+
+
+def hotspot_playground(request: HttpRequest) -> HttpResponse:
+    """Hotspot Live AI Playground scene."""
+    context = {
+        "page_title": "VibeForge AI — Live Playground with Hotspot Visualizer",
+        "site_url": settings.SITE_URL or "http://localhost:8000",
+        "demo_api_key": "hs_live_demo_sample_token",
+    }
+    return render(request, "playground.html", context)

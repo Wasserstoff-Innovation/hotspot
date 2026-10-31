@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VibeForge AI — Live Playground with Hotspot Visualizer</title>
+    <!-- Hotspot Single-Script SDK with Visualizer enabled -->
+    <script src="/hotspot.js" data-api-key="hs_live_demo_sample_token" data-visualizer="true"></script>
+    <style>
+        :root {
+            --bg-void: #07080D;
+            --bg-card: #0D111A;
+            --bg-card-hover: #131926;
+            --border: rgba(255, 255, 255, 0.08);
+            --border-hover: rgba(204, 255, 0, 0.3);
+            --neon-volt: #CCFF00;
+            --electric-magenta: #FF007F;
+            --hyper-cyan: #00F0FF;
+            --text-main: #FFFFFF;
+            --text-muted: #8892B0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-void);
+            color: var(--text-main);
+            min-height: 100vh;
+            background-image: 
+                radial-gradient(circle at 15% 20%, rgba(204, 255, 0, 0.03) 0%, transparent 40%),
+                radial-gradient(circle at 85% 60%, rgba(255, 0, 127, 0.03) 0%, transparent 40%),
+                linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+            background-size: 100% 100%, 100% 100%, 36px 36px, 36px 36px;
+            padding-bottom: 80px;
+        }
+
+        /* Top Notification Bar */
+        .banner {
+            background: rgba(13, 17, 26, 0.95);
+            border-bottom: 1px solid rgba(204, 255, 0, 0.3);
+            padding: 10px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            backdrop-filter: blur(12px);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .banner-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 13px;
+        }
+
+        .banner-badge {
+            background: rgba(204, 255, 0, 0.15);
+            color: var(--neon-volt);
+            border: 1px solid rgba(204, 255, 0, 0.4);
+            border-radius: 20px;
+            padding: 3px 10px;
+            font-weight: 700;
+            font-size: 11px;
+            letter-spacing: 0.05em;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .pulse-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--neon-volt);
+            box-shadow: 0 0 8px var(--neon-volt);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.4; transform: scale(0.9); }
+            50% { opacity: 1; transform: scale(1.15); }
+            100% { opacity: 0.4; transform: scale(0.9); }
+        }
+
+        .banner-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-banner {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #fff;
+            padding: 6px 14px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+
+        .btn-banner:hover {
+            border-color: var(--neon-volt);
+            color: var(--neon-volt);
+        }
+
+        .btn-banner-primary {
+            background: var(--neon-volt);
+            color: #07080D;
+            border-color: var(--neon-volt);
+            font-weight: 700;
+        }
+
+        .btn-banner-primary:hover {
+            background: #dfff33;
+            color: #000;
+            box-shadow: 0 0 15px rgba(204, 255, 0, 0.4);
+        }
+
+        /* Container */
+        .container {
+            max-width: 1120px;
+            margin: 0 auto;
+            padding: 40px 24px;
+        }
+
+        /* Nav */
+        nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 50px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            color: #fff;
+        }
+
+        .brand-logo {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: #000;
+            border: 1px solid var(--neon-volt);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 12px rgba(204, 255, 0, 0.25);
+        }
+
+        .brand-name {
+            font-weight: 800;
+            font-size: 18px;
+            letter-spacing: -0.02em;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 24px;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: var(--neon-volt);
+        }
+
+        /* Hero */
+        .hero {
+            text-align: center;
+            max-width: 780px;
+            margin: 0 auto 60px auto;
+        }
+
+        .hero-tag {
+            display: inline-block;
+            background: rgba(0, 240, 255, 0.1);
+            color: var(--hyper-cyan);
+            border: 1px solid rgba(0, 240, 255, 0.3);
+            border-radius: 20px;
+            padding: 4px 14px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 18px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .hero h1 {
+            font-size: 46px;
+            line-height: 1.15;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            margin-bottom: 16px;
+        }
+
+        .hero p {
+            font-size: 17px;
+            color: var(--text-muted);
+            line-height: 1.6;
+            margin-bottom: 32px;
+        }
+
+        /* Interactive Prompt Generator */
+        .prompt-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 8px 8px 8px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+            transition: border-color 0.2s;
+        }
+
+        .prompt-box:focus-within {
+            border-color: var(--neon-volt);
+            box-shadow: 0 0 25px rgba(204, 255, 0, 0.15);
+        }
+
+        .prompt-input {
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #fff;
+            font-size: 15px;
+            flex: 1;
+        }
+
+        .btn-generate {
+            background: var(--neon-volt);
+            color: #07080D;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-generate:hover {
+            background: #dfff33;
+            transform: translateY(-1px);
+        }
+
+        /* Pill Suggestions */
+        .pills {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+
+        .pill-btn {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .pill-btn:hover {
+            border-color: var(--neon-volt);
+            color: #fff;
+            background: rgba(204, 255, 0, 0.05);
+        }
+
+        /* Interactive Test Lab Cards */
+        .section-title {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .grid-cards {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 60px;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: all 0.25s;
+        }
+
+        .card:hover {
+            border-color: var(--border-hover);
+            transform: translateY(-2px);
+        }
+
+        .card-header {
+            margin-bottom: 16px;
+        }
+
+        .card-tag {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 8px;
+            display: inline-block;
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .card-desc {
+            font-size: 13px;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        .card-action {
+            margin-top: 24px;
+        }
+
+        .btn-card {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #fff;
+            padding: 10px 0;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-card:hover {
+            background: rgba(204, 255, 0, 0.12);
+            border-color: var(--neon-volt);
+            color: var(--neon-volt);
+        }
+
+        /* Dead Click Simulation Card */
+        .card-dead {
+            border-color: rgba(0, 240, 255, 0.2);
+        }
+
+        .btn-dead {
+            width: 100%;
+            background: rgba(0, 240, 255, 0.08);
+            border: 1px dashed rgba(0, 240, 255, 0.4);
+            color: var(--hyper-cyan);
+            padding: 10px 0;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: default; /* intentionally dead */
+        }
+
+        /* Rage Click Stress Test Card */
+        .card-rage {
+            border-color: rgba(255, 0, 127, 0.25);
+        }
+
+        .btn-rage {
+            width: 100%;
+            background: rgba(255, 0, 127, 0.15);
+            border: 1px solid var(--electric-magenta);
+            color: #fff;
+            padding: 10px 0;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+
+        .btn-rage:active {
+            transform: scale(0.97);
+            background: var(--electric-magenta);
+        }
+
+        /* Pricing Section */
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+        }
+
+        .pricing-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 32px 24px;
+            text-align: center;
+            transition: all 0.25s;
+        }
+
+        .pricing-card.featured {
+            border-color: var(--neon-volt);
+            box-shadow: 0 0 35px rgba(204, 255, 0, 0.12);
+            position: relative;
+        }
+
+        .featured-tag {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--neon-volt);
+            color: #07080D;
+            font-size: 10px;
+            font-weight: 800;
+            padding: 3px 12px;
+            border-radius: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .pricing-price {
+            font-size: 38px;
+            font-weight: 800;
+            margin: 16px 0 6px 0;
+        }
+
+        .pricing-period {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+
+        .pricing-features {
+            list-style: none;
+            margin-bottom: 32px;
+            font-size: 13px;
+            color: var(--text-muted);
+            text-align: left;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .pricing-features li::before {
+            content: "✓";
+            color: var(--neon-volt);
+            margin-right: 8px;
+            font-weight: 700;
+        }
+
+        /* Toast Feedback */
+        #toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: #0C0F17;
+            border: 1px solid var(--neon-volt);
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-size: 13px;
+            font-weight: 600;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8), 0 0 20px rgba(204,255,0,0.25);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 2000;
+            pointer-events: none;
+        }
+
+        #toast.show {
+            transform: translateX(-50%) translateY(0);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Notification Banner -->
+    <div class="banner">
+        <div class="banner-left">
+            <span class="banner-badge"><span class="pulse-dot"></span> HOTSPOT ACTIVE</span>
+            <span>Test the in-browser visualizer on this simulated AI app!</span>
+        </div>
+        <div class="banner-actions">
+            <button class="btn-banner" onclick="window.hotspot && window.hotspot.visualize.toggle()">⌥ Toggle Overlay (Option+H)</button>
+            <button class="btn-banner" onclick="window.hotspot && window.hotspot.visualize.clear()">Clear Heatmap</button>
+            <a href="/" class="btn-banner">← Landing Page</a>
+            <a href="/login" class="btn-banner btn-banner-primary">Open Hotspot Portal ↗</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Nav -->
+        <nav>
+            <a href="/playground/" class="brand">
+                <div class="brand-logo">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#CCFF00" stroke-width="2.5">
+                        <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5 12 2"/>
+                        <circle cx="12" cy="12" r="3" fill="#CCFF00"/>
+                    </svg>
+                </div>
+                <span class="brand-name">VibeForge AI</span>
+            </a>
+            <ul class="nav-links">
+                <li><a href="#agents" onclick="trackNav('Agents')">Agents</a></li>
+                <li><a href="#pipelines" onclick="trackNav('Pipelines')">Pipelines</a></li>
+                <li><a href="#observability" onclick="trackNav('Observability')">Observability</a></li>
+                <li><a href="#pricing" onclick="trackNav('Pricing')">Pricing</a></li>
+            </ul>
+        </nav>
+
+        <!-- Hero -->
+        <section class="hero">
+            <div class="hero-tag">Automated AI Deployment</div>
+            <h1>Generate, test, and deploy AI Agents in seconds.</h1>
+            <p>Hotspot is automatically monitoring every interaction on this page. Click buttons, hover elements, or test rapid clicks to see the live cyber-thermal heatmap.</p>
+
+            <div class="prompt-box">
+                <input type="text" id="promptInput" class="prompt-input" placeholder="Describe your AI agent (e.g. 'Build an automated Stripe refund agent')...">
+                <button class="btn-generate" onclick="handleGenerate()">Run Generation ⚡</button>
+            </div>
+
+            <div class="pills">
+                <button class="pill-btn" onclick="setPrompt('Build a GitHub PR review bot with security checks')">GitHub Reviewer</button>
+                <button class="pill-btn" onclick="setPrompt('Customer support agent with ZenDesk & Slack integrations')">Support Bot</button>
+                <button class="pill-btn" onclick="setPrompt('Data extraction bot for high-frequency pricing updates')">Data Scraper</button>
+            </div>
+        </section>
+
+        <!-- Interactive Interaction Lab -->
+        <div class="section-title">
+            <span>⚡ Interactive Testing Lab</span>
+            <span style="font-size: 13px; font-weight: 500; color: var(--text-muted);">(Click elements to feed the live heatmap)</span>
+        </div>
+
+        <div class="grid-cards">
+            <!-- Normal Click -->
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-tag" style="color: var(--neon-volt);">Active Flow</span>
+                    <h3 class="card-title">Deploy Agent to Edge</h3>
+                    <p class="card-desc">Simulates a standard user conversion event. Clicks plot as high-intensity Neon Acid Volt thermal points.</p>
+                </div>
+                <div class="card-action">
+                    <button class="btn-card" onclick="trackAction('Deploy to Edge', 'success')">Deploy to Edge 🚀</button>
+                </div>
+            </div>
+
+            <!-- Dead Click Demo -->
+            <div class="card card-dead">
+                <div class="card-header">
+                    <span class="card-tag" style="color: var(--hyper-cyan);">Dead Click Detection</span>
+                    <h3 class="card-title">Download Neural Weights</h3>
+                    <p class="card-desc">An unclickable button common in AI-generated prototypes. Hotspot flags these as dead clicks with cyan crosshairs!</p>
+                </div>
+                <div class="card-action">
+                    <div class="btn-dead" onclick="showToast('⚠️ Dead click detected! Element has no handler.')">Download Weights (Inactive)</div>
+                </div>
+            </div>
+
+            <!-- Rage Click Demo -->
+            <div class="card card-rage">
+                <div class="card-header">
+                    <span class="card-tag" style="color: var(--electric-magenta);">Rage Click Radar</span>
+                    <h3 class="card-title">Rapid Stress Test</h3>
+                    <p class="card-desc">Click this button 3+ times rapidly within 1 second. Hotspot automatically flags frustration with Magenta shockwaves!</p>
+                </div>
+                <div class="card-action">
+                    <button class="btn-rage" onclick="handleRageClick()">Click 3x Rapidly 🔥</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pricing Section -->
+        <div class="section-title" id="pricing">
+            <span>💳 Pricing & Conversion Funnels</span>
+        </div>
+
+        <div class="pricing-grid">
+            <div class="pricing-card">
+                <h3>Starter</h3>
+                <div class="pricing-price">$0</div>
+                <div class="pricing-period">Forever free for hobbyists</div>
+                <ul class="pricing-features">
+                    <li>1 AI Agent Instance</li>
+                    <li>Up to 10k executions/mo</li>
+                    <li>Community Discord support</li>
+                </ul>
+                <button class="btn-card" onclick="selectTier('Starter', 0)">Select Starter</button>
+            </div>
+
+            <div class="pricing-card featured">
+                <div class="featured-tag">Most Popular</div>
+                <h3>Pro Builder</h3>
+                <div class="pricing-price">$49</div>
+                <div class="pricing-period">Billed monthly</div>
+                <ul class="pricing-features">
+                    <li>Unlimited AI Agent Workflows</li>
+                    <li>Sub-second cold starts</li>
+                    <li>Hotspot Visual Telemetry</li>
+                    <li>Dedicated slack channel</li>
+                </ul>
+                <button class="btn-card" style="background: var(--neon-volt); color: #07080D; font-weight: 700;" onclick="selectTier('Pro', 49)">Start 14-Day Trial</button>
+            </div>
+
+            <div class="pricing-card">
+                <h3>Enterprise</h3>
+                <div class="pricing-price">Custom</div>
+                <div class="pricing-period">For teams with SOC2 needs</div>
+                <ul class="pricing-features">
+                    <li>Self-hosted dedicated clusters</li>
+                    <li>Custom SLA guarantees</li>
+                    <li>VPC Peering & Audit Logs</li>
+                </ul>
+                <button class="btn-card" onclick="selectTier('Enterprise', 999)">Contact Sales</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Element -->
+    <div id="toast">
+        <span id="toast-icon">✨</span>
+        <span id="toast-msg">Event captured!</span>
+    </div>
+
+    <script>
+        function showToast(msg, icon) {
+            var toast = document.getElementById('toast');
+            document.getElementById('toast-msg').innerText = msg;
+            document.getElementById('toast-icon').innerText = icon || '⚡';
+            toast.classList.add('show');
+            setTimeout(function() {
+                toast.classList.remove('show');
+            }, 2500);
+        }
+
+        function setPrompt(text) {
+            document.getElementById('promptInput').value = text;
+            showToast('Prompt inserted!');
+            if (window.hotspot) {
+                window.hotspot.capture('prompt_template_selected', { template: text });
+            }
+        }
+
+        function handleGenerate() {
+            var val = document.getElementById('promptInput').value;
+            if (!val) {
+                showToast('Please type a prompt first!', '⚠️');
+                return;
+            }
+            showToast('Agent generation queued: ' + val.substring(0, 24) + '...', '🚀');
+            if (window.hotspot) {
+                window.hotspot.capture('agent_generation_triggered', { prompt: val });
+            }
+        }
+
+        function trackAction(actionName, status) {
+            showToast('Action logged: ' + actionName, '✅');
+            if (window.hotspot) {
+                window.hotspot.capture('user_action', { action: actionName, status: status });
+            }
+        }
+
+        var rageCount = 0;
+        var lastRageTime = 0;
+        function handleRageClick() {
+            var now = Date.now();
+            if (now - lastRageTime < 400) {
+                rageCount++;
+            } else {
+                rageCount = 1;
+            }
+            lastRageTime = now;
+
+            if (rageCount >= 3) {
+                showToast('🔥 Rage Click Detected! Check the HUD badge in the bottom right!', '💥');
+            } else {
+                showToast('Click ' + (3 - rageCount) + ' more time(s) fast to trigger rage detection!');
+            }
+        }
+
+        function selectTier(tierName, price) {
+            showToast('Plan selected: ' + tierName + ' ($' + price + ')', '🎉');
+            if (window.hotspot) {
+                window.hotspot.capture('tier_selected', { tier: tierName, price: price });
+            }
+        }
+
+        function trackNav(link) {
+            if (window.hotspot) {
+                window.hotspot.capture('nav_link_clicked', { link: link });
+            }
+        }
+    </script>
+</body>
+</html>
