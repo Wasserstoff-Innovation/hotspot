@@ -866,16 +866,18 @@
                         (window.location.search.indexOf('hotspot=visualize') !== -1 ||
                             window.location.search.indexOf('hotspot_hud=1') !== -1))
                 ) {
-                    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+                    var initOverlay = function () {
                         createOverlay()
                         createHud()
-                        toggleOverlay(true)
-                    } else {
-                        document.addEventListener('DOMContentLoaded', function () {
-                            createOverlay()
-                            createHud()
+                        // Only show overlay canvas if explicitly requested via query param
+                        if (window.location && window.location.search.indexOf('hotspot_overlay=1') !== -1) {
                             toggleOverlay(true)
-                        })
+                        }
+                    }
+                    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+                        initOverlay()
+                    } else {
+                        document.addEventListener('DOMContentLoaded', initOverlay)
                     }
                 }
             },
