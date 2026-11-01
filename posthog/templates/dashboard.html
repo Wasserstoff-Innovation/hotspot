@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ page_title|default:"Hotspot Dashboard • Conversion Health & Fix Queue" }}</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%230a0a0a' stroke='%23F59E0B' stroke-width='1.5'/%3E%3Ccircle cx='16' cy='16' r='6' fill='%23F59E0B' opacity='0.9'/%3E%3Ccircle cx='16' cy='16' r='2.5' fill='%230a0a0a'/%3E%3C/svg%3E">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230B0F17'/%3E%3Crect x='6' y='6' width='20' height='20' rx='2' fill='none' stroke='%230052FF' stroke-width='2' stroke-dasharray='4 2'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%230052FF'/%3E%3Cline x1='16' y1='2' x2='16' y2='6' stroke='%230052FF' stroke-width='2' stroke-linecap='round'/%3E%3Cline x1='16' y1='26' x2='16' y2='30' stroke='%230052FF' stroke-width='2' stroke-linecap='round'/%3E%3Cline x1='2' y1='16' x2='6' y2='16' stroke='%230052FF' stroke-width='2' stroke-linecap='round'/%3E%3Cline x1='26' y1='16' x2='30' y2='16' stroke='%230052FF' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -25,18 +25,18 @@
             --text-secondary: #a1a1aa;
             --text-muted: #71717a;
 
-            --accent: #F59E0B;
-            --accent-dim: rgba(245, 158, 11, 0.12);
-            --accent-border: rgba(245, 158, 11, 0.25);
+            --accent: #0052FF;
+            --accent-dim: rgba(0, 82, 255, 0.12);
+            --accent-border: rgba(0, 82, 255, 0.3);
 
-            --success: #22c55e;
-            --success-dim: rgba(34, 197, 94, 0.12);
+            --success: #059669;
+            --success-dim: rgba(5, 150, 105, 0.12);
             --danger: #ef4444;
             --danger-dim: rgba(239, 68, 68, 0.12);
 
             --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-            --max-w: 1200px;
+            --max-w: 1440px;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -685,9 +685,9 @@
             <div class="brand-group">
                 <a href="/" class="logo">
                     <svg class="logo-mark" viewBox="0 0 28 28" fill="none">
-                        <circle cx="14" cy="14" r="13" stroke="var(--accent)" stroke-width="1.5" fill="none"/>
-                        <circle cx="14" cy="14" r="5" fill="var(--accent)" opacity="0.9"/>
-                        <circle cx="14" cy="14" r="2" fill="var(--bg)"/>
+                        <rect width="28" height="28" rx="6" fill="#0B0F17"/>
+                        <rect x="5" y="5" width="18" height="18" rx="2" stroke="var(--accent)" stroke-width="1.8" stroke-dasharray="3 2" fill="none"/>
+                        <circle cx="14" cy="14" r="3.5" fill="var(--accent)"/>
                     </svg>
                     <span class="logo-text">Hotspot</span>
                 </a>

@@ -642,13 +642,13 @@
             hudPill = document.createElement('div')
             hudPill.id = '__hotspot_hud_pill'
             hudPill.style.cssText =
-                'display:flex;align-items:center;gap:8px;background:#111113;border:1px solid rgba(255,255,255,0.12);border-radius:24px;padding:8px 14px;box-shadow:0 8px 30px rgba(0,0,0,0.8), 0 0 15px rgba(245,158,11,0.1);cursor:pointer;user-select:none;font-size:12px;font-weight:600;letter-spacing:0.02em;transition:all 0.2s;'
+                'display:flex;align-items:center;gap:8px;background:#111113;border:1px solid rgba(255,255,255,0.12);border-radius:24px;padding:8px 14px;box-shadow:0 8px 30px rgba(0,0,0,0.8), 0 0 15px rgba(0,82,255,0.15);cursor:pointer;user-select:none;font-size:12px;font-weight:600;letter-spacing:0.02em;transition:all 0.2s;'
             hudPill.innerHTML =
-                '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#F59E0B;box-shadow:0 0 8px rgba(245,158,11,0.6);animation:hsPulse 1.8s infinite;"></span>' +
+                '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#0052FF;box-shadow:0 0 8px rgba(0,82,255,0.8);animation:hsPulse 1.8s infinite;"></span>' +
                 '<span style="color:#FAFAFA;font-weight:700;">Hotspot</span>' +
                 '<span style="color:#71717A;">|</span>' +
                 '<span id="__hotspot_hud_pill_count" style="color:#A1A1AA;">0 Clicks</span>' +
-                '<span style="background:rgba(245,158,11,0.12);color:#F59E0B;padding:2px 6px;border-radius:6px;font-size:10px;margin-left:4px;border:1px solid rgba(245,158,11,0.25);">⌥H</span>'
+                '<span style="background:rgba(0,82,255,0.12);color:#0052FF;padding:2px 6px;border-radius:6px;font-size:10px;margin-left:4px;border:1px solid rgba(0,82,255,0.3);">⌥H</span>'
 
             hudExpanded = document.createElement('div')
             hudExpanded.id = '__hotspot_hud_expanded'
@@ -657,7 +657,7 @@
             hudExpanded.innerHTML =
                 '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.08);">' +
                 '  <div style="display:flex;align-items:center;gap:8px;">' +
-                '    <div style="width:8px;height:8px;border-radius:50%;background:#F59E0B;box-shadow:0 0 8px rgba(245,158,11,0.6);"></div>' +
+                '    <div style="width:8px;height:8px;border-radius:50%;background:#0052FF;box-shadow:0 0 8px rgba(0,82,255,0.8);"></div>' +
                 '    <span style="font-weight:700;font-size:13px;letter-spacing:-0.2px;color:#FAFAFA;">Hotspot Visualizer</span>' +
                 '  </div>' +
                 '  <button id="__hotspot_hud_minimize" style="background:none;border:none;color:#71717A;cursor:pointer;font-size:16px;padding:2px 6px;border-radius:4px;">✕</button>' +
@@ -665,7 +665,7 @@
                 '<div style="grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;display:grid;">' +
                 '  <div style="background:#18181B;border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:8px;text-align:center;">' +
                 '    <div style="font-size:10px;color:#71717A;text-transform:uppercase;margin-bottom:2px;">Clicks</div>' +
-                '    <div id="__hotspot_stat_total" style="font-size:16px;font-weight:700;color:#FAFAFA;">0</div>' +
+                '    <div id="__hotspot_stat_total" style="font-size:16px;font-weight:700;color:#0052FF;">0</div>' +
                 '  </div>' +
                 '  <div style="background:#18181B;border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:8px;text-align:center;">' +
                 '    <div style="font-size:10px;color:#71717A;text-transform:uppercase;margin-bottom:2px;">Rage</div>' +
@@ -683,7 +683,7 @@
                 '</div>' +
                 '<div style="display:flex;gap:8px;">' +
                 '  <button id="__hotspot_action_clear" style="flex:1;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#FAFAFA;border-radius:8px;padding:7px 0;font-size:11px;font-weight:600;cursor:pointer;">Clear</button>' +
-                '  <a id="__hotspot_action_dash" href="' + config.api_host + '/dashboard/" target="_blank" style="flex:1;display:flex;align-items:center;justify-content:center;text-decoration:none;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.25);color:#F59E0B;border-radius:8px;padding:7px 0;font-size:11px;font-weight:600;">Open Dashboard ↗</a>' +
+                '  <a id="__hotspot_action_dash" href="' + config.api_host + '/dashboard/" target="_blank" style="flex:1;display:flex;align-items:center;justify-content:center;text-decoration:none;background:rgba(0,82,255,0.12);border:1px solid rgba(0,82,255,0.3);color:#0052FF;border-radius:8px;padding:7px 0;font-size:11px;font-weight:600;">Open Dashboard ↗</a>' +
                 '</div>'
 
             hudContainer.appendChild(hudPill)
@@ -695,7 +695,7 @@
                 style.id = '__hotspot_styles'
                 style.textContent =
                     '@keyframes hsPulse { 0% { opacity: 0.5; transform: scale(0.95); } 50% { opacity: 1; transform: scale(1.1); } 100% { opacity: 0.5; transform: scale(0.95); } }' +
-                    '#__hotspot_hud_pill:hover { border-color:rgba(245,158,11,0.4); transform: translateY(-1px); }'
+                    '#__hotspot_hud_pill:hover { border-color:rgba(0,82,255,0.5); transform: translateY(-1px); }'
                 document.head.appendChild(style)
             }
 
@@ -841,9 +841,9 @@
                     ctx.stroke()
                 } else {
                     var gradN = ctx.createRadialGradient(vx, vy, 0, vx, vy, 32)
-                    gradN.addColorStop(0, 'rgba(245, 158, 11, 0.75)')
-                    gradN.addColorStop(0.35, 'rgba(245, 158, 11, 0.35)')
-                    gradN.addColorStop(1, 'rgba(245, 158, 11, 0)')
+                    gradN.addColorStop(0, 'rgba(0, 82, 255, 0.85)')
+                    gradN.addColorStop(0.35, 'rgba(0, 82, 255, 0.35)')
+                    gradN.addColorStop(1, 'rgba(0, 82, 255, 0)')
                     ctx.fillStyle = gradN
                     ctx.beginPath()
                     ctx.arc(vx, vy, 32, 0, Math.PI * 2)

@@ -3,1455 +3,2638 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Hotspot — Find Out Why Visitors Leave Without Buying</title>
-    <meta name="description" content="The automated conversion optimization and behavioral analytics platform for modern apps. Catch broken elements, see real click heatmaps, and get a ranked fix list with AI code prompts.">
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%230a0a0a' stroke='%23F59E0B' stroke-width='1.5'/%3E%3Ccircle cx='16' cy='16' r='6' fill='%23F59E0B' opacity='0.9'/%3E%3Ccircle cx='16' cy='16' r='2.5' fill='%230a0a0a'/%3E%3C/svg%3E">
+    <title>{{ page_title|default:"hotspot.js — 3.8KB Resident Telemetry & Intelligence Engine | Zero-Config Product Analytics & Heatmaps" }}</title>
+    
+    <!-- Primary SEO Metadata -->
+    <meta name="description" content="Drop 3.8KB hotspot.js into your site once. Lifetime free product analytics, route funnels, and Option+H heatmaps ($0/forever). Cross-correlates Google Search Console intent with live DOM telemetry and generates 1-click Cursor & Claude Code remediation prompts ($9/mo).">
+    <meta name="keywords" content="hotspot.js, product analytics, conversion rate optimization, resident telemetry, heatmaps, session replay alternative, search intent to DOM, rage click detection, AI code prompts, Next.js analytics, GA4 alternative, Hotjar alternative">
+    <meta name="author" content="Hotspot Engineering">
+    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+    <link rel="canonical" href="{{ site_url }}/">
 
+    <!-- Geographic & Generative Engine Optimization (GEO) Tags -->
+    <meta name="geo.region" content="US-CA">
+    <meta name="geo.placename" content="San Francisco">
+    <meta name="geo.position" content="37.7749;-122.4194">
+    <meta name="ICBM" content="37.7749, -122.4194">
+
+    <!-- OpenGraph / Social Metadata -->
+    <meta property="og:site_name" content="Hotspot.js">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{{ site_url }}/">
+    <meta property="og:title" content="hotspot.js — Resident Telemetry & Intelligence Engine">
+    <meta property="og:description" content="One 3.8KB script tag. Lifetime free product analytics, route funnels & heatmaps ($0/forever). Cross-correlates search queries with live DOM state to output plain-English AI fix prompts ($9/mo).">
+    <meta property="og:image" content="{{ site_url }}/static/hotspot-og-card.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Hotspot.js Resident Telemetry Architecture and Synthesis Specimen">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter Card Metadata -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:site" content="@hotspot_so">
+    <meta name="twitter:creator" content="@hotspot_so">
+    <meta name="twitter:title" content="hotspot.js — Resident Telemetry & Intelligence Engine">
+    <meta name="twitter:description" content="One 3.8KB script tag. Lifetime free analytics & heatmaps ($0/forever). Plain-English root causes and 1-click AI fix prompts ($9/mo).">
+    <meta name="twitter:image" content="{{ site_url }}/static/hotspot-og-card.png">
+
+    <!-- Favicon Suite: Precision Cobalt Reticle Architecture -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230B0F17'/%3E%3Crect x='6' y='6' width='20' height='20' rx='2' fill='none' stroke='%230052FF' stroke-width='2' stroke-dasharray='4 2'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%230052FF'/%3E%3Cline x1='16' y1='2' x2='16' y2='6' stroke='%230052FF' stroke-width='2' stroke-linecap='round'/%3E%3Cline x1='16' y1='26' x2='16' y2='30' stroke='%230052FF' stroke-width='2' stroke-linecap='round'/%3E%3Cline x1='2' y1='16' x2='6' y2='16' stroke='%230052FF' stroke-width='2' stroke-linecap='round'/%3E%3Cline x1='26' y1='16' x2='30' y2='16' stroke='%230052FF' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='36' fill='%230B0F17'/%3E%3Crect x='36' y='36' width='108' height='108' rx='12' fill='none' stroke='%230052FF' stroke-width='10' stroke-dasharray='20 10'/%3E%3Ccircle cx='90' cy='90' r='24' fill='%230052FF'/%3E%3C/svg%3E">
+    <meta name="theme-color" content="#0B0F17">
+
+    <!-- Schema.org Structured Data (JSON-LD) for Search Engines & LLM Citations -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "SoftwareApplication",
+          "@id": "{{ site_url }}/#software",
+          "name": "hotspot.js",
+          "operatingSystem": "All modern browsers (Chrome, Safari, Firefox, Edge, iOS Safari, Android)",
+          "applicationCategory": "DeveloperApplication",
+          "description": "Resident telemetry and conversion intelligence engine packaged in a single 3.8KB script. Replaces GA4 and Hotjar with 0 track() calls and outputs plain-English AI fix prompts.",
+          "offers": [
+            {
+              "@type": "Offer",
+              "name": "Telemetry Core",
+              "price": "0.00",
+              "priceCurrency": "USD",
+              "description": "Lifetime free autocapture analytics, route funnels, and Option+H in-browser heatmaps with zero manual event tracking."
+            },
+            {
+              "@type": "Offer",
+              "name": "Intelligence",
+              "price": "9.00",
+              "priceCurrency": "USD",
+              "billingIncrement": "Monthly",
+              "description": "Joins Google Search Console intent with live DOM telemetry, automated root cause synthesis, and 1-click Cursor/Claude Code remediation prompts."
+            },
+            {
+              "@type": "Offer",
+              "name": "Scale & Deep Memory",
+              "price": "19.00",
+              "priceCurrency": "USD",
+              "billingIncrement": "Monthly",
+              "description": "Up to 500k monthly sessions, 12-month cohort memory, multi-domain routing, post-deploy verification, and anomaly webhooks."
+            }
+          ]
+        },
+        {
+          "@type": "Organization",
+          "@id": "{{ site_url }}/#organization",
+          "name": "Hotspot",
+          "url": "{{ site_url }}",
+          "logo": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230B0F17'/%3E%3Ccircle cx='16' cy='16' r='6' fill='%230052FF'/%3E%3C/svg%3E",
+          "sameAs": [
+            "https://twitter.com/hotspot_so",
+            "https://github.com/PostHog/posthog"
+          ]
+        },
+        {
+          "@type": "FAQPage",
+          "@id": "{{ site_url }}/#faq",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "How does hotspot.js achieve 0-config tracking without track() calls?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "hotspot.js installs directly into the browser DOM runtime via a single 3.8KB script tag. It hooks into the Navigation API, History pushState, PointerEvents, and DOM MutationObserver. Every route transition, click vector, rage-tap cluster (>3 taps in 800ms), and Core Web Vital is automatically indexed without writing manual analytics tags."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Why is Telemetry Core free forever ($0)?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Baseline product tracking, route funnels, and click heatmaps should be open infrastructure, not an expensive metered utility. Telemetry Core is $0 forever. We monetize only on the $9/mo automated Intelligence layer, which runs advanced cross-signal synthesis between Google Search Console intent and in-app DOM state to generate ready-to-paste AI fix prompts."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How does Hotspot join Google Search Console queries with live in-app DOM telemetry?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "By linking your Google Search Console query stream via OAuth or API sync, Hotspot maps the exact keyword that generated a session with the user's immediate in-browser behavioral chain. This reveals critical friction like high-intent search queries bouncing within seconds because hero buttons open unexpected registration walls."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How do the 1-click AI prompts for Cursor and Claude Code work?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "When Hotspot synthesizes a conversion bottleneck, it pinpoints the exact DOM selector, file route, error stack trace, and user reproduction steps. It compiles these into an authoritative, hallucination-free prompt with strict acceptance criteria that you copy directly into Cursor, Claude Code, or Lovable to fix the problem in minutes."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Is hotspot.js cookie-less, GDPR, and CCPA compliant?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes. hotspot.js uses ephemeral browser session storage and cryptographic hashes instead of persistent third-party tracking cookies. It does not record personal identity data (PII) without explicit consent, automatically redacts password and credit card inputs, and is fully GDPR, CCPA, and PECR compliant out of the box."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Does hotspot.js slow down page load or degrade Core Web Vitals?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "No. hotspot.js is 3.8KB gzip and runs entirely off the critical rendering path. It uses requestIdleCallback, passive event listeners, and navigator.sendBeacon to batch payloads asynchronously with 0ms DOM blocking time, ensuring flawless Lighthouse scores and optimal Interaction to Next Paint (INP)."
+              }
+            }
+          ]
+        }
+      ]
+    }
+    </script>
+
+    <!-- Typography: Inter (Display Neo-Grotesque) + JetBrains Mono (Technical Precision) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
-    <!-- Hotspot Single Drop-in SDK -->
-    <script src="/hotspot.js" data-api-key="hs_live_demo_sample_token" data-api-host="{{ site_url }}" data-debug="true"></script>
-
-    <!-- GSAP for restrained animations -->
-    <script nonce="{{ request.csp_nonce }}" src="/gsap.js"></script>
-    <script nonce="{{ request.csp_nonce }}" src="/ScrollTrigger.js"></script>
+    <!-- Resident hotspot.js SDK with In-Browser Visualizer Enabled -->
+    <script src="/hotspot.js" data-api-key="hs_live_landing_reticle_9e4a" data-api-host="{{ site_url }}" data-visualizer="true"></script>
 
     <style>
+        /* =====================================================================
+           NEO-GROTESQUE COBALT ARCHITECTURAL DESIGN SYSTEM
+           Canvas: #F4F6F8 | Surface: #FFFFFF | Hairline: #DCE1E7 | Ink: #0B0F17
+           Accent: #0052FF | Success: #059669 | Danger/Rage: #EF4444
+        ===================================================================== */
         :root {
-            --bg: #09090b;
-            --bg-surface: #111113;
-            --bg-elevated: #18181b;
-            --border: rgba(255, 255, 255, 0.08);
-            --border-hover: rgba(255, 255, 255, 0.16);
-
-            --text-primary: #fafafa;
-            --text-secondary: #a1a1aa;
-            --text-muted: #71717a;
-
-            --accent: #F59E0B;
-            --accent-dim: rgba(245, 158, 11, 0.12);
-            --accent-border: rgba(245, 158, 11, 0.25);
-
-            --success: #22c55e;
-            --success-dim: rgba(34, 197, 94, 0.12);
-            --danger: #ef4444;
-            --danger-dim: rgba(239, 68, 68, 0.12);
-
-            --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-
-            --max-w: 1160px;
+            --canvas: #F4F6F8;
+            --surface: #FFFFFF;
+            --well: #EAECEF;
+            --hairline: #DCE1E7;
+            --hairline-dark: #222938;
+            --ink: #0B0F17;
+            --text-secondary: #475569;
+            --text-muted: #7E8B9B;
+            --accent: #0052FF;
+            --accent-hover: #0845CE;
+            --success: #059669;
+            --danger: #EF4444;
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        html { scroll-behavior: smooth; }
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            scroll-behavior: smooth;
+            -webkit-text-size-adjust: 100%;
+        }
 
         body {
-            background: var(--bg);
-            color: var(--text-primary);
-            font-family: var(--font);
-            font-size: 15.5px;
+            background-color: var(--canvas);
+            color: var(--ink);
+            font-family: var(--font-sans);
+            font-size: 15px;
             line-height: 1.6;
+            letter-spacing: -0.015em;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
             overflow-x: hidden;
-            position: relative;
+            background-image: 
+                linear-gradient(to right, rgba(220, 225, 231, 0.45) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(220, 225, 231, 0.45) 1px, transparent 1px);
+            background-size: 48px 48px;
+            background-position: center top;
         }
 
-        .ambient-glow {
-            position: absolute;
-            top: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 860px;
-            height: 520px;
-            background: radial-gradient(ellipse at 50% 0%, rgba(245, 158, 11, 0.06) 0%, transparent 70%);
-            pointer-events: none;
-            z-index: 0;
+        ::selection {
+            background-color: var(--accent);
+            color: #FFFFFF;
         }
 
-        .container {
-            max-width: var(--max-w);
+        /* ─── Typography Utility Classes ─── */
+        .font-mono-tech {
+            font-family: var(--font-mono);
+            font-variant-numeric: tabular-nums;
+            letter-spacing: -0.01em;
+        }
+
+        .font-display-neo {
+            font-family: var(--font-sans);
+            letter-spacing: -0.038em;
+            font-weight: 700;
+        }
+
+        /* ─── Architectural Frame & Full-Width Grid Scaling ─── */
+        .architectural-shell {
+            width: 100%;
+            max-width: 1600px;
             margin: 0 auto;
-            padding: 0 24px;
+            border-left: 1px solid var(--hairline);
+            border-right: 1px solid var(--hairline);
+            background: var(--canvas);
             position: relative;
-            z-index: 2;
+            box-shadow: 0 0 80px rgba(11, 15, 23, 0.04);
         }
 
-        /* ─── Navigation ─── */
-        nav {
+        @media (min-width: 1920px) {
+            .architectural-shell {
+                max-width: 1720px;
+            }
+        }
+
+        /* ─── Top Precision Header ─── */
+        header.precision-bar {
             position: sticky;
             top: 0;
-            z-index: 100;
-            background: rgba(9, 9, 11, 0.85);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border-bottom: 1px solid var(--border);
+            z-index: 50;
+            background: rgba(244, 246, 248, 0.95);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border-bottom: 1px solid var(--hairline);
         }
 
-        .nav-inner {
-            display: flex;
+        .precision-bar-grid {
+            display: grid;
+            grid-template-columns: auto 1fr auto;
             align-items: center;
-            justify-content: space-between;
-            height: 64px;
         }
 
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            text-decoration: none;
-            color: var(--text-primary);
-        }
-
-        .logo-mark {
-            width: 26px;
-            height: 26px;
-        }
-
-        .logo-text {
-            font-size: 16px;
-            font-weight: 700;
-            letter-spacing: -0.3px;
-        }
-
-        .nav-links {
-            display: flex;
-            align-items: center;
-            gap: 28px;
-        }
-
-        .nav-links a {
-            color: var(--text-secondary);
-            text-decoration: none;
-            font-size: 13.5px;
-            font-weight: 500;
-            transition: color 0.15s;
-        }
-
-        .nav-links a:hover {
-            color: var(--text-primary);
-        }
-
-        .nav-actions {
+        .brand-cell {
+            padding: 14px 24px;
+            border-right: 1px solid var(--hairline);
             display: flex;
             align-items: center;
             gap: 12px;
-        }
-
-        .nav-link-btn {
-            font-size: 13px;
-            color: var(--text-secondary);
             text-decoration: none;
-            font-weight: 500;
-            transition: color 0.15s;
         }
 
-        .nav-link-btn:hover {
-            color: var(--text-primary);
-        }
-
-        .nav-cta {
-            display: inline-flex;
-            align-items: center;
-            padding: 7px 15px;
-            background: var(--text-primary);
-            color: var(--bg);
-            font-size: 13px;
-            font-weight: 600;
-            border-radius: 6px;
-            text-decoration: none;
-            transition: opacity 0.15s;
-        }
-
-        .nav-cta:hover {
-            opacity: 0.88;
-        }
-
-        /* ─── Hero Section ─── */
-        .hero {
-            padding: 76px 0 60px;
-            text-align: center;
-        }
-
-        .hero-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 4px 14px;
-            border-radius: 100px;
-            background: var(--accent-dim);
-            border: 1px solid var(--accent-border);
-            color: var(--accent);
-            font-size: 12px;
-            font-weight: 600;
-            margin-bottom: 24px;
-            letter-spacing: 0.03em;
-            text-transform: uppercase;
-        }
-
-        .hero-badge-dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: var(--accent);
-        }
-
-        .hero h1 {
-            font-size: clamp(38px, 5.2vw, 64px);
-            font-weight: 800;
-            letter-spacing: -0.03em;
-            line-height: 1.08;
-            color: var(--text-primary);
-            margin-bottom: 20px;
-            max-width: 860px;
-            margin-left: auto;
-            margin-right: auto;
-        }
-
-        .hero h1 span {
-            color: var(--text-muted);
-        }
-
-        .hero-sub {
-            font-size: 17px;
-            color: var(--text-secondary);
-            max-width: 640px;
-            margin: 0 auto 36px;
-            line-height: 1.6;
-        }
-
-        /* Hero URL Input Box (Ecomhint instant audit style) */
-        .hero-input-form {
-            display: flex;
-            align-items: center;
-            max-width: 480px;
-            margin: 0 auto 16px;
-            background: var(--bg-surface);
-            border: 1px solid var(--border-hover);
-            border-radius: 8px;
-            padding: 4px 4px 4px 16px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
-            transition: border-color 0.15s;
-        }
-
-        .hero-input-form:focus-within {
-            border-color: var(--accent);
-        }
-
-        .hero-input {
-            background: transparent;
-            border: none;
-            outline: none;
-            color: var(--text-primary);
-            font-size: 14px;
-            flex: 1;
-        }
-
-        .hero-input::placeholder {
-            color: var(--text-muted);
-        }
-
-        .btn-audit {
-            background: var(--text-primary);
-            color: var(--bg);
-            border: none;
-            padding: 10px 20px;
-            border-radius: 6px;
-            font-size: 13.5px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: opacity 0.15s;
-            white-space: nowrap;
-        }
-
-        .btn-audit:hover {
-            opacity: 0.88;
-        }
-
-        .hero-guarantee {
-            font-size: 12px;
-            color: var(--text-muted);
-            margin-bottom: 56px;
-        }
-
-        /* ─── Hero Product Interface Preview (Audit Dashboard) ─── */
-        .hero-preview {
-            position: relative;
-            max-width: 1020px;
-            margin: 0 auto;
-            border-radius: 14px;
-            border: 1px solid var(--border);
-            background: var(--bg-surface);
-            overflow: hidden;
-            box-shadow: 0 30px 100px rgba(0,0,0,0.7);
-            text-align: left;
-        }
-
-        .preview-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 12px 20px;
-            border-bottom: 1px solid var(--border);
-            background: rgba(255,255,255,0.02);
-        }
-
-        .preview-window-controls {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .preview-dots {
-            display: flex;
-            gap: 6px;
-        }
-
-        .preview-dot {
+        .brand-reticle {
             width: 10px;
             height: 10px;
-            border-radius: 50%;
+            background: var(--accent);
+            display: inline-block;
         }
 
-        .preview-dot:nth-child(1) { background: #ef4444; }
-        .preview-dot:nth-child(2) { background: #eab308; }
-        .preview-dot:nth-child(3) { background: #22c55e; }
-
-        .preview-url {
-            font-family: var(--mono);
-            font-size: 12px;
-            color: var(--text-muted);
-        }
-
-        .preview-body {
-            padding: 24px;
-            background: #09090b;
-        }
-
-        /* Top Audit Banner inside Preview */
-        .preview-audit-banner {
-            background: var(--bg-surface);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 20px;
-            display: grid;
-            grid-template-columns: 240px 1fr;
-            gap: 24px;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-
-        .preview-score-box {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            border-right: 1px solid var(--border);
-            padding-right: 20px;
-        }
-
-        .score-dial {
-            width: 72px;
-            height: 72px;
-            border-radius: 50%;
-            border: 3.5px solid var(--accent);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            background: rgba(245, 158, 11, 0.08);
-            flex-shrink: 0;
-        }
-
-        .score-val {
-            font-size: 26px;
-            font-weight: 800;
-            color: var(--text-primary);
-            line-height: 1;
-        }
-
-        .score-denom {
-            font-size: 10px;
-            color: var(--text-muted);
-            font-weight: 600;
-        }
-
-        .preview-score-text h3 {
-            font-size: 14px;
+        .brand-title {
+            font-family: var(--font-mono);
+            font-size: 13px;
             font-weight: 700;
-            margin-bottom: 2px;
-        }
-
-        .preview-score-text p {
-            font-size: 11.5px;
-            color: var(--text-muted);
-            line-height: 1.35;
-        }
-
-        .preview-pillars-row {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 10px;
-        }
-
-        .preview-pillar {
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 10px;
-        }
-
-        .pp-title {
-            font-size: 11px;
-            color: var(--text-muted);
-            margin-bottom: 4px;
-            display: block;
-        }
-
-        .pp-score {
-            font-size: 14px;
-            font-weight: 700;
-            font-family: var(--mono);
-        }
-
-        .pp-score.good { color: var(--success); }
-        .pp-score.warn { color: var(--accent); }
-        .pp-score.bad { color: var(--danger); }
-
-        /* Sample Open Issue Card with AI Prompt */
-        .preview-issue-card {
-            background: var(--bg-surface);
-            border: 1px solid var(--border);
-            border-left: 3px solid var(--danger);
-            border-radius: 8px;
-            padding: 18px 20px;
-        }
-
-        .pic-top {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-        }
-
-        .pic-badge {
-            font-size: 10.5px;
-            font-weight: 700;
+            letter-spacing: 0.08em;
             text-transform: uppercase;
-            padding: 2px 7px;
-            border-radius: 4px;
-            background: var(--danger-dim);
-            color: #fca5a5;
+            color: var(--ink);
         }
 
-        .pic-impact {
-            font-size: 11.5px;
+        .version-pill {
+            padding: 3px 8px;
+            background: var(--well);
+            border: 1px solid var(--hairline);
+            font-family: var(--font-mono);
+            font-size: 10px;
             font-weight: 600;
+            color: var(--text-secondary);
+            margin-left: 6px;
+        }
+
+        .status-cell {
+            padding: 14px 28px;
+            border-right: 1px solid var(--hairline);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
             color: var(--success);
         }
 
-        .pic-title {
-            font-size: 14.5px;
-            font-weight: 600;
-            color: var(--text-primary);
-            margin-bottom: 4px;
+        .status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--success);
+            box-shadow: 0 0 8px rgba(5, 150, 105, 0.6);
+            display: inline-block;
         }
 
-        .pic-desc {
-            font-size: 12.5px;
-            color: var(--text-secondary);
-            margin-bottom: 12px;
-        }
-
-        .pic-ai-box {
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 12px 14px;
+        .action-cell {
+            padding: 10px 24px;
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            gap: 12px;
+            justify-content: flex-end;
+            gap: 20px;
         }
 
-        .pic-ai-prompt {
-            font-family: var(--mono);
-            font-size: 11.5px;
+        .nav-link {
+            font-family: var(--font-mono);
+            font-size: 12px;
             color: var(--text-secondary);
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
+            text-decoration: none;
+            transition: color 0.15s ease;
         }
 
-        .pic-copy-btn {
-            background: var(--accent-dim);
-            border: 1px solid var(--accent-border);
+        .nav-link:hover {
             color: var(--accent);
-            padding: 5px 12px;
-            border-radius: 5px;
-            font-size: 11.5px;
+        }
+
+        .btn-cobalt-cta {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 9px 18px;
+            background: var(--accent);
+            color: #FFFFFF;
+            font-family: var(--font-mono);
+            font-size: 11px;
             font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            text-decoration: none;
+            border: 1px solid var(--accent);
+            transition: all 0.15s ease;
             cursor: pointer;
-            white-space: nowrap;
-            transition: all 0.15s;
         }
 
-        .pic-copy-btn:hover {
-            background: rgba(245, 158, 11, 0.2);
+        .btn-cobalt-cta:hover {
+            background: var(--ink);
+            border-color: var(--ink);
+            color: #FFFFFF;
         }
 
-        /* ─── Section 2: 3-Step Simple Audit Flow ─── */
-        .audit-steps {
-            padding: 90px 0;
-            border-top: 1px solid var(--border);
-            border-bottom: 1px solid var(--border);
+        .btn-ghost-cta {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 9px 16px;
+            background: var(--surface);
+            color: var(--ink);
+            font-family: var(--font-mono);
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            text-decoration: none;
+            border: 1px solid var(--hairline);
+            transition: all 0.15s ease;
+            cursor: pointer;
         }
 
-        .steps-header {
-            text-align: center;
-            margin-bottom: 60px;
+        .btn-ghost-cta:hover {
+            background: var(--well);
+            border-color: var(--ink);
         }
 
-        .steps-header h2 {
-            font-size: 34px;
-            font-weight: 700;
-            letter-spacing: -0.02em;
-            margin-bottom: 12px;
-        }
-
-        .steps-header p {
-            font-size: 16.5px;
-            color: var(--text-secondary);
-        }
-
-        .steps-grid {
+        /* ─── Hero Grid ─── */
+        .hero-section {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: 1fr;
+            border-bottom: 1px solid var(--hairline);
+        }
+
+        @media (min-width: 1024px) {
+            .hero-section {
+                grid-template-columns: 7fr 5fr;
+            }
+        }
+
+        .hero-narrative {
+            padding: 48px 32px;
+            background: var(--canvas);
+            display: flex;
+            flex-col: column;
+            justify-content: space-between;
+            border-right: 1px solid var(--hairline);
+        }
+
+        @media (min-width: 768px) {
+            .hero-narrative {
+                padding: 64px 56px;
+            }
+        }
+
+        @media (min-width: 1440px) {
+            .hero-narrative {
+                padding: 80px 72px;
+            }
+        }
+
+        .section-eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 5px 12px;
+            background: var(--well);
+            border: 1px solid var(--hairline);
+            font-family: var(--font-mono);
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-secondary);
+            margin-bottom: 28px;
+        }
+
+        .hero-heading {
+            font-family: var(--font-sans);
+            font-size: clamp(38px, 4.4vw, 66px);
+            font-weight: 800;
+            line-height: 1.02;
+            letter-spacing: -0.04em;
+            color: var(--ink);
+        }
+
+        .hero-heading span.accent-text {
+            color: var(--accent);
+        }
+
+        .hero-desc {
+            margin-top: 28px;
+            font-size: clamp(16px, 1.25vw, 19px);
+            line-height: 1.68;
+            color: var(--text-secondary);
+            max-width: 700px;
+        }
+
+        .hero-desc strong {
+            color: var(--ink);
+            font-weight: 600;
+        }
+
+        .hero-code-inline {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            font-weight: 600;
+            background: var(--well);
+            border: 1px solid var(--hairline);
+            padding: 2px 7px;
+            color: var(--ink);
+        }
+
+        .hero-spec-grid {
+            margin-top: 48px;
+            padding-top: 32px;
+            border-top: 1px solid var(--hairline);
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
             gap: 24px;
         }
 
-        .step-card {
-            background: var(--bg-surface);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 32px 26px;
-            position: relative;
+        @media (min-width: 640px) {
+            .hero-spec-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
         }
 
-        .step-number {
-            font-size: 12px;
-            font-weight: 700;
-            color: var(--accent);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin-bottom: 12px;
-            display: block;
-        }
-
-        .step-card h3 {
-            font-size: 17px;
+        .spec-item-label {
+            font-family: var(--font-mono);
+            font-size: 10px;
             font-weight: 600;
-            margin-bottom: 10px;
-            color: var(--text-primary);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
         }
 
-        .step-card p {
-            font-size: 14px;
-            color: var(--text-secondary);
-            line-height: 1.6;
-        }
-
-        /* ─── Section 3: The 4 Health Areas ─── */
-        .health-pillars-section {
-            padding: 90px 0;
-        }
-
-        .hps-header {
-            text-align: center;
-            margin-bottom: 56px;
-        }
-
-        .hps-header h2 {
-            font-size: 34px;
+        .spec-item-val {
+            font-family: var(--font-mono);
+            font-size: 20px;
             font-weight: 700;
-            letter-spacing: -0.02em;
-            margin-bottom: 12px;
+            color: var(--ink);
+            margin-top: 4px;
         }
 
-        .hps-header p {
-            font-size: 16.5px;
-            color: var(--text-secondary);
-            max-width: 540px;
-            margin: 0 auto;
-        }
+        .spec-item-val.success { color: var(--success); }
+        .spec-item-val.accent { color: var(--accent); }
 
-        .hps-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 16px;
-        }
-
-        .hps-card {
-            background: var(--bg-surface);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 24px;
+        /* ─── Hero Provisioner Panel ─── */
+        .hero-provisioner {
+            background: var(--surface);
+            padding: 36px 28px;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
         }
 
-        .hps-icon {
-            width: 36px;
-            height: 36px;
-            border-radius: 6px;
-            background: var(--bg-elevated);
-            border: 1px solid var(--border);
+        @media (min-width: 768px) {
+            .hero-provisioner {
+                padding: 48px 40px;
+            }
+        }
+
+        .provisioner-header {
             display: flex;
             align-items: center;
-            justify-content: center;
-            margin-bottom: 16px;
+            justify-content: space-between;
+            padding-bottom: 18px;
+            border-bottom: 1px solid var(--hairline);
+        }
+
+        .provisioner-title {
+            font-family: var(--font-mono);
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+        }
+
+        .provisioner-subtitle {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--ink);
+            margin-top: 2px;
+        }
+
+        .provisioner-badge {
+            padding: 3px 8px;
+            background: rgba(5, 150, 105, 0.1);
+            border: 1px solid rgba(5, 150, 105, 0.3);
+            color: var(--success);
+            font-family: var(--font-mono);
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+
+        .field-group {
+            margin-top: 24px;
+        }
+
+        .field-label-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .field-label {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--ink);
+        }
+
+        .preset-links {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .preset-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-family: var(--font-mono);
+            font-size: 11px;
+            text-decoration: underline;
+            cursor: pointer;
+            transition: color 0.15s ease;
+        }
+
+        .preset-btn:hover, .preset-btn.active {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .input-box {
+            display: flex;
+            align-items: center;
+            background: var(--canvas);
+            border: 1px solid var(--ink);
+            padding: 10px 14px;
+            gap: 8px;
+        }
+
+        .input-prefix {
+            font-family: var(--font-mono);
+            font-size: 13px;
+            color: var(--text-muted);
+            user-select: none;
+        }
+
+        .domain-input {
+            width: 100%;
+            background: transparent;
+            border: none;
+            outline: none;
+            font-family: var(--font-mono);
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--ink);
+        }
+
+        .key-preview-pill {
+            font-family: var(--font-mono);
+            font-size: 10px;
+            padding: 2px 7px;
+            background: var(--surface);
+            border: 1px solid var(--hairline);
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+
+        /* ─── Framework Switcher Tabs ─── */
+        .fw-tabs {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 4px;
+            background: var(--well);
+            padding: 4px;
+            border: 1px solid var(--hairline);
+        }
+
+        .fw-tab-btn {
+            background: none;
+            border: 1px solid transparent;
+            padding: 8px 4px;
+            font-family: var(--font-mono);
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.15s ease;
+        }
+
+        .fw-tab-btn.active {
+            background: var(--surface);
+            border-color: var(--hairline);
             color: var(--accent);
         }
 
-        .hps-card h3 {
-            font-size: 15.5px;
-            font-weight: 600;
-            margin-bottom: 8px;
-            color: var(--text-primary);
+        /* ─── Syntax Block Box ─── */
+        .code-syntax-card {
+            margin-top: 24px;
+            border: 1px solid var(--hairline);
+            background: var(--well);
         }
 
-        .hps-card p {
-            font-size: 13.5px;
-            color: var(--text-secondary);
-            line-height: 1.55;
+        .syntax-header {
+            padding: 10px 16px;
+            background: var(--canvas);
+            border-bottom: 1px solid var(--hairline);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-family: var(--font-mono);
+            font-size: 11px;
         }
 
-        /* ─── Section 4: SaaS Pricing Grid ─── */
-        .pricing-section {
-            padding: 90px 0;
-            border-top: 1px solid var(--border);
-            border-bottom: 1px solid var(--border);
+        .syntax-key-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
-        .pricing-header {
-            text-align: center;
-            margin-bottom: 56px;
+        .syntax-key-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--accent);
+            display: inline-block;
         }
 
-        .pricing-header h2 {
-            font-size: 34px;
+        .syntax-code-body {
+            padding: 18px 16px;
+            background: var(--surface);
+            font-family: var(--font-mono);
+            font-size: 12px;
+            line-height: 1.65;
+            color: var(--ink);
+            white-space: pre-wrap;
+            overflow-x: auto;
+        }
+
+        .syntax-action-bar {
+            padding: 12px 16px;
+            background: var(--canvas);
+            border-top: 1px solid var(--hairline);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .btn-copy-snippet {
+            padding: 9px 18px;
+            background: var(--accent);
+            color: #FFFFFF;
+            border: none;
+            font-family: var(--font-mono);
+            font-size: 11px;
             font-weight: 700;
-            letter-spacing: -0.02em;
-            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            cursor: pointer;
+            transition: background 0.15s ease;
         }
 
-        .pricing-header p {
-            font-size: 16.5px;
+        .btn-copy-snippet:hover {
+            background: var(--ink);
+        }
+
+        .provisioner-footer {
+            margin-top: 24px;
+            padding-top: 16px;
+            border-top: 1px solid var(--hairline);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* ─── Section 01: 4 Telemetry Streams ─── */
+        .section-header-block {
+            padding: 48px 32px;
+            background: var(--canvas);
+            border-bottom: 1px solid var(--hairline);
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 24px;
+        }
+
+        @media (min-width: 1024px) {
+            .section-header-block {
+                grid-template-columns: 7fr 5fr;
+                padding: 64px 56px;
+                align-items: flex-end;
+            }
+        }
+
+        .section-title {
+            font-family: var(--font-sans);
+            font-size: clamp(28px, 3.2vw, 44px);
+            font-weight: 800;
+            line-height: 1.08;
+            letter-spacing: -0.038em;
+            color: var(--ink);
+        }
+
+        .section-subtitle {
+            font-size: clamp(15px, 1.1vw, 17px);
+            line-height: 1.65;
             color: var(--text-secondary);
+        }
+
+        .streams-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            background: var(--surface);
+            border-bottom: 1px solid var(--hairline);
+        }
+
+        @media (min-width: 768px) {
+            .streams-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (min-width: 1200px) {
+            .streams-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+
+        .stream-card {
+            padding: 36px 30px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--hairline);
+        }
+
+        @media (min-width: 768px) {
+            .stream-card {
+                border-right: 1px solid var(--hairline);
+            }
+            .stream-card:nth-child(2n) {
+                border-right: none;
+            }
+        }
+
+        @media (min-width: 1200px) {
+            .stream-card {
+                border-right: 1px solid var(--hairline);
+                border-bottom: none;
+            }
+            .stream-card:nth-child(2n) {
+                border-right: 1px solid var(--hairline);
+            }
+            .stream-card:last-child {
+                border-right: none;
+            }
+        }
+
+        .stream-top-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--hairline);
+            margin-bottom: 20px;
+        }
+
+        .stream-code {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .stream-badge {
+            padding: 3px 8px;
+            background: var(--well);
+            font-family: var(--font-mono);
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--ink);
+        }
+
+        .stream-heading {
+            font-family: var(--font-sans);
+            font-size: 19px;
+            font-weight: 700;
+            line-height: 1.25;
+            color: var(--ink);
+        }
+
+        .stream-body {
+            margin-top: 12px;
+            font-size: 14px;
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+
+        .stream-signals-box {
+            margin-top: 28px;
+            padding-top: 16px;
+            border-top: 1px solid var(--hairline);
+            font-family: var(--font-mono);
+            font-size: 11px;
+        }
+
+        .stream-signals-title {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .stream-signals-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            color: var(--ink);
+        }
+
+        /* ─── Section 02: Multi-Signal Specimens ─── */
+        .specimens-section {
+            background: var(--canvas);
+            border-bottom: 1px solid var(--hairline);
+        }
+
+        .specimens-tabs-bar {
+            margin-top: 28px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .specimen-tab-btn {
+            padding: 10px 18px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border: 1px solid var(--hairline);
+            background: var(--well);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .specimen-tab-btn:hover {
+            background: var(--surface);
+            color: var(--ink);
+        }
+
+        .specimen-tab-btn.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #FFFFFF;
+            font-weight: 700;
+        }
+
+        .specimen-container {
+            padding: 36px 24px;
+        }
+
+        @media (min-width: 768px) {
+            .specimen-container {
+                padding: 48px 48px;
+            }
+        }
+
+        @media (min-width: 1440px) {
+            .specimen-container {
+                padding: 64px 64px;
+            }
+        }
+
+        .specimen-card {
+            border: 1px solid var(--ink);
+            background: var(--surface);
+            box-shadow: 0 10px 30px rgba(11, 15, 23, 0.05);
+        }
+
+        .specimen-hero-row {
+            padding: 28px 32px;
+            border-bottom: 1px solid var(--hairline);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            justify-content: space-between;
+        }
+
+        @media (min-width: 1024px) {
+            .specimen-hero-row {
+                flex-direction: row;
+                align-items: center;
+            }
+        }
+
+        .specimen-meta-pills {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+        }
+
+        .specimen-severity-tag {
+            padding: 3px 10px;
+            background: var(--accent);
+            color: #FFFFFF;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .specimen-code-tag {
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .specimen-route-tag {
+            padding: 3px 10px;
+            background: var(--well);
+            color: var(--ink);
+            font-weight: 600;
+        }
+
+        .specimen-headline {
+            font-family: var(--font-sans);
+            font-size: clamp(20px, 2.2vw, 27px);
+            font-weight: 700;
+            line-height: 1.25;
+            color: var(--ink);
+            margin-top: 12px;
+            max-width: 880px;
+        }
+
+        .specimen-impact-cell {
+            padding-top: 16px;
+            border-top: 1px solid var(--hairline);
+        }
+
+        @media (min-width: 1024px) {
+            .specimen-impact-cell {
+                padding-top: 0;
+                border-top: none;
+                text-align: right;
+                flex-shrink: 0;
+            }
+        }
+
+        .impact-label {
+            font-family: var(--font-mono);
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+        }
+
+        .impact-amount {
+            font-family: var(--font-mono);
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--accent);
+            margin-top: 2px;
+        }
+
+        /* 3 Joined Signals Grid */
+        .joined-signals-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            background: var(--well);
+            border-bottom: 1px solid var(--hairline);
+        }
+
+        @media (min-width: 1024px) {
+            .joined-signals-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        .signal-cell {
+            padding: 24px 28px;
+            border-bottom: 1px solid var(--hairline);
+        }
+
+        @media (min-width: 1024px) {
+            .signal-cell {
+                border-bottom: none;
+                border-right: 1px solid var(--hairline);
+            }
+            .signal-cell:last-child {
+                border-right: none;
+            }
+        }
+
+        .signal-layer-label {
+            font-family: var(--font-mono);
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+        }
+
+        .signal-metric {
+            font-family: var(--font-mono);
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--ink);
+            margin-top: 6px;
+        }
+
+        .signal-detail {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        /* Plain-English Root Cause Diagnosis */
+        .diagnosis-card {
+            padding: 28px 32px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--hairline);
+        }
+
+        .diagnosis-title {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--accent);
+            margin-bottom: 10px;
+        }
+
+        .diagnosis-text {
+            font-size: 16px;
+            line-height: 1.68;
+            color: var(--ink);
+            max-width: 960px;
+        }
+
+        .diagnosis-env {
+            margin-top: 16px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .diagnosis-env strong {
+            color: var(--ink);
+        }
+
+        /* Carbon Dark AI Prompt Box */
+        .ai-prompt-box {
+            background: #0B0F17;
+            color: #FFFFFF;
+            padding: 28px 32px;
+        }
+
+        .ai-prompt-header {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            padding-bottom: 18px;
+            border-bottom: 1px solid #222938;
+        }
+
+        @media (min-width: 768px) {
+            .ai-prompt-header {
+                flex-direction: row;
+                align-items: center;
+                justify-content: space-between;
+            }
+        }
+
+        .ai-prompt-title {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #22C55E;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .ai-prompt-sub {
+            font-size: 12px;
+            color: #7E8B9B;
+            margin-top: 2px;
+        }
+
+        .btn-copy-prompt {
+            padding: 9px 18px;
+            background: var(--accent);
+            color: #FFFFFF;
+            border: none;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+
+        .btn-copy-prompt:hover {
+            background: #FFFFFF;
+            color: #0B0F17;
+        }
+
+        .ai-prompt-content {
+            margin-top: 20px;
+            font-family: var(--font-mono);
+            font-size: 12.5px;
+            line-height: 1.75;
+            color: #EAECEF;
+            white-space: pre-wrap;
+            overflow-x: auto;
+        }
+
+        /* ─── Section 03: Architectural Replacement Matrix ─── */
+        .matrix-section {
+            background: var(--surface);
+            border-bottom: 1px solid var(--hairline);
+        }
+
+        .matrix-table-wrap {
+            overflow-x: auto;
+            width: 100%;
+        }
+
+        table.comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        table.comparison-table th {
+            padding: 16px 28px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-secondary);
+            background: var(--well);
+            border-bottom: 1px solid var(--hairline);
+            border-right: 1px solid var(--hairline);
+        }
+
+        table.comparison-table th.col-highlight {
+            background: #0B0F17;
+            color: #FFFFFF;
+            border-right: none;
+        }
+
+        table.comparison-table td {
+            padding: 22px 28px;
+            border-bottom: 1px solid var(--hairline);
+            border-right: 1px solid var(--hairline);
+            font-size: 14px;
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+
+        table.comparison-table td.dim-title {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--ink);
+            background: var(--canvas);
+            width: 22%;
+        }
+
+        table.comparison-table td.cell-hotspot {
+            background: #FFFFFF;
+            color: var(--ink);
+            font-weight: 600;
+            border-right: none;
+        }
+
+        /* ─── Section 04: SaaS Pricing Grid ─── */
+        .pricing-section {
+            background: var(--canvas);
+            border-bottom: 1px solid var(--hairline);
         }
 
         .pricing-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-            align-items: stretch;
+            grid-template-columns: 1fr;
+            background: var(--canvas);
         }
 
-        .p-card {
-            background: var(--bg-surface);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 32px 28px;
+        @media (min-width: 1024px) {
+            .pricing-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        .pricing-col {
+            padding: 44px 36px;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            transition: all 0.2s;
+            border-bottom: 1px solid var(--hairline);
         }
 
-        .p-card:hover {
-            border-color: var(--border-hover);
+        @media (min-width: 1024px) {
+            .pricing-col {
+                border-bottom: none;
+                border-right: 1px solid var(--hairline);
+            }
+            .pricing-col:last-child {
+                border-right: none;
+            }
         }
 
-        .p-card.featured {
-            border-color: var(--accent-border);
-            background: rgba(245, 158, 11, 0.03);
+        .pricing-col.recommended {
+            background: var(--surface);
+            box-shadow: inset 0 0 0 2px var(--accent);
             position: relative;
         }
 
-        .p-badge {
-            position: absolute;
-            top: -12px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: var(--accent);
-            color: #09090b;
-            font-size: 11px;
+        .pricing-tier-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-family: var(--font-mono);
+            font-size: 12px;
             font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
-            padding: 3px 12px;
-            border-radius: 100px;
         }
 
-        .p-name {
-            font-size: 18px;
-            font-weight: 700;
-            margin-bottom: 6px;
+        .pricing-badge-free {
+            padding: 3px 8px;
+            background: rgba(5, 150, 105, 0.1);
+            border: 1px solid rgba(5, 150, 105, 0.3);
+            color: var(--success);
+            font-size: 10px;
         }
 
-        .p-desc {
-            font-size: 13px;
-            color: var(--text-muted);
-            margin-bottom: 24px;
-            min-height: 38px;
+        .pricing-badge-rec {
+            padding: 3px 8px;
+            background: var(--accent);
+            color: #FFFFFF;
+            font-size: 10px;
         }
 
-        .p-price-row {
+        .pricing-figure-row {
+            margin-top: 24px;
             display: flex;
             align-items: baseline;
-            gap: 6px;
-            margin-bottom: 24px;
+            gap: 8px;
         }
 
-        .p-price {
-            font-size: 40px;
+        .pricing-amount {
+            font-family: var(--font-sans);
+            font-size: clamp(48px, 4vw, 64px);
             font-weight: 800;
-            letter-spacing: -1px;
-            color: var(--text-primary);
+            letter-spacing: -0.04em;
+            color: var(--ink);
+            line-height: 1;
         }
 
-        .p-period {
-            font-size: 13px;
+        .pricing-cycle {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            font-weight: 600;
             color: var(--text-muted);
+            text-transform: uppercase;
         }
 
-        .p-features {
+        .pricing-pitch {
+            margin-top: 14px;
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.55;
+        }
+
+        .pricing-features-list {
+            margin-top: 32px;
+            padding-top: 24px;
+            border-top: 1px solid var(--hairline);
             list-style: none;
             display: flex;
             flex-direction: column;
-            gap: 12px;
-            font-size: 13.5px;
-            color: var(--text-secondary);
-            margin-bottom: 32px;
-            flex: 1;
+            gap: 14px;
+            font-size: 14px;
+            color: var(--ink);
         }
 
-        .p-features li {
+        .pricing-features-list li {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             gap: 10px;
+            line-height: 1.45;
         }
 
-        .p-features li::before {
-            content: "✓";
-            color: var(--accent);
-            font-weight: 700;
-        }
-
-        .btn-plan {
-            width: 100%;
-            padding: 12px 0;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 600;
-            text-align: center;
-            text-decoration: none;
-            cursor: pointer;
-            transition: all 0.15s;
-        }
-
-        .btn-plan-ghost {
-            background: rgba(255, 255, 255, 0.06);
-            border: 1px solid var(--border);
-            color: var(--text-primary);
-        }
-
-        .btn-plan-ghost:hover {
-            background: rgba(255, 255, 255, 0.1);
-            border-color: var(--border-hover);
-        }
-
-        .btn-plan-primary {
-            background: var(--text-primary);
-            color: var(--bg);
-            border: 1px solid var(--text-primary);
-        }
-
-        .btn-plan-primary:hover {
-            opacity: 0.88;
-        }
-
-        /* ─── Section 5: Comparison ─── */
-        .comparison {
-            padding: 90px 0 110px;
-        }
-
-        .comparison-header {
-            text-align: center;
-            margin-bottom: 48px;
-        }
-
-        .comparison-header h2 {
-            font-size: 34px;
-            font-weight: 700;
-            letter-spacing: -0.02em;
-            margin-bottom: 12px;
-        }
-
-        .comparison-header p {
-            font-size: 16.5px;
-            color: var(--text-secondary);
-        }
-
-        .comparison-table {
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            overflow: hidden;
-            background: var(--bg-surface);
-        }
-
-        .comparison-row {
-            display: grid;
-            grid-template-columns: 1.2fr 1fr 1fr;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .comparison-row:last-child {
-            border-bottom: none;
-        }
-
-        .comparison-row.header {
-            background: rgba(255, 255, 255, 0.02);
-        }
-
-        .comparison-cell {
-            padding: 16px 24px;
-            font-size: 14px;
-            color: var(--text-secondary);
-            border-right: 1px solid var(--border);
-        }
-
-        .comparison-cell:last-child {
-            border-right: none;
-        }
-
-        .comparison-cell.label {
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .comparison-cell.header-cell {
-            font-weight: 600;
+        .check-icon {
+            font-family: var(--font-mono);
             font-size: 12px;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .comparison-cell.highlight {
-            color: var(--accent);
-            font-weight: 600;
-        }
-
-        /* ─── Section 6: FAQ ─── */
-        .faq-section {
-            padding: 90px 0;
-            border-top: 1px solid var(--border);
-        }
-
-        .faq-header {
-            text-align: center;
-            margin-bottom: 56px;
-        }
-
-        .faq-header h2 {
-            font-size: 34px;
             font-weight: 700;
-            letter-spacing: -0.02em;
-            margin-bottom: 12px;
+            flex-shrink: 0;
+        }
+
+        .check-icon.success { color: var(--success); }
+        .check-icon.accent { color: var(--accent); }
+
+        .btn-pricing-action {
+            margin-top: 40px;
+            display: block;
+            width: 100%;
+            padding: 14px 20px;
+            text-align: center;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            text-decoration: none;
+            transition: all 0.15s ease;
+        }
+
+        .btn-pricing-action.primary {
+            background: var(--accent);
+            color: #FFFFFF;
+        }
+
+        .btn-pricing-action.primary:hover {
+            background: var(--ink);
+        }
+
+        .btn-pricing-action.secondary {
+            background: var(--surface);
+            border: 1px solid var(--ink);
+            color: var(--ink);
+        }
+
+        .btn-pricing-action.secondary:hover {
+            background: var(--ink);
+            color: #FFFFFF;
+        }
+
+        /* ─── Section 05: Precision FAQ & GEO Answer Cards ─── */
+        .faq-section {
+            background: var(--surface);
+            border-bottom: 1px solid var(--hairline);
         }
 
         .faq-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 28px;
-            max-width: 960px;
-            margin: 0 auto;
+            grid-template-columns: 1fr;
+            divide-y: 1px solid var(--hairline);
         }
 
-        .faq-card {
-            background: var(--bg-surface);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 24px;
+        @media (min-width: 1024px) {
+            .faq-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
 
-        .faq-q {
-            font-size: 15px;
-            font-weight: 600;
-            margin-bottom: 8px;
-            color: var(--text-primary);
+        .faq-item {
+            padding: 32px 36px;
+            border-bottom: 1px solid var(--hairline);
         }
 
-        .faq-a {
-            font-size: 13.5px;
+        @media (min-width: 1024px) {
+            .faq-item:nth-child(odd) {
+                border-right: 1px solid var(--hairline);
+            }
+        }
+
+        .faq-question {
+            font-family: var(--font-sans);
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--ink);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .faq-q-num {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--accent);
+            padding-top: 3px;
+        }
+
+        .faq-answer {
+            font-size: 14.5px;
+            line-height: 1.68;
             color: var(--text-secondary);
-            line-height: 1.6;
         }
 
-        /* ─── Bottom CTA Banner ─── */
-        .bottom-cta {
-            padding: 60px 0 120px;
+        /* ─── Precision Bottom Banner & Footer ─── */
+        footer.precision-footer {
+            background: var(--surface);
         }
 
-        .cta-box {
-            border: 1px solid var(--border);
-            border-radius: 14px;
-            padding: 72px 36px;
-            text-align: center;
-            background: var(--bg-surface);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .cta-box::before {
-            content: '';
-            position: absolute;
-            top: -150px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 500px;
-            height: 300px;
-            background: radial-gradient(circle, rgba(245, 158, 11, 0.06) 0%, transparent 70%);
-            pointer-events: none;
-        }
-
-        .cta-box h2 {
-            font-size: clamp(30px, 4vw, 42px);
-            font-weight: 800;
-            letter-spacing: -0.02em;
-            margin-bottom: 14px;
-            position: relative;
-        }
-
-        .cta-box p {
-            font-size: 16.5px;
-            color: var(--text-secondary);
-            max-width: 500px;
-            margin: 0 auto 32px;
-            position: relative;
-        }
-
-        .cta-actions {
+        .footer-cta-band {
+            padding: 56px 36px;
+            border-bottom: 1px solid var(--hairline);
             display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 14px;
-            position: relative;
-            flex-wrap: wrap;
-        }
-
-        /* ─── Footer ─── */
-        footer {
-            border-top: 1px solid var(--border);
-            padding: 32px 0;
-        }
-
-        .footer-inner {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .footer-left {
-            font-size: 13px;
-            color: var(--text-muted);
-        }
-
-        .footer-links {
-            display: flex;
+            flex-direction: column;
             gap: 24px;
+            justify-content: space-between;
         }
 
-        .footer-links a {
-            font-size: 13px;
+        @media (min-width: 1024px) {
+            .footer-cta-band {
+                flex-direction: row;
+                align-items: center;
+                padding: 64px 72px;
+            }
+        }
+
+        .footer-legal-bar {
+            padding: 24px 36px;
+            background: var(--canvas);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            font-family: var(--font-mono);
+            font-size: 11px;
             color: var(--text-muted);
-            text-decoration: none;
-            transition: color 0.15s;
+            justify-content: space-between;
         }
 
-        .footer-links a:hover {
+        @media (min-width: 768px) {
+            .footer-legal-bar {
+                flex-direction: row;
+                align-items: center;
+                padding: 24px 72px;
+            }
+        }
+
+        .footer-nav-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .footer-nav-links a {
             color: var(--text-secondary);
+            text-decoration: none;
+            transition: color 0.15s ease;
         }
 
-        @media (max-width: 860px) {
-            .nav-links { display: none; }
-            .preview-audit-banner { grid-template-columns: 1fr; }
-            .preview-score-box { border-right: none; padding-right: 0; border-bottom: 1px solid var(--border); padding-bottom: 16px; }
-            .preview-pillars-row { grid-template-columns: 1fr 1fr; }
-            .steps-grid { grid-template-columns: 1fr; }
-            .hps-grid { grid-template-columns: 1fr 1fr; }
-            .pricing-grid { grid-template-columns: 1fr; }
-            .faq-grid { grid-template-columns: 1fr; }
-            .comparison-row { grid-template-columns: 1fr; }
-            .comparison-row.header { display: none; }
-            .comparison-cell { border-right: none; }
-            .footer-inner { flex-direction: column; gap: 16px; }
+        .footer-nav-links a:hover {
+            color: var(--accent);
         }
 
-        .reveal {
-            opacity: 0;
-            transform: translateY(16px);
+        /* Mobile Adjustments */
+        @media (max-width: 640px) {
+            .brand-cell { padding: 10px 14px; }
+            .action-cell { padding: 8px 14px; }
+            .status-cell { display: none; }
+            .hero-narrative { padding: 36px 20px; }
+            .hero-provisioner { padding: 28px 20px; }
+            .specimen-container { padding: 24px 16px; }
+            .specimen-hero-row { padding: 20px 18px; }
+            .signal-cell { padding: 18px 18px; }
+            .diagnosis-card { padding: 20px 18px; }
+            .ai-prompt-box { padding: 20px 18px; }
+            .pricing-col { padding: 32px 24px; }
+            .faq-item { padding: 24px 20px; }
+            .footer-cta-band { padding: 36px 20px; }
+            .footer-legal-bar { padding: 20px 20px; }
         }
     </style>
 </head>
 <body>
 
-    <div class="ambient-glow"></div>
+    <!-- Architectural Outer Container -->
+    <div class="architectural-shell">
 
-    <!-- Navigation -->
-    <nav>
-        <div class="container nav-inner">
-            <a href="/" class="logo">
-                <svg class="logo-mark" viewBox="0 0 28 28" fill="none">
-                    <circle cx="14" cy="14" r="13" stroke="var(--accent)" stroke-width="1.5" fill="none"/>
-                    <circle cx="14" cy="14" r="5" fill="var(--accent)" opacity="0.9"/>
-                    <circle cx="14" cy="14" r="2" fill="var(--bg)"/>
-                </svg>
-                <span class="logo-text">Hotspot</span>
-            </a>
+        <!-- =================================================================
+             1. TOP PRECISION BAR (STICKY HEADER)
+        ================================================================= -->
+        <header class="precision-bar" id="site-header">
+            <div class="precision-bar-grid">
+                <!-- Left: Brand Reticle + Identity -->
+                <a href="#top" class="brand-cell" aria-label="hotspot.js home">
+                    <span class="brand-reticle" aria-hidden="true"></span>
+                    <span class="brand-title">HOTSPOT.JS</span>
+                    <span class="version-pill">v2.4 • 3.8KB GZIP</span>
+                </a>
 
-            <div class="nav-links">
-                <a href="#how-it-works">How It Works</a>
-                <a href="#audit-areas">Audit Areas</a>
-                <a href="#pricing">Pricing</a>
-                <a href="#compare">Compare</a>
-                <a href="#faq">FAQ</a>
-                <a href="/playground/">Live Demo</a>
-            </div>
-
-            <div class="nav-actions">
-                <a href="/login" class="nav-link-btn">Sign in</a>
-                <a href="/dashboard/" class="nav-cta">Start Free Audit</a>
-            </div>
-        </div>
-    </nav>
-
-    <main>
-
-        <!-- Hero Section -->
-        <section class="container hero">
-            <div class="hero-badge">
-                <span class="hero-badge-dot"></span>
-                Automated Conversion Audit for AI-Built Apps
-            </div>
-
-            <h1>
-                Traffic is not the problem.<br>
-                <span>Find out what is killing your conversions.</span>
-            </h1>
-
-            <p class="hero-sub">
-                Traditional analytics gives you endless charts. Hotspot gives you a ranked fix-it list.
-                We audit your visitor journeys like a real user, detect why people leave without buying,
-                and hand you the exact fix with ready-to-use AI code prompts.
-            </p>
-
-            <!-- Instant Audit Form -->
-            <form class="hero-input-form" onsubmit="handleStartAudit(event)">
-                <input type="text" class="hero-input" id="audit-url-input" placeholder="Enter your app or store URL (e.g. acme.com)" required>
-                <button type="submit" class="btn-audit">Audit My Site →</button>
-            </form>
-
-            <div class="hero-guarantee">
-                ✓ 14-day free trial &nbsp;•&nbsp; No credit card required &nbsp;•&nbsp; Instant cloud setup &nbsp;•&nbsp; Works with any web app
-            </div>
-
-            <!-- Product Preview: Authentic Audit Dashboard Preview -->
-            <div class="hero-preview reveal">
-                <div class="preview-header">
-                    <div class="preview-window-controls">
-                        <div class="preview-dots">
-                            <span class="preview-dot"></span>
-                            <span class="preview-dot"></span>
-                            <span class="preview-dot"></span>
-                        </div>
-                        <span class="preview-url">hotspot-cloud / live-audit / acme-saas.com</span>
+                <!-- Middle: Live Telemetry Edge Status -->
+                <div class="status-cell">
+                    <div class="status-indicator">
+                        <span class="status-dot"></span>
+                        <span>EDGE INGESTION ONLINE</span>
                     </div>
-                    <div style="font-family: var(--mono); font-size: 11.5px; color: var(--accent);">
-                        ● 4,291 visits audited
+                    <span class="font-mono-tech" style="font-size: 11px; color: var(--text-muted);">
+                        0ms DOM BLOCKING TIME
+                    </span>
+                </div>
+
+                <!-- Right: Nav Jump Links + CTAs -->
+                <div class="action-cell">
+                    <nav class="footer-nav-links" style="display: none;" id="desktop-nav">
+                        <a href="#architecture" class="nav-link">01. Architecture</a>
+                        <a href="#intelligence" class="nav-link">02. Intelligence</a>
+                        <a href="#comparison" class="nav-link">03. vs Legacy</a>
+                        <a href="#pricing" class="nav-link">04. Pricing</a>
+                        <a href="#faq" class="nav-link">05. FAQ</a>
+                    </nav>
+                    <a href="/dashboard/" class="btn-ghost-cta" style="margin-right: -8px;">
+                        Live Audit Demo ↗
+                    </a>
+                    <a href="#top" class="btn-cobalt-cta" id="top-claim-key-btn">
+                        Get Free Key →
+                    </a>
+                </div>
+            </div>
+        </header>
+
+        <!-- =================================================================
+             2. HERO SECTION + INSTANT KEY & 1-LINE JS PROVISIONER
+        ================================================================= -->
+        <section id="top" class="hero-section" aria-label="Hotspot overview and script provisioner">
+            
+            <!-- Left Narrative Column (7 cols on desktop) -->
+            <div class="hero-narrative">
+                <div>
+                    <div class="section-eyebrow">
+                        <span class="brand-reticle" style="width: 6px; height: 6px;" aria-hidden="true"></span>
+                        <span>00 // RESIDENT TELEMETRY &amp; INTELLIGENCE ENGINE</span>
+                    </div>
+
+                    <h1 class="hero-heading">
+                        One script tag.<br>
+                        Every user movement.<br>
+                        <span class="accent-text">Plain-English fixes.</span>
+                    </h1>
+
+                    <p class="hero-desc">
+                        Drop <code class="hero-code-inline">hotspot.js</code> into your site header once. It sits quietly inside your runtime—replacing <strong>GA4, Hotjar heatmaps, and manual Search Console exports</strong> without writing a single <code class="hero-code-inline">track()</code> call.
+                    </p>
+
+                    <p class="hero-desc" style="margin-top: 14px;">
+                        Your baseline tracking, route funnels, and live heatmaps are <strong style="color: var(--success);">lifetime free ($0 forever)</strong>. Upgrade to the <strong>$9/mo Intelligence layer</strong> only when you want Hotspot to cross-correlate your telemetry and generate copy-paste Cursor &amp; Claude Code fixes.
+                    </p>
+
+                    <!-- In-Browser Visualizer Shortcut Notification -->
+                    <div style="margin-top: 24px; display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; background: rgba(0, 82, 255, 0.06); border: 1px solid rgba(0, 82, 255, 0.2); font-family: var(--font-mono); font-size: 11px; color: var(--accent);">
+                        <span>● LIVE HUD ACTIVE:</span>
+                        <span style="color: var(--ink);">Press</span>
+                        <kbd style="padding: 2px 6px; background: var(--surface); border: 1px solid var(--hairline); border-radius: 3px; font-weight: 700;">Option + H</kbd>
+                        <span style="color: var(--ink);">on this page to view in-browser click heatmaps</span>
                     </div>
                 </div>
 
-                <div class="preview-body">
-                    <!-- Top Audit Banner -->
-                    <div class="preview-audit-banner">
-                        <div class="preview-score-box">
-                            <div class="score-dial">
-                                <div class="score-val">88</div>
-                                <div class="score-denom">/ 100</div>
-                            </div>
-                            <div class="preview-score-text">
-                                <h3>Conversion Health Score</h3>
-                                <p>3 open friction points. ~14% potential conversion lift.</p>
-                            </div>
-                        </div>
-
-                        <div class="preview-pillars-row">
-                            <div class="preview-pillar">
-                                <span class="pp-title">Click Health</span>
-                                <span class="pp-score good">92%</span>
-                            </div>
-                            <div class="preview-pillar">
-                                <span class="pp-title">Funnel Flow</span>
-                                <span class="pp-score warn">74%</span>
-                            </div>
-                            <div class="preview-pillar">
-                                <span class="pp-title">Friction Radar</span>
-                                <span class="pp-score bad">64%</span>
-                            </div>
-                            <div class="preview-pillar">
-                                <span class="pp-title">Mobile UX</span>
-                                <span class="pp-score warn">68%</span>
-                            </div>
-                        </div>
+                <!-- Architectural Spec Bar -->
+                <div class="hero-spec-grid">
+                    <div>
+                        <div class="spec-item-label">BUNDLE FOOTPRINT</div>
+                        <div class="spec-item-val">3.8 KB gzip</div>
                     </div>
-
-                    <!-- Open Issue Card with AI Prompt Copy -->
-                    <div class="preview-issue-card">
-                        <div class="pic-top">
-                            <span class="pic-badge">Critical Issue #1 • /pricing</span>
-                            <span class="pic-impact">+8% estimated conversion lift</span>
-                        </div>
-                        <div class="pic-title">Unwired Button: 'Upgrade to Pro' CTA has no click handler</div>
-                        <div class="pic-desc">
-                            14 visitors clicked <code>#pro-plan-btn</code> repeatedly without any action triggering, then bounced from the session.
-                        </div>
-                        <div class="pic-ai-box">
-                            <span class="pic-ai-prompt">In /app/pricing/page.tsx, users rage-click '#pro-plan-btn'. Add onClick that routes to /checkout?plan=pro...</span>
-                            <button class="pic-copy-btn" onclick="copyHeroPrompt(this)">📋 Copy Prompt for AI</button>
-                        </div>
+                    <div>
+                        <div class="spec-item-label">MANUAL EVENTS</div>
+                        <div class="spec-item-val">0 required</div>
+                    </div>
+                    <div>
+                        <div class="spec-item-label">CORE TELEMETRY</div>
+                        <div class="spec-item-val success">$0 / forever</div>
+                    </div>
+                    <div>
+                        <div class="spec-item-label">AI INTELLIGENCE</div>
+                        <div class="spec-item-val accent">$9 / month</div>
                     </div>
                 </div>
             </div>
-        </section>
 
-        <!-- Section 2: 3-Step Simple Audit Flow -->
-        <section class="audit-steps" id="how-it-works">
-            <div class="container">
-                <div class="steps-header reveal">
-                    <h2>How our automated audit works</h2>
-                    <p>Three steps from dropping in one script to knowing exactly what to fix.</p>
-                </div>
-
-                <div class="steps-grid reveal">
-                    <div class="step-card">
-                        <span class="step-number">Step 01</span>
-                        <h3>Drop in one script tag</h3>
-                        <p>No npm installs. No custom telemetry schemas. Drop in one script tag and Hotspot automatically records user coordinates, clicks, scrolls, and journeys in real time.</p>
-                    </div>
-
-                    <div class="step-card">
-                        <span class="step-number">Step 02</span>
-                        <h3>We audit the whole journey</h3>
-                        <p>Hotspot walks your app like a buyer from the landing page to checkout. It detects slow steps, unlinked buttons, dead links, rage clicks, and mobile layout dropoffs.</p>
-                    </div>
-
-                    <div class="step-card">
-                        <span class="step-number">Step 03</span>
-                        <h3>Fix the biggest leaks first</h3>
-                        <p>Everything is compiled into one prioritized fix list with proof. Copy the ready-made prompt straight into Cursor or Claude Code, deploy the fix, and watch your score go up.</p>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Section 3: The 4 Health Areas -->
-        <section class="health-pillars-section" id="audit-areas">
-            <div class="container">
-                <div class="hps-header reveal">
-                    <h2>Know where your app is strong and where it needs work</h2>
-                    <p>Comprehensive telemetry evaluated across four core behavioral pillars.</p>
-                </div>
-
-                <div class="hps-grid reveal">
-                    <div class="hps-card">
-                        <div class="hps-icon">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <circle cx="12" cy="12" r="10"/>
-                                <circle cx="12" cy="12" r="3"/>
-                            </svg>
-                        </div>
-                        <h3>Click Health & Affordance</h3>
-                        <p>See if visitors are clicking what you want them to click, or getting distracted by non-converting dead zones.</p>
-                    </div>
-
-                    <div class="hps-card">
-                        <div class="hps-icon">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-                            </svg>
-                        </div>
-                        <h3>Funnel Velocity & Leaks</h3>
-                        <p>Reveal exactly where visitors drop off between landing, pricing, signup, and checkout without manual funnel setup.</p>
-                    </div>
-
-                    <div class="hps-card">
-                        <div class="hps-icon">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
-                            </svg>
-                        </div>
-                        <h3>Friction Radar</h3>
-                        <p>Catch rage clicks, dead clicks, and JavaScript errors. Instantly flag broken buttons your AI forgot to wire up.</p>
-                    </div>
-
-                    <div class="hps-card">
-                        <div class="hps-icon">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="5" y="2" width="14" height="20" rx="2"/>
-                                <line x1="12" y1="18" x2="12" y2="18"/>
-                            </svg>
-                        </div>
-                        <h3>Mobile UX & Fold Depth</h3>
-                        <p>Measure real scroll depth across devices. Identify critical CTAs pushed too far down on phone viewports.</p>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Section 4: SaaS Pricing -->
-        <section class="pricing-section" id="pricing">
-            <div class="container">
-                <div class="pricing-header reveal">
-                    <h2>Transparent pricing for every stage</h2>
-                    <p>Start with a 14-day free trial. Scale as your traffic and revenue grow.</p>
-                </div>
-
-                <div class="pricing-grid reveal">
-                    <!-- Starter Plan -->
-                    <div class="p-card">
+            <!-- Right Column: Instant Key & 1-Line JS Provisioner (5 cols on desktop) -->
+            <div class="hero-provisioner">
+                <div>
+                    <!-- Provisioner Card Header -->
+                    <div class="provisioner-header">
                         <div>
-                            <div class="p-name">Starter</div>
-                            <div class="p-desc">For solo founders and early products validating conversion rate.</div>
-                            <div class="p-price-row">
-                                <span class="p-price">$19</span>
-                                <span class="p-period">/ month</span>
-                            </div>
-                            <ul class="p-features">
-                                <li>Up to 10,000 monthly visitors</li>
-                                <li>Automated Conversion Health Audit</li>
-                                <li>Visual Click & Tap Heatmaps</li>
-                                <li>Rage Click & Dead Click Detection</li>
-                                <li>30-day telemetry retention</li>
-                            </ul>
+                            <div class="provisioner-title">INSTANT KEY &amp; SNIPPET PROVISIONER</div>
+                            <div class="provisioner-subtitle">NO ACCOUNT WALL • TEST IMMEDIATELY</div>
                         </div>
-                        <a href="/dashboard/" class="btn-plan btn-plan-ghost">Start 14-Day Free Trial</a>
+                        <span class="provisioner-badge">KEY READY</span>
                     </div>
 
-                    <!-- Pro Plan (Featured) -->
-                    <div class="p-card featured">
-                        <span class="p-badge">Most Popular</span>
+                    <!-- Step 1: Target Domain Input -->
+                    <div class="field-group">
+                        <div class="field-label-bar">
+                            <label for="domain-input" class="field-label">01. TARGET DOMAIN</label>
+                            <div class="preset-links">
+                                <span>Try:</span>
+                                <button type="button" class="preset-btn" data-preset="yourproduct.com">yourproduct.com</button>
+                                <button type="button" class="preset-btn" data-preset="vibe-saas.ai">vibe-saas.ai</button>
+                                <button type="button" class="preset-btn" data-preset="nordic.store">nordic.store</button>
+                            </div>
+                        </div>
+
+                        <div class="input-box">
+                            <span class="input-prefix">https://</span>
+                            <input type="text" id="domain-input" class="domain-input" value="yourproduct.com" placeholder="yourproduct.com" autocomplete="off" spellcheck="false">
+                            <span class="key-preview-pill" id="key-preview-badge">hs_live_yourpr_...</span>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: Runtime Environment Tabs -->
+                    <div class="field-group">
+                        <div class="field-label" style="margin-bottom: 8px;">02. RUNTIME ENVIRONMENT</div>
+                        <div class="fw-tabs" role="tablist">
+                            <button type="button" class="fw-tab-btn active" data-fw="nextjs" role="tab" aria-selected="true">Next.js Router</button>
+                            <button type="button" class="fw-tab-btn" data-fw="html" role="tab" aria-selected="false">HTML / Script</button>
+                            <button type="button" class="fw-tab-btn" data-fw="react" role="tab" aria-selected="false">React / Vite</button>
+                            <button type="button" class="fw-tab-btn" data-fw="shopify" role="tab" aria-selected="false">Shopify Liquid</button>
+                        </div>
+                    </div>
+
+                    <!-- Step 3: Light-Mode / Cool-Stone Syntax Block -->
+                    <div class="code-syntax-card">
+                        <div class="syntax-header">
+                            <div class="syntax-key-indicator">
+                                <span class="syntax-key-dot"></span>
+                                <span style="color: var(--text-secondary);">KEY:</span>
+                                <span style="color: var(--ink); font-weight: 700;" id="active-key-text">hs_live_yourpr_9e4a</span>
+                            </div>
+                            <span style="color: var(--text-muted);" id="active-file-target">src/app/layout.tsx</span>
+                        </div>
+
+                        <pre class="syntax-code-body" id="snippet-code-display">// Paste inside &lt;head&gt; in src/app/layout.tsx
+&lt;Script
+  src="{{ site_url }}/hotspot.js"
+  data-key="hs_live_yourpr_9e4a"
+  data-domain="yourproduct.com"
+  strategy="afterInteractive"
+/&gt;</pre>
+
+                        <div class="syntax-action-bar">
+                            <span class="font-mono-tech" style="font-size: 11px; color: var(--text-secondary);">
+                                Autocaptures routes, clicks &amp; vitals
+                            </span>
+                            <div style="display: flex; gap: 8px;">
+                                <a id="test-playground-link" href="/playground/?key=hs_live_yourpr_9e4a&domain=yourproduct.com" class="btn-ghost-cta" style="padding: 7px 12px; font-size: 10px;">
+                                    Test Lab ↗
+                                </a>
+                                <button type="button" class="btn-copy-snippet" id="copy-snippet-btn">
+                                    Copy 1-Line Snippet →
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Provisioner Footer Metadata -->
+                <div class="provisioner-footer">
+                    <span>COOKIE-LESS • GDPR &amp; CCPA COMPLIANT</span>
+                    <span style="color: var(--success); font-weight: 700;">● STREAM READY</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- =================================================================
+             3. SECTION 01 — THE 4 RESIDENT TELEMETRY STREAMS
+        ================================================================= -->
+        <section id="architecture" class="border-b border-[#DCE1E7]" aria-label="The four telemetry streams">
+            <div class="section-header-block">
+                <div>
+                    <div class="section-eyebrow" style="color: var(--accent); margin-bottom: 12px;">
+                        01 // THE 4 RESIDENT TELEMETRY STREAMS
+                    </div>
+                    <h2 class="section-title">
+                        Four telemetry engines unified inside a single 3.8KB script.
+                    </h2>
+                </div>
+                <div>
+                    <p class="section-subtitle">
+                        Legacy analytics tools only count pageviews or record detached heatmaps. Because <code class="hero-code-inline">hotspot.js</code> lives in the browser runtime, it captures four synchronized telemetry layers simultaneously.
+                    </p>
+                </div>
+            </div>
+
+            <div class="streams-grid">
+                <!-- Stream 01: Autocapture -->
+                <div class="stream-card">
+                    <div>
+                        <div class="stream-top-bar">
+                            <span class="stream-code">01 / AUTOCAPTURE ANALYTICS</span>
+                            <span class="stream-badge">REPLACES GA4</span>
+                        </div>
+                        <h3 class="stream-heading">Routes, Funnels &amp; Cohort Attribution</h3>
+                        <p class="stream-body">
+                            Automatically tracks every SPA route change, multi-step conversion funnel, UTM campaign, and returning user cohort without configuring custom GTM tags.
+                        </p>
+                    </div>
+                    <div class="stream-signals-box">
+                        <div class="stream-signals-title">SIGNALS CAPTURED:</div>
+                        <ul class="stream-signals-list">
+                            <li>• History pushState &amp; SPA route tree</li>
+                            <li>• Automatic step-by-step funnel drop-off</li>
+                            <li>• Referrer, UTM &amp; device attribution</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Stream 02: DOM & Spatial -->
+                <div class="stream-card">
+                    <div>
+                        <div class="stream-top-bar">
+                            <span class="stream-code">02 / DOM &amp; SPATIAL TELEMETRY</span>
+                            <span class="stream-badge">REPLACES HOTJAR</span>
+                        </div>
+                        <h3 class="stream-heading">Rage Clicks, Dead Taps &amp; Hesitation</h3>
+                        <p class="stream-body">
+                            Observes physical pointer vectors and touch clusters—pinpointing which exact CSS selector users rage-tap, hover over in confusion, or abandon mid-input.
+                        </p>
+                    </div>
+                    <div class="stream-signals-box">
+                        <div class="stream-signals-title">SIGNALS CAPTURED:</div>
+                        <ul class="stream-signals-list">
+                            <li>• Rage-tap clusters (&gt;3 taps / 800ms)</li>
+                            <li>• Input focus &amp; field hesitation timers</li>
+                            <li>• Mobile vs. desktop fold scroll depth</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Stream 03: Search & AI Intent -->
+                <div class="stream-card">
+                    <div>
+                        <div class="stream-top-bar">
+                            <span class="stream-code">03 / SEARCH &amp; AI INTENT</span>
+                            <span class="stream-badge" style="color: var(--accent); background: rgba(0, 82, 255, 0.08);">QUERY × DOM JOIN</span>
+                        </div>
+                        <h3 class="stream-heading">Search Console &amp; AI Referral Intent</h3>
+                        <p class="stream-body">
+                            Joins inbound Google Search Console queries and AI citations (ChatGPT, Perplexity, Claude) directly with the user’s subsequent in-app DOM actions.
+                        </p>
+                    </div>
+                    <div class="stream-signals-box">
+                        <div class="stream-signals-title">SIGNALS CAPTURED:</div>
+                        <ul class="stream-signals-list">
+                            <li>• Search keyword → conversion mapping</li>
+                            <li>• High-impression / fast-bounce detection</li>
+                            <li>• Perplexity &amp; ChatGPT referrer tracking</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Stream 04: Vitals & Exceptions -->
+                <div class="stream-card">
+                    <div>
+                        <div class="stream-top-bar">
+                            <span class="stream-code">04 / VITALS &amp; NETWORK FRICTION</span>
+                            <span class="stream-badge" style="color: var(--accent); background: rgba(0, 82, 255, 0.08);">RUNTIME HEALTH</span>
+                        </div>
+                        <h3 class="stream-heading">API Stalls, Hydration &amp; JS Exceptions</h3>
+                        <p class="stream-body">
+                            Correlates slow fetch requests, React hydration stalls, layout shifts (CLS), and unhandled JavaScript promise rejections directly with user drop-off.
+                        </p>
+                    </div>
+                    <div class="stream-signals-box">
+                        <div class="stream-signals-title">SIGNALS CAPTURED:</div>
+                        <ul class="stream-signals-list">
+                            <li>• Unhandled JS runtime error stack</li>
+                            <li>• Slow API endpoint &amp; INP latency spikes</li>
+                            <li>• Layout shift &amp; rage-exit correlation</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- =================================================================
+             4. SECTION 02 — HOW TELEMETRY BECOMES INTELLIGENCE (SPECIMENS)
+        ================================================================= -->
+        <section id="intelligence" class="specimens-section" aria-label="Interactive intelligence specimens">
+            <div class="section-header-block">
+                <div>
+                    <div class="section-eyebrow" style="color: var(--accent); margin-bottom: 12px;">
+                        02 // HOW TELEMETRY BECOMES INTELLIGENCE
+                    </div>
+                    <h2 class="section-title">
+                        3 joined signals → Plain-English root cause → Ready-to-paste AI fix prompt.
+                    </h2>
+                </div>
+                <div>
+                    <p class="section-subtitle">
+                        Charts only tell you <em>what</em> dropped. By joining <strong>Inbound Intent</strong>, <strong>DOM Interaction</strong>, and <strong>Runtime State</strong>, Hotspot diagnoses <em>why</em> users leave and writes the exact remediation prompt for Cursor or Claude Code.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Specimen Switcher Tabs -->
+            <div style="padding: 0 32px; background: var(--canvas);">
+                <div class="specimens-tabs-bar" role="tablist">
+                    <button type="button" class="specimen-tab-btn active" data-specimen="intent" role="tab" aria-selected="true">
+                        Specimen A — Search Intent vs. Mobile Fold Mismatch
+                    </button>
+                    <button type="button" class="specimen-tab-btn" data-specimen="dom" role="tab" aria-selected="false">
+                        Specimen B — Silent Rage-Tap on Unbound Checkout State
+                    </button>
+                    <button type="button" class="specimen-tab-btn" data-specimen="journey" role="tab" aria-selected="false">
+                        Specimen C — High-Intent Pricing Loop &amp; Hesitation
+                    </button>
+                </div>
+            </div>
+
+            <!-- Active Specimen Display Container -->
+            <div class="specimen-container">
+                <div class="specimen-card" id="active-specimen-card">
+                    <!-- Top Row: Severity, Code, Route, Headline & Impact -->
+                    <div class="specimen-hero-row">
                         <div>
-                            <div class="p-name">Pro</div>
-                            <div class="p-desc">For growing SaaS apps and stores looking to maximize revenue.</div>
-                            <div class="p-price-row">
-                                <span class="p-price">$49</span>
-                                <span class="p-period">/ month</span>
+                            <div class="specimen-meta-pills">
+                                <span class="specimen-severity-tag" id="spec-severity">HIGH BOUNCE CORRELATION</span>
+                                <span class="specimen-code-tag" id="spec-code">SYNTHESIS-01 / SEARCH CONSOLE × DOM STATE</span>
+                                <span class="specimen-route-tag" id="spec-route">/tools/invoice-generator</span>
                             </div>
-                            <ul class="p-features">
-                                <li>Up to 50,000 monthly visitors</li>
-                                <li>Prioritized Fix-It List with impact rankings</li>
-                                <li>Unlimited "Fix with AI" Prompt Exports</li>
-                                <li>Mobile vs Desktop Scroll Depth Maps</li>
-                                <li>Retroactive Funnel Leak Detection</li>
-                                <li>Slack & Discord dropoff alerts</li>
-                            </ul>
+                            <h3 class="specimen-headline" id="spec-headline">
+                                Visitors searching for an "instant" tool leave in 6.2 seconds because your hero button opens a 7-field registration modal.
+                            </h3>
                         </div>
-                        <a href="/dashboard/" class="btn-plan btn-plan-primary">Start 14-Day Free Trial</a>
+
+                        <div class="specimen-impact-cell">
+                            <div class="impact-label">QUANTIFIED PIPELINE IMPACT</div>
+                            <div class="impact-amount" id="spec-loss">-$1,940 / mo est. pipeline</div>
+                        </div>
                     </div>
 
-                    <!-- Scale Plan -->
-                    <div class="p-card">
-                        <div>
-                            <div class="p-name">Scale</div>
-                            <div class="p-desc">For high-traffic products and digital agencies managing multiple apps.</div>
-                            <div class="p-price-row">
-                                <span class="p-price">$99</span>
-                                <span class="p-period">/ month</span>
+                    <!-- 3 Joined Signals Row -->
+                    <div class="joined-signals-grid" id="spec-signals-grid">
+                        <div class="signal-cell">
+                            <div class="signal-layer-label" id="spec-sig1-layer">01 / INBOUND SEARCH SIGNAL</div>
+                            <div class="signal-metric" id="spec-sig1-metric">Query: "instant invoice generator"</div>
+                            <div class="signal-detail" id="spec-sig1-detail">1,140 clicks · Avg. Position 3.2 · High transactional intent</div>
+                        </div>
+                        <div class="signal-cell">
+                            <div class="signal-layer-label" id="spec-sig2-layer">02 / SPATIAL &amp; DOM SIGNAL</div>
+                            <div class="signal-metric" id="spec-sig2-metric">4.4s hesitation on input[name="tax_id"]</div>
+                            <div class="signal-detail" id="spec-sig2-detail">84.6% modal abandonment before first keystroke</div>
+                        </div>
+                        <div class="signal-cell">
+                            <div class="signal-layer-label" id="spec-sig3-layer">03 / JOURNEY OUTCOME</div>
+                            <div class="signal-metric" id="spec-sig3-metric">6.2s median session duration</div>
+                            <div class="signal-detail" id="spec-sig3-detail">Only 3.1% reach /dashboard vs 28.4% site average</div>
+                        </div>
+                    </div>
+
+                    <!-- Plain-English Root Cause Diagnosis -->
+                    <div class="diagnosis-card">
+                        <div class="diagnosis-title">PLAIN-ENGLISH ROOT CAUSE DIAGNOSIS</div>
+                        <p class="diagnosis-text" id="spec-plain-english">
+                            By correlating your Google Search Console query stream with live in-app DOM telemetry, hotspot.js detected a severe intent mismatch. Visitors arriving specifically from the keyword "instant invoice generator" tap #launch-tool-btn within 1.8 seconds, hit a mandatory account creation wall pushed below the mobile fold, hesitate on the "Company Tax ID" input for 4.4 seconds, and close the tab.
+                        </p>
+                        <div class="diagnosis-env">
+                            TELEMETRY ENVIRONMENT: <strong id="spec-env">Organic Google Search · Query: "instant invoice generator" · 1,140 sessions</strong>
+                        </div>
+                    </div>
+
+                    <!-- Carbon Dark AI Fix Prompt -->
+                    <div class="ai-prompt-box">
+                        <div class="ai-prompt-header">
+                            <div>
+                                <div class="ai-prompt-title">
+                                    <span>● READY-TO-PASTE AI REMEDIATION PROMPT (CURSOR / CLAUDE CODE / LOVABLE)</span>
+                                </div>
+                                <div class="ai-prompt-sub">
+                                    Includes exact file targets, DOM selectors, and telemetry reproduction context.
+                                </div>
                             </div>
-                            <ul class="p-features">
-                                <li>Up to 250,000 monthly visitors</li>
-                                <li>Up to 5 custom domains / stores</li>
-                                <li>Custom conversion event tracking</li>
-                                <li>Team seats & shared prompt library</li>
-                                <li>1-year telemetry retention</li>
-                                <li>Priority email & Slack support</li>
-                            </ul>
+                            <button type="button" class="btn-copy-prompt" id="copy-ai-prompt-btn">
+                                Copy Prompt for AI →
+                            </button>
                         </div>
-                        <a href="/dashboard/" class="btn-plan btn-plan-ghost">Start 14-Day Free Trial</a>
+
+                        <pre class="ai-prompt-content" id="spec-ai-prompt">In src/app/tools/invoice-generator/page.tsx and src/components/AuthModal.tsx:
+
+1. Telemetry shows 84.6% of organic visitors from "instant invoice generator" abandon when #launch-tool-btn triggers the 7-field signup modal.
+2. Remove the upfront AuthModal gate on #launch-tool-btn and allow unauthenticated users to populate the invoice canvas immediately in local state (localStorage).
+3. Defer account creation to a single-field magic-link prompt only when the user clicks "Download PDF" or "Send Invoice".</pre>
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- Section 5: Comparison Table -->
-        <section class="container comparison" id="compare">
-            <div class="comparison-header reveal">
-                <h2>Why modern builders choose Hotspot over PostHog & GA4</h2>
-                <p>PostHog and GA4 require data engineers to set up and interpret. Hotspot hands you the fix.</p>
+        <!-- =================================================================
+             5. SECTION 03 — ARCHITECTURAL REPLACEMENT MATRIX
+        ================================================================= -->
+        <section id="comparison" class="matrix-section" aria-label="Tool comparison matrix">
+            <div class="section-header-block">
+                <div>
+                    <div class="section-eyebrow" style="color: var(--accent); margin-bottom: 12px;">
+                        03 // ARCHITECTURAL REPLACEMENT MATRIX
+                    </div>
+                    <h2 class="section-title">
+                        Legacy Multi-Tool Stack vs. <span style="color: var(--accent);">hotspot.js</span>
+                    </h2>
+                </div>
+                <div>
+                    <p class="section-subtitle">
+                        Replace three bloated scripts and disconnected dashboards with one unified runtime observer that outputs actionable engineering fixes.
+                    </p>
+                </div>
             </div>
 
-            <div class="comparison-table reveal">
-                <div class="comparison-row header">
-                    <div class="comparison-cell header-cell"></div>
-                    <div class="comparison-cell header-cell">PostHog / GA4</div>
-                    <div class="comparison-cell header-cell" style="color: var(--accent);">Hotspot</div>
+            <div class="matrix-table-wrap">
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 20%;">SYSTEM DIMENSION</th>
+                            <th style="width: 26%;">GA4 + HOTJAR + GSC SPREADSHEETS</th>
+                            <th style="width: 26%;">POSTHOG / MIXPANEL</th>
+                            <th class="col-highlight" style="width: 28%;">HOTSPOT.JS (RESIDENT ENGINE)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="dim-title">Instrumentation</td>
+                            <td>3 separate scripts, complex GTM triggers, manual CSV exports.</td>
+                            <td>Heavy SDK bundle + manual <code class="hero-code-inline">capture()</code> calls in application code.</td>
+                            <td class="cell-hotspot">One 3.8KB <code class="hero-code-inline" style="color: var(--accent);">&lt;script&gt;</code> tag. Zero manual event wiring.</td>
+                        </tr>
+                        <tr>
+                            <td class="dim-title">Core Tracking Price</td>
+                            <td>GA4 is free; Hotjar charges $39–$99/mo for heatmaps.</td>
+                            <td>Usage-based metering that spikes with sudden traffic bursts.</td>
+                            <td class="cell-hotspot" style="color: var(--success); font-weight: 700;">$0 / forever (Lifetime free analytics, funnels &amp; heatmaps).</td>
+                        </tr>
+                        <tr>
+                            <td class="dim-title">Query × DOM Correlation</td>
+                            <td>Impossible to see which GSC keyword triggered a rage-click.</td>
+                            <td>No native Search Console query-to-DOM session join.</td>
+                            <td class="cell-hotspot">Automatic join between search queries, AI referrals &amp; DOM state.</td>
+                        </tr>
+                        <tr>
+                            <td class="dim-title">Actionable Output</td>
+                            <td>Raw charts. You guess what is broken and how to fix it.</td>
+                            <td>Requires SQL/HogQL queries and watching hours of replays.</td>
+                            <td class="cell-hotspot" style="color: var(--accent);">Plain-English root cause cards + 1-click Cursor / Claude prompts.</td>
+                        </tr>
+                        <tr>
+                            <td class="dim-title">Intelligence Billing</td>
+                            <td>$2,000+/mo for external CRO / analytics consultants.</td>
+                            <td>$150–$600+/mo as session replay volume scales.</td>
+                            <td class="cell-hotspot">Flat $9/mo for Intelligence or $19/mo for Scale. Zero overages.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- =================================================================
+             6. SECTION 04 — LIFETIME FREE TELEMETRY + LOW MONTHLY INTELLIGENCE
+        ================================================================= -->
+        <section id="pricing" class="pricing-section" aria-label="Transparent pricing">
+            <div class="section-header-block">
+                <div>
+                    <div class="section-eyebrow" style="color: var(--accent); margin-bottom: 12px;">
+                        04 // TRANSPARENT TELEMETRY &amp; INTELLIGENCE PRICING
+                    </div>
+                    <h2 class="section-title">
+                        Lifetime free tracking. Pay $9/mo only when you want automated intelligence.
+                    </h2>
                 </div>
-                <div class="comparison-row">
-                    <div class="comparison-cell label">Audience</div>
-                    <div class="comparison-cell">Data engineers & enterprise analytics teams</div>
-                    <div class="comparison-cell highlight">Founders, creators & AI builders</div>
+                <div>
+                    <p class="section-subtitle">
+                        Install <code class="hero-code-inline">hotspot.js</code> once. Your core analytics and heatmaps never expire.
+                    </p>
                 </div>
-                <div class="comparison-row">
-                    <div class="comparison-cell label">Actionability</div>
-                    <div class="comparison-cell">Write SQL queries, study multi-chart graphs</div>
-                    <div class="comparison-cell highlight">Prioritized fix list + ready-to-copy AI prompts</div>
+            </div>
+
+            <!-- 3 Clean Architectural Pricing Columns -->
+            <div class="pricing-grid">
+                <!-- Tier 1: Telemetry Core ($0 / forever) -->
+                <div class="pricing-col">
+                    <div>
+                        <div class="pricing-tier-header">
+                            <span style="color: var(--ink);">01 / TELEMETRY CORE</span>
+                            <span class="pricing-badge-free">FREE FOREVER</span>
+                        </div>
+                        <div class="pricing-figure-row">
+                            <div class="pricing-amount">$0</div>
+                            <div class="pricing-cycle">/ FOREVER</div>
+                        </div>
+                        <p class="pricing-pitch">
+                            Full-depth replacement for GA4 and basic heatmap tools. No credit card, no trial countdown.
+                        </p>
+
+                        <ul class="pricing-features-list">
+                            <li>
+                                <span class="check-icon success">✓</span>
+                                <span><strong>1-line <code class="hero-code-inline">hotspot.js</code> script</strong> (unlimited domains)</span>
+                            </li>
+                            <li>
+                                <span class="check-icon success">✓</span>
+                                <span>Autocapture traffic, SPA routes, UTM &amp; referrer channels</span>
+                            </li>
+                            <li>
+                                <span class="check-icon success">✓</span>
+                                <span>Live click, tap &amp; scroll depth heatmaps (<code class="hero-code-inline">Option+H</code>)</span>
+                            </li>
+                            <li>
+                                <span class="check-icon success">✓</span>
+                                <span>Multi-step route funnel &amp; drop-off visualizer</span>
+                            </li>
+                            <li>
+                                <span class="check-icon success">✓</span>
+                                <span>Core Web Vitals &amp; runtime error counter</span>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <a href="#top" class="btn-pricing-action secondary">
+                        Claim Free Key Above →
+                    </a>
                 </div>
-                <div class="comparison-row">
-                    <div class="comparison-cell label">Health Metric</div>
-                    <div class="comparison-cell" style="color: var(--text-muted);">None — build custom insight formulas</div>
-                    <div class="comparison-cell highlight">Automatic 0-100 Conversion Health Score</div>
+
+                <!-- Tier 2: Intelligence ($9 / month — Highlighted with Cobalt Ring) -->
+                <div class="pricing-col recommended">
+                    <div>
+                        <div class="pricing-tier-header">
+                            <span style="color: var(--accent);">02 / INTELLIGENCE</span>
+                            <span class="pricing-badge-rec">RECOMMENDED</span>
+                        </div>
+                        <div class="pricing-figure-row">
+                            <div class="pricing-amount">$9</div>
+                            <div class="pricing-cycle">/ MONTH</div>
+                        </div>
+                        <p class="pricing-pitch">
+                            Automated multi-signal correlation that turns your raw telemetry into plain-English fixes and AI code prompts.
+                        </p>
+
+                        <ul class="pricing-features-list">
+                            <li>
+                                <span class="check-icon accent">✓</span>
+                                <span><strong>Everything in Telemetry Core</strong> + 100,000 monthly sessions</span>
+                            </li>
+                            <li>
+                                <span class="check-icon accent">✓</span>
+                                <span><strong>Search Console &amp; AI Referrer Join</strong> (query → DOM action)</span>
+                            </li>
+                            <li>
+                                <span class="check-icon accent">✓</span>
+                                <span><strong>Automated Root-Cause Synthesis</strong> ranked by revenue lift</span>
+                            </li>
+                            <li>
+                                <span class="check-icon accent">✓</span>
+                                <span><strong>Unlimited 1-Click AI Fix Prompts</strong> (Cursor / Claude Code)</span>
+                            </li>
+                            <li>
+                                <span class="check-icon accent">✓</span>
+                                <span>Weekly plain-English Fix-It digest &amp; silent JS error correlation</span>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <a href="#top" class="btn-pricing-action primary">
+                        Start Free • Enable Intelligence ($9/mo) →
+                    </a>
                 </div>
-                <div class="comparison-row">
-                    <div class="comparison-cell label">In-Browser Inspector</div>
-                    <div class="comparison-cell" style="color: var(--text-muted);">Complex toolbar injection</div>
-                    <div class="comparison-cell highlight">Press Option+H on your live site</div>
-                </div>
-                <div class="comparison-row">
-                    <div class="comparison-cell label">Setup time</div>
-                    <div class="comparison-cell">Hours reading docs, writing event hooks</div>
-                    <div class="comparison-cell highlight">30 seconds (1 script tag)</div>
-                </div>
-                <div class="comparison-row">
-                    <div class="comparison-cell label">Cost</div>
-                    <div class="comparison-cell">Steep enterprise pricing ($400+/mo)</div>
-                    <div class="comparison-cell highlight">From $19/mo with 14-day free trial</div>
+
+                <!-- Tier 3: Scale & Deep Memory ($19 / month) -->
+                <div class="pricing-col">
+                    <div>
+                        <div class="pricing-tier-header">
+                            <span style="color: var(--ink);">03 / SCALE &amp; DEEP MEMORY</span>
+                            <span style="font-size: 10px; color: var(--text-muted);">TEAMS &amp; PORTFOLIOS</span>
+                        </div>
+                        <div class="pricing-figure-row">
+                            <div class="pricing-amount">$19</div>
+                            <div class="pricing-cycle">/ MONTH</div>
+                        </div>
+                        <p class="pricing-pitch">
+                            Cross-domain attribution, 12-month behavioral memory, and real-time anomaly dispatches for growing teams.
+                        </p>
+
+                        <ul class="pricing-features-list">
+                            <li>
+                                <span class="check-icon" style="color: var(--ink); font-weight: 700;">—</span>
+                                <span>Up to <strong>500,000 monthly sessions</strong> across multi-domain apps</span>
+                            </li>
+                            <li>
+                                <span class="check-icon" style="color: var(--ink); font-weight: 700;">—</span>
+                                <span>12-month behavioral cohort memory &amp; LTV retention curves</span>
+                            </li>
+                            <li>
+                                <span class="check-icon" style="color: var(--ink); font-weight: 700;">—</span>
+                                <span>Post-deploy verification (tracks conversion lift after AI fix)</span>
+                            </li>
+                            <li>
+                                <span class="check-icon" style="color: var(--ink); font-weight: 700;">—</span>
+                                <span>Slack, Discord, and Linear real-time anomaly webhooks</span>
+                            </li>
+                            <li>
+                                <span class="check-icon" style="color: var(--ink); font-weight: 700;">—</span>
+                                <span>Unlimited team seats &amp; raw JSON telemetry export</span>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <a href="#top" class="btn-pricing-action secondary">
+                        Start Free • Enable Scale ($19/mo) →
+                    </a>
                 </div>
             </div>
         </section>
 
-        <!-- Section 6: FAQ -->
-        <section class="faq-section" id="faq">
-            <div class="container">
-                <div class="faq-header reveal">
-                    <h2>Frequently asked questions</h2>
+        <!-- =================================================================
+             7. SECTION 05 — FREQUENTLY ASKED QUESTIONS (GEO & LLM INDEX)
+        ================================================================= -->
+        <section id="faq" class="faq-section" aria-label="Frequently Asked Questions and GEO indexing">
+            <div class="section-header-block">
+                <div>
+                    <div class="section-eyebrow" style="color: var(--accent); margin-bottom: 12px;">
+                        05 // FREQUENTLY ASKED QUESTIONS
+                    </div>
+                    <h2 class="section-title">
+                        Engineered for zero friction, complete privacy, and instant AI execution.
+                    </h2>
+                </div>
+                <div>
+                    <p class="section-subtitle">
+                        Direct factual answers to technical, operational, and commercial questions about hotspot.js.
+                    </p>
+                </div>
+            </div>
+
+            <div class="faq-grid">
+                <!-- FAQ 1 -->
+                <div class="faq-item">
+                    <h3 class="faq-question">
+                        <span class="faq-q-num">Q1.</span>
+                        <span>How does hotspot.js achieve 0-config tracking without track() calls?</span>
+                    </h3>
+                    <p class="faq-answer">
+                        hotspot.js installs directly into the browser DOM runtime via a single 3.8KB script tag. It hooks into the Navigation API, History pushState, PointerEvents, and DOM MutationObserver. Every route transition, click vector, rage-tap cluster (&gt;3 taps in 800ms), and Core Web Vital is automatically indexed without writing manual analytics tags.
+                    </p>
                 </div>
 
-                <div class="faq-grid reveal">
-                    <div class="faq-card">
-                        <div class="faq-q">How long does setup take?</div>
-                        <div class="faq-a">Under 60 seconds. You copy our single script tag into your HTML &lt;head&gt;. Hotspot begins streaming visitor telemetry and building your conversion audit immediately.</div>
-                    </div>
+                <!-- FAQ 2 -->
+                <div class="faq-item">
+                    <h3 class="faq-question">
+                        <span class="faq-q-num">Q2.</span>
+                        <span>Why is Telemetry Core free forever ($0)?</span>
+                    </h3>
+                    <p class="faq-answer">
+                        Baseline product tracking, route funnels, and click heatmaps should be open infrastructure, not an expensive metered utility. Telemetry Core is $0 forever. We monetize only on the $9/mo automated Intelligence layer, which runs advanced cross-signal synthesis between Google Search Console intent and in-app DOM state to generate ready-to-paste AI fix prompts.
+                    </p>
+                </div>
 
-                    <div class="faq-card">
-                        <div class="faq-q">Do I need data analytics or technical skills?</div>
-                        <div class="faq-a">No. Hotspot is built specifically for non-analysts. Instead of overwhelming you with SQL queries or complex event filters, we give you a plain-English score and a ranked checklist of what to fix.</div>
-                    </div>
+                <!-- FAQ 3 -->
+                <div class="faq-item">
+                    <h3 class="faq-question">
+                        <span class="faq-q-num">Q3.</span>
+                        <span>How does Hotspot join Google Search Console queries with live in-app DOM telemetry?</span>
+                    </h3>
+                    <p class="faq-answer">
+                        By linking your Google Search Console query stream via OAuth or API sync, Hotspot maps the exact keyword that generated a session with the user's immediate in-browser behavioral chain. This reveals critical friction like high-intent search queries bouncing within seconds because hero buttons open unexpected registration walls.
+                    </p>
+                </div>
 
-                    <div class="faq-card">
-                        <div class="faq-q">Can I use Hotspot with Cursor, Claude, or Bolt?</div>
-                        <div class="faq-a">Yes! That is our signature superpower. Every single detected friction point comes with a one-click "Copy Prompt for AI" button so you can paste the fix directly into Cursor, Claude, or ChatGPT.</div>
-                    </div>
+                <!-- FAQ 4 -->
+                <div class="faq-item">
+                    <h3 class="faq-question">
+                        <span class="faq-q-num">Q4.</span>
+                        <span>How do the 1-click AI prompts for Cursor and Claude Code work?</span>
+                    </h3>
+                    <p class="faq-answer">
+                        When Hotspot synthesizes a conversion bottleneck, it pinpoints the exact DOM selector, file route, error stack trace, and user reproduction steps. It compiles these into an authoritative, hallucination-free prompt with strict acceptance criteria that you copy directly into Cursor, Claude Code, or Lovable to fix the problem in minutes.
+                    </p>
+                </div>
 
-                    <div class="faq-card">
-                        <div class="faq-q">Does the script slow down my website?</div>
-                        <div class="faq-a">Not at all. The Hotspot SDK is a lightweight ~12KB script that loads asynchronously without blocking page rendering. Total execution time is under 8ms.</div>
-                    </div>
+                <!-- FAQ 5 -->
+                <div class="faq-item">
+                    <h3 class="faq-question">
+                        <span class="faq-q-num">Q5.</span>
+                        <span>Is hotspot.js cookie-less, GDPR, and CCPA compliant?</span>
+                    </h3>
+                    <p class="faq-answer">
+                        Yes. hotspot.js uses ephemeral browser session storage and cryptographic hashes instead of persistent third-party tracking cookies. It does not record personal identity data (PII) without explicit consent, automatically redacts password and credit card inputs, and is fully GDPR, CCPA, and PECR compliant out of the box.
+                    </p>
+                </div>
+
+                <!-- FAQ 6 -->
+                <div class="faq-item">
+                    <h3 class="faq-question">
+                        <span class="faq-q-num">Q6.</span>
+                        <span>Does hotspot.js slow down page load or degrade Core Web Vitals?</span>
+                    </h3>
+                    <p class="faq-answer">
+                        No. hotspot.js is 3.8KB gzip and runs entirely off the critical rendering path. It uses requestIdleCallback, passive event listeners, and navigator.sendBeacon to batch payloads asynchronously with 0ms DOM blocking time, ensuring flawless Lighthouse scores and optimal Interaction to Next Paint (INP).
+                    </p>
                 </div>
             </div>
         </section>
 
-        <!-- Section 7: Bottom CTA -->
-        <section class="container bottom-cta">
-            <div class="cta-box reveal">
-                <h2>Find out why visitors leave without buying</h2>
-                <p>
-                    Start your 14-day free trial. Drop in one script tag and get your first
-                    conversion audit report in less than 3 minutes.
-                </p>
-
-                <div class="cta-actions">
-                    <a href="/dashboard/" class="btn-primary" style="padding: 13px 28px; font-size: 15px;">Start 14-Day Free Trial →</a>
-                    <a href="/playground/" class="btn-secondary" style="padding: 13px 24px; font-size: 15px;">Test Live Demo</a>
+        <!-- =================================================================
+             8. PRECISION FOOTER & FINAL CALL TO ACTION
+        ================================================================= -->
+        <footer class="precision-footer">
+            <div class="footer-cta-band">
+                <div>
+                    <div class="section-eyebrow" style="color: var(--accent); margin-bottom: 8px;">
+                        INSTALL IN 30 SECONDS • FREE FOREVER CORE
+                    </div>
+                    <h2 class="section-title">
+                        Drop <span style="color: var(--accent);">hotspot.js</span> into your header today.
+                    </h2>
+                </div>
+                <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                    <a href="/playground/" class="btn-ghost-cta" style="padding: 14px 24px;">
+                        Explore Test Lab ↗
+                    </a>
+                    <a href="#top" class="btn-cobalt-cta" style="padding: 14px 28px;">
+                        Provision Free Key &amp; Script ↑
+                    </a>
                 </div>
             </div>
-        </section>
 
-    </main>
-
-    <!-- Footer -->
-    <footer>
-        <div class="container footer-inner">
-            <span class="footer-left">Hotspot Inc. • Automated Conversion Rate Optimization Platform</span>
-            <div class="footer-links">
-                <a href="/dashboard/">Dashboard</a>
-                <a href="/playground/">Playground</a>
-                <a href="#pricing">Pricing</a>
-                <a href="/login">Sign In</a>
+            <div class="footer-legal-bar">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span class="brand-reticle" style="width: 7px; height: 7px;"></span>
+                    <span style="color: var(--ink); font-weight: 700;">HOTSPOT.JS</span>
+                    <span>— RESIDENT TELEMETRY &amp; INTELLIGENCE ENGINE (v2.4)</span>
+                </div>
+                <div class="footer-nav-links">
+                    <a href="#architecture">01. Architecture</a>
+                    <a href="#intelligence">02. Intelligence</a>
+                    <a href="#comparison">03. vs Legacy</a>
+                    <a href="#pricing">04. Pricing ($0 / $9 / $19)</a>
+                    <a href="#faq">05. FAQ</a>
+                    <a href="/dashboard/" style="color: var(--accent); font-weight: 600;">Live Dashboard ↗</a>
+                </div>
             </div>
-        </div>
-    </footer>
+        </footer>
 
+    </div>
+
+    <!-- Interactive Logic (Pure Vanilla JS, CSP Nonce Compliant) -->
     <script nonce="{{ request.csp_nonce }}">
-        function handleStartAudit(e) {
-            e.preventDefault();
-            var url = document.getElementById('audit-url-input').value.trim();
-            if (url) {
-                window.location.href = '/dashboard/?target=' + encodeURIComponent(url);
+    (function() {
+        // Specimen Data Store (Section 02)
+        var SPECIMENS = {
+            intent: {
+                id: 'intent',
+                tabLabel: 'Specimen A — Search Intent vs. Mobile Fold Mismatch',
+                code: 'SYNTHESIS-01 / SEARCH CONSOLE × DOM STATE',
+                severity: 'HIGH BOUNCE CORRELATION',
+                estLoss: '-$1,940 / mo est. pipeline',
+                route: '/tools/invoice-generator',
+                environment: 'Organic Google Search · Query: "instant invoice generator" · 1,140 sessions',
+                headline: 'Visitors searching for an "instant" tool leave in 6.2 seconds because your hero button opens a 7-field registration modal.',
+                plainEnglish: 'By correlating your Google Search Console query stream with live in-app DOM telemetry, hotspot.js detected a severe intent mismatch. Visitors arriving specifically from the keyword "instant invoice generator" tap #launch-tool-btn within 1.8 seconds, hit a mandatory account creation wall pushed below the mobile fold, hesitate on the "Company Tax ID" input for 4.4 seconds, and close the tab.',
+                signals: [
+                    { layer: '01 / INBOUND SEARCH SIGNAL', metric: 'Query: "instant invoice generator"', detail: '1,140 clicks · Avg. Position 3.2 · High transactional intent' },
+                    { layer: '02 / SPATIAL & DOM SIGNAL', metric: '4.4s hesitation on input[name="tax_id"]', detail: '84.6% modal abandonment before first keystroke' },
+                    { layer: '03 / JOURNEY OUTCOME', metric: '6.2s median session duration', detail: 'Only 3.1% reach /dashboard vs 28.4% site average' }
+                ],
+                aiPrompt: 'In src/app/tools/invoice-generator/page.tsx and src/components/AuthModal.tsx:\n\n1. Telemetry shows 84.6% of organic visitors from "instant invoice generator" abandon when #launch-tool-btn triggers the 7-field signup modal.\n2. Remove the upfront AuthModal gate on #launch-tool-btn and allow unauthenticated users to populate the invoice canvas immediately in local state (localStorage).\n3. Defer account creation to a single-field magic-link prompt only when the user clicks "Download PDF" or "Send Invoice".'
+            },
+            dom: {
+                id: 'dom',
+                tabLabel: 'Specimen B — Silent Rage-Tap on Unbound Checkout State',
+                code: 'SYNTHESIS-02 / RAGE CLICK × RUNTIME EXCEPTION',
+                severity: 'CRITICAL CHECKOUT LEAK',
+                estLoss: '-$2,680 / mo lost carts',
+                route: '/checkout/payment',
+                environment: 'iOS 18 Safari · Mobile Viewport (< 430px) · Element button#apply-promo',
+                headline: '412 mobile shoppers rage-tapped "Apply Coupon" while a silent promise rejection locked your checkout state.',
+                plainEnglish: 'Standard analytics only shows a 31% drop-off on your checkout page. Because hotspot.js sits inside your runtime, it captured the exact chain of events: when mobile users tap #apply-promo with an uppercase code, an unhandled TypeError fires in your discount validator, freezing the primary "Pay Now" button state permanently.',
+                signals: [
+                    { layer: '01 / SPATIAL & DOM SIGNAL', metric: '412 sessions with 4+ rapid taps', detail: 'Target: button#apply-promo (380ms average tap interval)' },
+                    { layer: '02 / JS RUNTIME TELEMETRY', metric: 'Unhandled Rejection: code.trim().toLowerCase', detail: 'Triggered when iOS autofill inserts trailing non-breaking space' },
+                    { layer: '03 / JOURNEY OUTCOME', metric: '31.4% immediate cart abandonment', detail: 'Primary #submit-order-btn remains stuck in disabled={true}' }
+                ],
+                aiPrompt: 'Fix the silent checkout lockup in src/components/CheckoutPromo.tsx and src/hooks/useCheckout.ts:\n\n1. hotspot.js telemetry captured 412 mobile iOS sessions rage-tapping button#apply-promo due to an unhandled runtime error when promoCode is undefined or contains iOS autofill whitespace.\n2. Wrap validatePromoCode() in a try/catch/finally block that always resets isSubmittingPromo to false so #submit-order-btn never locks in a disabled state.\n3. Sanitize input with String(promoCode ?? "").replace(/\\s+/g, "").toUpperCase() before validation and render inline error feedback below the input.'
+            },
+            journey: {
+                id: 'journey',
+                tabLabel: 'Specimen C — High-Intent Pricing Loop & Hesitation',
+                code: 'SYNTHESIS-03 / ROUTE LOOP × CURSOR VELOCITY',
+                severity: 'CONVERSION FRICTION',
+                estLoss: '-38% trial starts on Pro tier',
+                route: '/pricing ⇄ /docs/billing ⇄ /pricing',
+                environment: 'Desktop Chrome & Arc · Referrer: Direct & Perplexity Citation',
+                headline: 'Buyers loop between /pricing and /docs three times and hover 19 seconds over "Team Seats" before leaving.',
+                plainEnglish: 'Pageview analytics makes /pricing look healthy because traffic is high. Resident journey tracking reveals that 29% of visitors bounce back and forth between your Pricing table and Billing Docs, pause their cursor over the "Per Seat / Monthly" toggle for 19 seconds, and exit without starting a trial—indicating unclear seat billing rules.',
+                signals: [
+                    { layer: '01 / MULTI-ROUTE JOURNEY', metric: '29.2% ping-pong loop detected', detail: 'Path: /pricing → /docs/billing → /pricing → Exit' },
+                    { layer: '02 / CURSOR & SCROLL DWELL', metric: '19.4s dwell on #seat-calculator-card', detail: 'Repeated toggle between Monthly/Annual without clicking CTA' },
+                    { layer: '03 / INBOUND REFERRER CONTEXT', metric: 'High-intent AI & organic traffic', detail: '64% arrived via Perplexity / Google comparison queries' }
+                ],
+                aiPrompt: 'Clarify seat billing directly inside src/components/PricingTable.tsx to eliminate the /pricing ⇄ /docs loop:\n\n1. Telemetry shows 29.2% of high-intent visitors leave /pricing to read /docs/billing after hovering 19s on #seat-calculator-card.\n2. Add an explicit one-line micro-copy callout directly beneath the Pro tier price: "Includes 3 builder seats free. Read-only viewers are always $0."\n3. Embed a compact interactive seat cost preview directly inside #seat-calculator-card so users do not have to navigate away from /pricing to calculate their bill.'
+            }
+        };
+
+        // File targets per framework
+        var FRAMEWORK_FILES = {
+            nextjs: 'src/app/layout.tsx',
+            html: 'index.html',
+            react: 'index.html',
+            shopify: 'theme.liquid'
+        };
+
+        // State
+        var currentDomain = 'yourproduct.com';
+        var currentFramework = 'nextjs';
+        var currentSpecimenKey = 'intent';
+        var siteHost = '{{ site_url }}' || window.location.origin;
+
+        // Elements
+        var domainInput = document.getElementById('domain-input');
+        var keyPreviewBadge = document.getElementById('key-preview-badge');
+        var activeKeyText = document.getElementById('active-key-text');
+        var activeFileTarget = document.getElementById('active-file-target');
+        var snippetCodeDisplay = document.getElementById('snippet-code-display');
+        var copySnippetBtn = document.getElementById('copy-snippet-btn');
+        var testPlaygroundLink = document.getElementById('test-playground-link');
+
+        // Deterministic FNV-1a Hash Generator for Keys
+        function computeLiveKey(domain) {
+            var clean = (domain || 'yourproduct.com')
+                .trim()
+                .toLowerCase()
+                .replace(/^https?:\/\//, '')
+                .replace(/\/.*$/, '');
+            if (!clean) clean = 'yourproduct.com';
+
+            var hash = 2166136261;
+            for (var i = 0; i < clean.length; i++) {
+                hash ^= clean.charCodeAt(i);
+                hash = Math.imul(hash, 16777619);
+            }
+            var hex = (hash >>> 0).toString(16);
+            while (hex.length < 8) hex = '0' + hex;
+            var prefix = clean.replace(/[^a-z0-9]/g, '').slice(0, 6) || 'app';
+            return {
+                cleanDomain: clean,
+                key: 'hs_live_' + prefix + '_' + hex + '9e4a'
+            };
+        }
+
+        // Generate Snippet Code
+        function generateSnippet(fw, key, domain) {
+            if (fw === 'nextjs') {
+                return '// Paste inside <head> in src/app/layout.tsx\n<Script\n  src="' + siteHost + '/hotspot.js"\n  data-key="' + key + '"\n  data-domain="' + domain + '"\n  strategy="afterInteractive"\n/>';
+            }
+            if (fw === 'shopify') {
+                return '<!-- Paste before </head> in theme.liquid -->\n<script\n  defer\n  src="' + siteHost + '/hotspot.js"\n  data-key="' + key + '"\n  data-domain="' + domain + '"\n  data-ecommerce="auto"\n></script>';
+            }
+            return '<!-- Paste inside <head> of index.html (3.8KB gzip) -->\n<script\n  defer\n  src="' + siteHost + '/hotspot.js"\n  data-key="' + key + '"\n  data-domain="' + domain + '"\n></script>';
+        }
+
+        // Update Provisioner UI
+        function updateProvisioner() {
+            var data = computeLiveKey(currentDomain);
+            var key = data.key;
+            var domain = data.cleanDomain;
+
+            if (keyPreviewBadge) keyPreviewBadge.textContent = key.slice(0, 15) + '…';
+            if (activeKeyText) activeKeyText.textContent = key;
+            if (activeFileTarget) activeFileTarget.textContent = FRAMEWORK_FILES[currentFramework] || 'index.html';
+            
+            var snippet = generateSnippet(currentFramework, key, domain);
+            if (snippetCodeDisplay) snippetCodeDisplay.textContent = snippet;
+
+            if (testPlaygroundLink) {
+                testPlaygroundLink.href = '/playground/?key=' + encodeURIComponent(key) + '&domain=' + encodeURIComponent(domain);
             }
         }
 
-        function copyHeroPrompt(btn) {
-            var prompt = "In /app/pricing/page.tsx, users are rage-clicking the '#pro-plan-btn' CTA because it has no click handler. Add an onClick handler that routes to /checkout?plan=pro and records the checkout_started event.";
-            navigator.clipboard.writeText(prompt).then(function() {
-                var orig = btn.textContent;
-                btn.textContent = '✓ Copied!';
-                btn.style.color = '#22c55e';
-                setTimeout(function() {
-                    btn.textContent = orig;
-                    btn.style.color = '';
-                }, 2000);
+        // Domain Input Events
+        if (domainInput) {
+            domainInput.addEventListener('input', function(e) {
+                currentDomain = e.target.value;
+                updateProvisioner();
             });
         }
 
-        // GSAP Scroll Reveals
-        if (typeof gsap !== 'undefined' && typeof ScrollTrigger !== 'undefined') {
-            gsap.registerPlugin(ScrollTrigger);
-
-            document.querySelectorAll('.reveal').forEach(function(el) {
-                gsap.to(el, {
-                    scrollTrigger: {
-                        trigger: el,
-                        start: 'top 88%',
-                        once: true
-                    },
-                    opacity: 1,
-                    y: 0,
-                    duration: 0.65,
-                    ease: 'power2.out'
-                });
+        // Preset Domain Buttons
+        var presetBtns = document.querySelectorAll('.preset-btn');
+        presetBtns.forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var preset = this.getAttribute('data-preset');
+                if (preset) {
+                    currentDomain = preset;
+                    if (domainInput) domainInput.value = preset;
+                    presetBtns.forEach(function(b) { b.classList.remove('active'); });
+                    this.classList.add('active');
+                    updateProvisioner();
+                }
             });
+        });
 
-            gsap.from('.hero-badge', { opacity: 0, y: -8, duration: 0.45, delay: 0.1 });
-            gsap.from('.hero h1', { opacity: 0, y: 14, duration: 0.55, delay: 0.2 });
-            gsap.from('.hero-sub', { opacity: 0, y: 10, duration: 0.45, delay: 0.32 });
-            gsap.from('.hero-input-form', { opacity: 0, y: 8, duration: 0.45, delay: 0.42 });
+        // Framework Switcher Tabs
+        var fwBtns = document.querySelectorAll('.fw-tab-btn');
+        fwBtns.forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var fw = this.getAttribute('data-fw');
+                if (fw) {
+                    currentFramework = fw;
+                    fwBtns.forEach(function(b) {
+                        b.classList.remove('active');
+                        b.setAttribute('aria-selected', 'false');
+                    });
+                    this.classList.add('active');
+                    this.setAttribute('aria-selected', 'true');
+                    updateProvisioner();
+                }
+            });
+        });
+
+        // Copy Snippet Button
+        if (copySnippetBtn) {
+            copySnippetBtn.addEventListener('click', function() {
+                var code = snippetCodeDisplay ? snippetCodeDisplay.textContent : '';
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(code).then(function() {
+                        copySnippetBtn.textContent = '✓ SNIPPET COPIED';
+                        copySnippetBtn.style.background = 'var(--success)';
+                        setTimeout(function() {
+                            copySnippetBtn.textContent = 'Copy 1-Line Snippet →';
+                            copySnippetBtn.style.background = 'var(--accent)';
+                        }, 2200);
+                    });
+                }
+            });
         }
+
+        // =====================================================================
+        // Specimen Tab Switcher (Section 02)
+        // =====================================================================
+        var specimenBtns = document.querySelectorAll('.specimen-tab-btn');
+        var specSeverity = document.getElementById('spec-severity');
+        var specCode = document.getElementById('spec-code');
+        var specRoute = document.getElementById('spec-route');
+        var specHeadline = document.getElementById('spec-headline');
+        var specLoss = document.getElementById('spec-loss');
+        var specPlainEnglish = document.getElementById('spec-plain-english');
+        var specEnv = document.getElementById('spec-env');
+        var specAiPrompt = document.getElementById('spec-ai-prompt');
+        var copyAiPromptBtn = document.getElementById('copy-ai-prompt-btn');
+
+        var specSig1Layer = document.getElementById('spec-sig1-layer');
+        var specSig1Metric = document.getElementById('spec-sig1-metric');
+        var specSig1Detail = document.getElementById('spec-sig1-detail');
+
+        var specSig2Layer = document.getElementById('spec-sig2-layer');
+        var specSig2Metric = document.getElementById('spec-sig2-metric');
+        var specSig2Detail = document.getElementById('spec-sig2-detail');
+
+        var specSig3Layer = document.getElementById('spec-sig3-layer');
+        var specSig3Metric = document.getElementById('spec-sig3-metric');
+        var specSig3Detail = document.getElementById('spec-sig3-detail');
+
+        function updateSpecimenUI(key) {
+            var data = SPECIMENS[key];
+            if (!data) return;
+
+            if (specSeverity) specSeverity.textContent = data.severity;
+            if (specCode) specCode.textContent = data.code;
+            if (specRoute) specRoute.textContent = data.route;
+            if (specHeadline) specHeadline.textContent = data.headline;
+            if (specLoss) specLoss.textContent = data.estLoss;
+            if (specPlainEnglish) specPlainEnglish.textContent = data.plainEnglish;
+            if (specEnv) specEnv.textContent = data.environment;
+            if (specAiPrompt) specAiPrompt.textContent = data.aiPrompt;
+
+            if (data.signals && data.signals.length >= 3) {
+                if (specSig1Layer) specSig1Layer.textContent = data.signals[0].layer;
+                if (specSig1Metric) specSig1Metric.textContent = data.signals[0].metric;
+                if (specSig1Detail) specSig1Detail.textContent = data.signals[0].detail;
+
+                if (specSig2Layer) specSig2Layer.textContent = data.signals[1].layer;
+                if (specSig2Metric) specSig2Metric.textContent = data.signals[1].metric;
+                if (specSig2Detail) specSig2Detail.textContent = data.signals[1].detail;
+
+                if (specSig3Layer) specSig3Layer.textContent = data.signals[2].layer;
+                if (specSig3Metric) specSig3Metric.textContent = data.signals[2].metric;
+                if (specSig3Detail) specSig3Detail.textContent = data.signals[2].detail;
+            }
+
+            if (copyAiPromptBtn) {
+                copyAiPromptBtn.textContent = 'Copy Prompt for AI →';
+                copyAiPromptBtn.style.background = 'var(--accent)';
+                copyAiPromptBtn.style.color = '#FFFFFF';
+            }
+        }
+
+        specimenBtns.forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var sKey = this.getAttribute('data-specimen');
+                if (sKey && SPECIMENS[sKey]) {
+                    currentSpecimenKey = sKey;
+                    specimenBtns.forEach(function(b) {
+                        b.classList.remove('active');
+                        b.setAttribute('aria-selected', 'false');
+                    });
+                    this.classList.add('active');
+                    this.setAttribute('aria-selected', 'true');
+                    updateSpecimenUI(sKey);
+                }
+            });
+        });
+
+        // Copy AI Prompt Button
+        if (copyAiPromptBtn) {
+            copyAiPromptBtn.addEventListener('click', function() {
+                var promptText = specAiPrompt ? specAiPrompt.textContent : '';
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(promptText).then(function() {
+                        copyAiPromptBtn.textContent = '✓ COPIED TO CLIPBOARD';
+                        copyAiPromptBtn.style.background = 'var(--success)';
+                        copyAiPromptBtn.style.color = '#FFFFFF';
+                        setTimeout(function() {
+                            copyAiPromptBtn.textContent = 'Copy Prompt for AI →';
+                            copyAiPromptBtn.style.background = 'var(--accent)';
+                        }, 2200);
+                    });
+                }
+            });
+        }
+
+        // Show navigation on medium+ screens
+        var desktopNav = document.getElementById('desktop-nav');
+        if (desktopNav && window.innerWidth >= 900) {
+            desktopNav.style.display = 'flex';
+        }
+        window.addEventListener('resize', function() {
+            if (desktopNav) {
+                desktopNav.style.display = window.innerWidth >= 900 ? 'flex' : 'none';
+            }
+        });
+
+        // Initialize Provisioner
+        updateProvisioner();
+    })();
     </script>
-
 </body>
 </html>
