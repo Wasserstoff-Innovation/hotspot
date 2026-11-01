@@ -3,677 +3,651 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ page_title|default:"Hotspot Dashboard • Conversion Health & Fix Queue" }}</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230B0F17'/%3E%3Crect x='6' y='6' width='20' height='20' rx='2' fill='none' stroke='%230052FF' stroke-width='2' stroke-dasharray='4 2'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%230052FF'/%3E%3Cline x1='16' y1='2' x2='16' y2='6' stroke='%230052FF' stroke-width='2' stroke-linecap='round'/%3E%3Cline x1='16' y1='26' x2='16' y2='30' stroke='%230052FF' stroke-width='2' stroke-linecap='round'/%3E%3Cline x1='2' y1='16' x2='6' y2='16' stroke='%230052FF' stroke-width='2' stroke-linecap='round'/%3E%3Cline x1='26' y1='16' x2='30' y2='16' stroke='%230052FF' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
+    <title>Hotspot Dashboard • Store Conversion Health & Action Plan</title>
+    
+    <!-- Modern Crisp Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%232563EB'/%3E%3Cstop offset='100%25' stop-color='%231D4ED8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%23FFFFFF' stroke-width='2' stroke-dasharray='4 2'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%2310B981'/%3E%3Cline x1='16' y1='3' x2='16' y2='7' stroke='%23FFFFFF' stroke-width='2' stroke-linecap='round'/%3E%3Cline x1='16' y1='25' x2='16' y2='29' stroke='%23FFFFFF' stroke-width='2' stroke-linecap='round'/%3E%3Cline x1='3' y1='16' x2='7' y2='16' stroke='%23FFFFFF' stroke-width='2' stroke-linecap='round'/%3E%3Cline x1='25' y1='16' x2='29' y2='16' stroke='%23FFFFFF' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
 
+    <!-- Typography: Plus Jakarta Sans / Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 
-    <!-- Hotspot Single-Script SDK -->
-    <script src="/hotspot.js" data-api-key="{{ demo_api_key }}" data-api-host="{{ site_url }}"></script>
+    <!-- Silent Telemetry -->
+    <script src="/hotspot.js" data-api-key="hs_live_dashboard" data-api-host="http://localhost:8000" data-visualizer="false"></script>
 
     <style>
         :root {
-            --bg: #09090b;
-            --bg-surface: #111113;
-            --bg-elevated: #18181b;
-            --border: rgba(255, 255, 255, 0.08);
-            --border-hover: rgba(255, 255, 255, 0.16);
+            --bg-page: #F8FAFC;
+            --bg-surface: #FFFFFF;
+            --border-light: #E2E8F0;
+            --border-hover: #CBD5E1;
 
-            --text-primary: #fafafa;
-            --text-secondary: #a1a1aa;
-            --text-muted: #71717a;
+            --text-primary: #0F172A;
+            --text-secondary: #475569;
+            --text-muted: #64748B;
+            --text-light: #94A3B8;
 
-            --accent: #0052FF;
-            --accent-dim: rgba(0, 82, 255, 0.12);
-            --accent-border: rgba(0, 82, 255, 0.3);
+            --brand-primary: #2563EB;
+            --brand-hover: #1D4ED8;
+            --brand-light: #EFF6FF;
 
-            --success: #059669;
-            --success-dim: rgba(5, 150, 105, 0.12);
-            --danger: #ef4444;
-            --danger-dim: rgba(239, 68, 68, 0.12);
+            --success: #10B981;
+            --success-light: #ECFDF5;
+            --warning: #F59E0B;
+            --warning-light: #FFFBEB;
+            --danger: #EF4444;
+            --danger-light: #FEF2F2;
 
-            --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-            --max-w: 1440px;
+            --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.06), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.07), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
         body {
-            background-color: var(--bg);
+            background-color: var(--bg-page);
             color: var(--text-primary);
-            font-family: var(--font);
-            font-size: 14.5px;
+            font-family: var(--font-sans);
+            font-size: 15px;
             line-height: 1.5;
             -webkit-font-smoothing: antialiased;
             min-height: 100vh;
-            padding-bottom: 80px;
+            padding-bottom: 5rem;
         }
 
         /* ─── Top Header ─── */
         header {
-            background: rgba(17, 17, 19, 0.85);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border-bottom: 1px solid var(--border);
+            background: #FFFFFF;
+            border-bottom: 1px solid var(--border-light);
             position: sticky;
             top: 0;
-            z-index: 100;
+            z-index: 50;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
         }
-
         .header-inner {
-            max-width: var(--max-w);
+            max-width: 1360px;
             margin: 0 auto;
-            padding: 0 24px;
-            height: 60px;
+            padding: 0 1.5rem;
+            height: 4.25rem;
             display: flex;
             align-items: center;
             justify-content: space-between;
         }
-
         .brand-group {
             display: flex;
             align-items: center;
-            gap: 16px;
+            gap: 1.25rem;
         }
-
         .logo {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 0.6rem;
             text-decoration: none;
             color: var(--text-primary);
+            font-weight: 800;
+            font-size: 1.25rem;
+            letter-spacing: -0.02em;
         }
-
-        .logo-mark {
-            width: 24px;
-            height: 24px;
-        }
-
-        .logo-text {
-            font-size: 16px;
-            font-weight: 700;
-            letter-spacing: -0.3px;
-        }
-
-        .app-selector {
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #2563EB, #1D4ED8);
             display: flex;
             align-items: center;
-            gap: 8px;
-            padding: 5px 12px;
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            font-size: 12.5px;
-            color: var(--text-secondary);
+            justify-content: center;
+            color: #FFFFFF;
         }
 
+        .store-selector {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: #F1F5F9;
+            padding: 0.35rem 0.85rem;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            cursor: pointer;
+            border: 1px solid var(--border-light);
+        }
         .live-dot {
-            width: 6px;
-            height: 6px;
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
             background: var(--success);
-            box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
+            box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+            display: inline-block;
         }
 
-        .nav-tabs {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            background: var(--bg);
-            padding: 3px;
-            border-radius: 8px;
-            border: 1px solid var(--border);
-        }
-
-        .nav-tab {
-            padding: 6px 14px;
-            font-size: 13px;
-            font-weight: 500;
-            color: var(--text-muted);
-            border: none;
-            background: transparent;
+        .plan-badge {
+            font-size: 0.6875rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--brand-primary);
+            background: var(--brand-light);
+            padding: 0.2rem 0.5rem;
             border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.15s;
-        }
-
-        .nav-tab:hover {
-            color: var(--text-primary);
-        }
-
-        .nav-tab.active {
-            background: var(--bg-surface);
-            color: var(--text-primary);
-            font-weight: 600;
+            border: 1px solid rgba(37, 99, 235, 0.2);
         }
 
         .header-actions {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 0.875rem;
         }
-
-        .btn-header {
+        .btn {
             display: inline-flex;
             align-items: center;
-            gap: 6px;
-            padding: 6px 12px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            color: var(--text-secondary);
-            font-size: 12.5px;
-            font-weight: 500;
-            text-decoration: none;
-            cursor: pointer;
-            transition: all 0.15s;
-        }
-
-        .btn-header:hover {
-            color: var(--text-primary);
-            border-color: var(--border-hover);
-        }
-
-        .btn-header-primary {
-            background: var(--text-primary);
-            color: var(--bg);
-            border-color: var(--text-primary);
+            justify-content: center;
+            gap: 0.4rem;
+            font-family: var(--font-sans);
             font-weight: 600;
+            font-size: 0.875rem;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            text-decoration: none;
+            transition: all 0.15s ease;
+            cursor: pointer;
+            border: 1px solid transparent;
+            line-height: 1.2;
         }
-
-        .btn-header-primary:hover {
-            opacity: 0.88;
+        .btn-primary {
+            background: var(--brand-primary);
+            color: #FFFFFF;
+        }
+        .btn-primary:hover {
+            background: var(--brand-hover);
+        }
+        .btn-outline {
+            background: #FFFFFF;
+            color: var(--text-primary);
+            border-color: var(--border-light);
+        }
+        .btn-outline:hover {
+            background: var(--bg-page);
+            border-color: var(--border-hover);
         }
 
         /* ─── Main Container ─── */
         .container {
-            max-width: var(--max-w);
-            margin: 0 auto;
-            padding: 32px 24px;
+            max-width: 1360px;
+            margin: 2rem auto 0 auto;
+            padding: 0 1.5rem;
         }
 
-        /* ─── Section 1: Health & Audit Score Banner (Ecomhint Model) ─── */
-        .audit-hero-card {
-            background: var(--bg-surface);
-            border: 1px solid var(--border);
+        /* ─── Top Banner Stats ─── */
+        .top-recovery-strip {
+            background: linear-gradient(135deg, #1E293B, #0F172A);
+            color: #FFFFFF;
             border-radius: 14px;
-            padding: 28px;
-            margin-bottom: 32px;
-            display: grid;
-            grid-template-columns: 320px 1fr;
-            gap: 32px;
+            padding: 1.25rem 1.75rem;
+            margin-bottom: 2rem;
+            display: flex;
+            flex-wrap: wrap;
             align-items: center;
-            position: relative;
-            overflow: hidden;
+            justify-content: space-between;
+            gap: 1rem;
+            box-shadow: var(--shadow-sm);
         }
-
-        .score-side {
+        .recovery-title-group {
             display: flex;
             align-items: center;
-            gap: 22px;
-            border-right: 1px solid var(--border);
-            padding-right: 32px;
+            gap: 0.75rem;
+        }
+        .recovery-icon {
+            font-size: 1.5rem;
+        }
+        .recovery-bold {
+            font-size: 1.2rem;
+            font-weight: 800;
+            color: #34D399;
+        }
+        .recovery-sub {
+            font-size: 0.875rem;
+            color: #94A3B8;
         }
 
+        /* ─── Audit Score & Pillars Card ─── */
+        .audit-hero-card {
+            background: #FFFFFF;
+            border: 1px solid var(--border-light);
+            border-radius: 18px;
+            padding: 2rem;
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 2rem;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+        }
+        @media (min-width: 992px) {
+            .audit-hero-card {
+                grid-template-columns: 360px 1fr;
+                align-items: center;
+            }
+        }
+        .score-side {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            border-bottom: 1px solid var(--border-light);
+            padding-bottom: 1.5rem;
+        }
+        @media (min-width: 992px) {
+            .score-side {
+                border-bottom: none;
+                border-right: 1px solid var(--border-light);
+                padding-bottom: 0;
+                padding-right: 2rem;
+            }
+        }
         .score-circle {
-            width: 92px;
-            height: 92px;
+            width: 140px;
+            height: 140px;
             border-radius: 50%;
-            border: 4px solid var(--accent);
+            background: conic-gradient(#10B981 0% 88%, #E2E8F0 88% 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1rem;
+            box-shadow: 0 4px 14px rgba(16, 185, 129, 0.2);
+        }
+        .score-circle-inner {
+            width: 112px;
+            height: 112px;
+            background: #FFFFFF;
+            border-radius: 50%;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            background: rgba(245, 158, 11, 0.06);
-            flex-shrink: 0;
-            box-shadow: 0 0 25px rgba(245, 158, 11, 0.15);
         }
-
         .score-number {
-            font-size: 34px;
+            font-size: 2.75rem;
             font-weight: 800;
-            letter-spacing: -1px;
-            color: var(--text-primary);
             line-height: 1;
+            color: var(--text-primary);
         }
-
         .score-max {
-            font-size: 11px;
+            font-size: 0.75rem;
             color: var(--text-muted);
-            font-weight: 600;
-        }
-
-        .score-meta h2 {
-            font-size: 18px;
             font-weight: 700;
-            letter-spacing: -0.3px;
-            margin-bottom: 4px;
         }
-
         .score-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 2px 8px;
-            border-radius: 4px;
-            background: var(--accent-dim);
-            border: 1px solid var(--accent-border);
-            color: var(--accent);
-            font-size: 11px;
-            font-weight: 600;
-            margin-bottom: 8px;
+            background: var(--success-light);
+            color: #065F46;
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            margin-bottom: 0.5rem;
         }
-
+        .score-heading {
+            font-size: 1.35rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            margin-bottom: 0.25rem;
+        }
         .score-desc {
-            font-size: 12.5px;
-            color: var(--text-muted);
-            line-height: 1.45;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
         }
 
-        /* 4 Core Health Areas Breakdown */
+        /* 4 Pillars */
         .pillars-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 14px;
+            grid-template-columns: 1fr;
+            gap: 1.25rem;
         }
-
+        @media (min-width: 600px) {
+            .pillars-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
         .pillar-card {
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 16px;
+            background: #F8FAFC;
+            border: 1px solid var(--border-light);
+            border-radius: 12px;
+            padding: 1.25rem;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
         }
-
-        .pillar-header {
+        .pillar-head {
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            margin-bottom: 8px;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
         }
-
         .pillar-title {
-            font-size: 12px;
-            font-weight: 600;
+            font-size: 0.875rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .pillar-score {
+            font-size: 0.8125rem;
+            font-weight: 700;
+            padding: 0.2rem 0.5rem;
+            border-radius: 6px;
+        }
+        .pillar-score.good { background: var(--success-light); color: var(--success); }
+        .pillar-score.warning { background: var(--warning-light); color: #B45309; }
+        .pillar-score.danger { background: var(--danger-light); color: var(--danger); }
+        .pillar-bar-bg {
+            height: 6px;
+            background: #E2E8F0;
+            border-radius: 9999px;
+            margin-bottom: 0.6rem;
+            overflow: hidden;
+        }
+        .pillar-bar-fill {
+            height: 100%;
+            border-radius: 9999px;
+        }
+        .pillar-note {
+            font-size: 0.8125rem;
             color: var(--text-secondary);
         }
 
-        .pillar-score {
-            font-size: 16px;
-            font-weight: 700;
-            font-family: var(--mono);
-        }
-
-        .pillar-score.good { color: var(--success); }
-        .pillar-score.warning { color: var(--accent); }
-        .pillar-score.bad { color: var(--danger); }
-
-        .pillar-bar-bg {
-            height: 4px;
-            background: rgba(255, 255, 255, 0.08);
-            border-radius: 2px;
-            overflow: hidden;
-            margin-bottom: 8px;
-        }
-
-        .pillar-bar-fill {
-            height: 100%;
-            border-radius: 2px;
-        }
-
-        .pillar-note {
-            font-size: 11px;
-            color: var(--text-muted);
-            line-height: 1.35;
-        }
-
-        /* ─── Dashboard Body Layout ─── */
-        .dashboard-grid {
+        /* ─── Main Content Layout (2 Columns) ─── */
+        .dashboard-layout {
             display: grid;
-            grid-template-columns: 1.55fr 1fr;
-            gap: 28px;
-            align-items: start;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+        }
+        @media (min-width: 1024px) {
+            .dashboard-layout {
+                grid-template-columns: 1fr 380px;
+            }
         }
 
-        /* Section Headings */
+        /* ─── Left Column: Ranked Action Plan ─── */
         .section-header-row {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 16px;
+            margin-bottom: 1.25rem;
         }
-
-        .section-heading {
-            font-size: 16px;
-            font-weight: 700;
-            letter-spacing: -0.2px;
+        .section-title-wrap {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 0.625rem;
+        }
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: var(--text-primary);
+        }
+        .badge-count {
+            background: #E2E8F0;
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 0.15rem 0.5rem;
+            border-radius: 9999px;
         }
 
-        .section-count {
-            font-size: 12px;
-            color: var(--text-muted);
-            background: var(--bg-surface);
-            padding: 2px 8px;
-            border-radius: 100px;
-            border: 1px solid var(--border);
-        }
-
-        /* ─── The Fix Queue (Ecomhint Ranked Tasks) ─── */
         .fix-list {
             display: flex;
             flex-direction: column;
-            gap: 14px;
+            gap: 1.25rem;
         }
-
         .fix-card {
-            background: var(--bg-surface);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 20px;
-            transition: all 0.2s;
-            position: relative;
+            background: #FFFFFF;
+            border: 1px solid var(--border-light);
+            border-radius: 14px;
+            padding: 1.5rem;
+            box-shadow: var(--shadow-sm);
+            transition: all 0.2s ease;
         }
-
         .fix-card:hover {
-            border-color: var(--border-hover);
+            border-color: #CBD5E1;
+            box-shadow: var(--shadow-md);
         }
-
-        .fix-card.critical {
-            border-left: 3px solid var(--danger);
-        }
-
-        .fix-card.high {
-            border-left: 3px solid var(--accent);
-        }
-
-        .fix-card.medium {
-            border-left: 3px solid #38bdf8;
-        }
-
-        .fix-top {
+        .fix-top-row {
             display: flex;
+            flex-wrap: wrap;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 10px;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
         }
-
-        .fix-tags {
+        .fix-badge-group {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 0.5rem;
         }
-
-        .tag-pill {
-            font-size: 10.5px;
-            font-weight: 700;
+        .severity-badge {
+            font-size: 0.6875rem;
+            font-weight: 800;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            padding: 2px 8px;
+            padding: 0.2rem 0.5rem;
+            border-radius: 6px;
+        }
+        .severity-badge.critical { background: var(--danger-light); color: var(--danger); }
+        .severity-badge.warning { background: var(--warning-light); color: #B45309; }
+        .severity-badge.quickwin { background: var(--success-light); color: var(--success); }
+        .fix-path {
+            font-family: var(--font-mono);
+            font-size: 0.8125rem;
+            color: var(--text-muted);
+            background: #F1F5F9;
+            padding: 0.15rem 0.45rem;
             border-radius: 4px;
         }
-
-        .tag-critical { background: var(--danger-dim); color: #fca5a5; }
-        .tag-high { background: var(--accent-dim); color: var(--accent); }
-        .tag-medium { background: rgba(56, 189, 248, 0.12); color: #7dd3fc; }
-
-        .fix-page {
-            font-family: var(--mono);
-            font-size: 11.5px;
-            color: var(--text-muted);
-        }
-
-        .fix-impact {
-            font-size: 11.5px;
-            font-weight: 600;
+        .revenue-lift-badge {
+            font-size: 0.8125rem;
+            font-weight: 700;
             color: var(--success);
+            background: var(--success-light);
+            padding: 0.25rem 0.625rem;
+            border-radius: 6px;
         }
-
         .fix-title {
-            font-size: 15px;
-            font-weight: 600;
+            font-size: 1.05rem;
+            font-weight: 700;
             color: var(--text-primary);
-            margin-bottom: 6px;
+            margin-bottom: 0.4rem;
         }
-
-        .fix-proof {
-            font-size: 13px;
+        .fix-cause {
+            font-size: 0.875rem;
             color: var(--text-secondary);
-            margin-bottom: 14px;
+            margin-bottom: 1.25rem;
             line-height: 1.5;
         }
 
-        .fix-proof code {
-            font-family: var(--mono);
-            font-size: 12px;
-            background: var(--bg);
-            border: 1px solid var(--border);
-            padding: 1px 5px;
-            border-radius: 4px;
-            color: var(--accent);
+        /* Instructions Box (Layman vs Tech switch) */
+        .instructions-box {
+            background: #F8FAFC;
+            border: 1px solid var(--border-light);
+            border-radius: 10px;
+            padding: 1.25rem;
         }
-
-        /* Expandable AI Prompt Box */
-        .prompt-preview {
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 14px;
-            margin-top: 12px;
-        }
-
-        .prompt-header {
+        .instruction-tabs {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-            font-size: 11.5px;
+            gap: 0.5rem;
+            margin-bottom: 0.875rem;
+            border-bottom: 1px solid var(--border-light);
+            padding-bottom: 0.5rem;
+        }
+        .instruction-tab {
+            background: none;
+            border: none;
+            font-family: var(--font-sans);
+            font-size: 0.8125rem;
             font-weight: 600;
             color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
+            cursor: pointer;
+            padding: 0.2rem 0.4rem;
         }
-
-        .prompt-text {
-            font-family: var(--mono);
-            font-size: 12px;
-            color: var(--text-secondary);
+        .instruction-tab.active {
+            color: var(--brand-primary);
+            font-weight: 700;
+        }
+        .instruction-text {
+            font-size: 0.875rem;
+            color: var(--text-primary);
             line-height: 1.6;
         }
-
-        .prompt-actions {
-            display: flex;
-            justify-content: flex-end;
-            margin-top: 10px;
-            gap: 8px;
-        }
-
-        .btn-copy-prompt {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 6px 12px;
-            background: var(--accent-dim);
-            border: 1px solid var(--accent-border);
-            color: var(--accent);
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.15s;
-        }
-
-        .btn-copy-prompt:hover {
-            background: rgba(245, 158, 11, 0.2);
-            color: #fbbf24;
-        }
-
-        /* ─── Right Column: Visual Heatmaps & Live Feed ─── */
-        .side-stack {
-            display: flex;
-            flex-direction: column;
-            gap: 24px;
-        }
-
-        /* Visual Heatmap Gallery */
-        .gallery-card {
-            background: var(--bg-surface);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 20px;
-        }
-
-        .gallery-list {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            margin-top: 14px;
-        }
-
-        .gallery-item {
+        .fix-actions-row {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 12px;
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.15s;
+            margin-top: 1rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--border-light);
         }
-
-        .gallery-item:hover {
-            border-color: var(--accent-border);
-            transform: translateX(2px);
-        }
-
-        .gallery-info {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
-
-        .gallery-route {
-            font-family: var(--mono);
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .gallery-meta {
-            font-size: 11.5px;
-            color: var(--text-muted);
-        }
-
-        .gallery-heat-pill {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 11.5px;
-            font-weight: 600;
-            color: var(--accent);
-            padding: 4px 10px;
-            background: var(--accent-dim);
-            border-radius: 100px;
-        }
-
-        /* Live Activity Stream */
-        .feed-card {
-            background: var(--bg-surface);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 20px;
-        }
-
-        .feed-list {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            margin-top: 14px;
-            max-height: 340px;
-            overflow-y: auto;
-        }
-
-        .feed-row {
-            padding: 10px 12px;
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .feed-row-top {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 11px;
-            color: var(--text-muted);
-        }
-
-        .feed-row-text {
-            font-size: 12.5px;
+        .btn-resolved {
+            background: none;
+            border: 1px solid var(--border-light);
             color: var(--text-secondary);
-            line-height: 1.4;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            padding: 0.35rem 0.75rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .btn-resolved:hover {
+            background: var(--success-light);
+            color: var(--success);
+            border-color: rgba(16, 185, 129, 0.3);
         }
 
-        .feed-row-text strong {
+        /* ─── Right Sidebar: Heatmaps & Live Stream ─── */
+        .sidebar-card {
+            background: #FFFFFF;
+            border: 1px solid var(--border-light);
+            border-radius: 14px;
+            padding: 1.5rem;
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 1.5rem;
+        }
+        .sidebar-title {
+            font-size: 1rem;
+            font-weight: 700;
             color: var(--text-primary);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
 
-        .feed-row.alert {
-            border-left: 3px solid var(--danger);
+        .heatmap-pages-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        .heatmap-page-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem;
+            background: #F8FAFC;
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            text-decoration: none;
+            color: var(--text-primary);
+            transition: all 0.15s ease;
+        }
+        .heatmap-page-item:hover {
+            border-color: var(--brand-primary);
+            background: #EFF6FF;
+        }
+        .page-name {
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+        .page-clicks {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+        .btn-inspect-pill {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--brand-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
         }
 
-        /* Interactive Heatmap Modal */
-        #heatmap-modal {
+        /* Live Stream List */
+        .live-stream-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.875rem;
+        }
+        .stream-item {
+            padding: 0.75rem;
+            background: #F8FAFC;
+            border-radius: 8px;
+            font-size: 0.8125rem;
+            border-left: 3px solid var(--border-light);
+        }
+        .stream-item.danger { border-left-color: var(--danger); }
+        .stream-item.success { border-left-color: var(--success); }
+        .stream-item.info { border-left-color: var(--brand-primary); }
+        .stream-time {
+            font-size: 0.6875rem;
+            color: var(--text-muted);
+            margin-bottom: 0.25rem;
+        }
+        .stream-msg {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        /* ─── Script Modal ─── */
+        .modal-backdrop {
             position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.85);
-            backdrop-filter: blur(12px);
-            z-index: 500;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
+            z-index: 100;
             display: none;
             align-items: center;
             justify-content: center;
-            padding: 24px;
+            padding: 1.5rem;
         }
-
-        .modal-content {
-            background: var(--bg-surface);
-            border: 1px solid var(--border);
-            border-radius: 14px;
-            max-width: 900px;
+        .modal-box {
+            background: #FFFFFF;
+            border-radius: 16px;
+            max-width: 600px;
             width: 100%;
-            overflow: hidden;
-            box-shadow: 0 30px 100px rgba(0,0,0,0.8);
-        }
-
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 16px 24px;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .modal-body {
-            padding: 24px;
-            min-height: 400px;
+            padding: 2rem;
+            box-shadow: var(--shadow-lg);
             position: relative;
         }
-
-        @media (max-width: 900px) {
-            .audit-hero-card { grid-template-columns: 1fr; }
-            .score-side { border-right: none; padding-right: 0; border-bottom: 1px solid var(--border); padding-bottom: 24px; }
-            .pillars-grid { grid-template-columns: 1fr 1fr; }
-            .dashboard-grid { grid-template-columns: 1fr; }
+        .code-box {
+            background: #0F172A;
+            color: #F8FAFC;
+            font-family: var(--font-mono);
+            font-size: 0.8125rem;
+            padding: 1.25rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            overflow-x: auto;
+            line-height: 1.5;
         }
     </style>
 </head>
@@ -684,348 +658,353 @@
         <div class="header-inner">
             <div class="brand-group">
                 <a href="/" class="logo">
-                    <svg class="logo-mark" viewBox="0 0 28 28" fill="none">
-                        <rect width="28" height="28" rx="6" fill="#0B0F17"/>
-                        <rect x="5" y="5" width="18" height="18" rx="2" stroke="var(--accent)" stroke-width="1.8" stroke-dasharray="3 2" fill="none"/>
-                        <circle cx="14" cy="14" r="3.5" fill="var(--accent)"/>
-                    </svg>
-                    <span class="logo-text">Hotspot</span>
+                    <div class="logo-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <circle cx="12" cy="12" r="8"/>
+                            <circle cx="12" cy="12" r="3" fill="currentColor"/>
+                        </svg>
+                    </div>
+                    <span>Hotspot</span>
                 </a>
-                <div class="app-selector">
-                    <span class="live-dot"></span>
-                    <span>Acme App (Live)</span>
-                </div>
-                <div style="font-size: 11px; font-weight: 700; color: var(--accent); background: var(--accent-dim); border: 1px solid var(--accent-border); padding: 3px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em;">
-                    Pro Plan (Trial)
-                </div>
-            </div>
 
-            <div class="nav-tabs">
-                <button class="nav-tab active" onclick="switchTab('queue')">Fix Queue</button>
-                <button class="nav-tab" onclick="switchTab('heatmaps')">Heatmaps</button>
-                <button class="nav-tab" onclick="switchTab('radar')">Friction Radar</button>
-                <button class="nav-tab" onclick="switchTab('stream')">Live Stream</button>
+                <div class="store-selector">
+                    <span class="live-dot"></span>
+                    <span>🛍️ Nordic Skincare (Shopify)</span>
+                    <span style="font-size: 0.75rem; color: var(--text-muted);">▾</span>
+                </div>
+
+                <span class="plan-badge">Growth Plan</span>
             </div>
 
             <div class="header-actions">
-                <a href="/playground/" class="btn-header">Demo Store</a>
-                <a href="/#pricing" class="btn-header" style="color: var(--accent); border-color: var(--accent-border);">Upgrade</a>
-                <button class="btn-header btn-header-primary" onclick="showSnippet()">+ Install Script</button>
+                <a href="/" class="btn btn-outline">Back to Landing</a>
+                <button class="btn btn-primary" onclick="showScriptModal()">+ Install Script</button>
             </div>
         </div>
     </header>
 
     <div class="container">
 
-        <!-- ─── Section 1: Health Score Audit Card (Ecomhint Style) ─── -->
-        <div class="audit-hero-card">
-            <div class="score-side">
-                <div class="score-circle">
-                    <div class="score-number">88</div>
-                    <div class="score-max">/ 100</div>
-                </div>
-                <div class="score-meta">
-                    <div class="score-badge">Audit Score • 3 Fixes Found</div>
-                    <h2>Conversion Health</h2>
-                    <p class="score-desc">
-                        Healthy traffic flow, but broken elements on <code>/pricing</code> are causing rage-clicks and dropping ~14% of potential buyers.
-                    </p>
+        <!-- Top Revenue Recovery Strip -->
+        <div class="top-recovery-strip">
+            <div class="recovery-title-group">
+                <span class="recovery-icon">💡</span>
+                <div>
+                    <div>Potential Monthly Revenue Recovery: <span class="recovery-bold">+$3,420 / month</span></div>
+                    <div class="recovery-sub">Resolving the 3 items below will lift checkout completion by an estimated ~14%.</div>
                 </div>
             </div>
+            <div>
+                <a href="#action-plan" class="btn btn-primary" style="background: #10B981; border: none;">
+                    Review Fixes Below ↓
+                </a>
+            </div>
+        </div>
 
-            <!-- 4 Pillar Breakdown -->
+        <!-- Conversion Health Score & 4 Pillars -->
+        <div class="audit-hero-card">
+            <!-- Score Gauge -->
+            <div class="score-side">
+                <div class="score-circle">
+                    <div class="score-circle-inner">
+                        <div class="score-number" id="dashboard-score">88</div>
+                        <div class="score-max">OUT OF 100</div>
+                    </div>
+                </div>
+                <span class="score-badge">Good Conversion Health</span>
+                <h2 class="score-heading">Store Health: 88%</h2>
+                <p class="score-desc">
+                    Traffic quality is strong, but mobile cart drop-off is costing you approximately 18 orders per week.
+                </p>
+            </div>
+
+            <!-- 4 Pillars -->
             <div class="pillars-grid">
                 <div class="pillar-card">
-                    <div class="pillar-header">
-                        <span class="pillar-title">Click Health</span>
+                    <div class="pillar-head">
+                        <span class="pillar-title">🛒 Cart & Checkout</span>
                         <span class="pillar-score good">92%</span>
                     </div>
                     <div class="pillar-bar-bg">
-                        <div class="pillar-bar-fill" style="width: 92%; background: var(--success);"></div>
+                        <div class="pillar-bar-fill" style="width: 92%; background: #10B981;"></div>
                     </div>
-                    <p class="pillar-note">92% of clicks trigger real actions</p>
+                    <p class="pillar-note">92% of users reach checkout without errors</p>
                 </div>
 
                 <div class="pillar-card">
-                    <div class="pillar-header">
-                        <span class="pillar-title">Funnel Flow</span>
+                    <div class="pillar-head">
+                        <span class="pillar-name">📱 Mobile UX & Rage Clicks</span>
                         <span class="pillar-score warning">74%</span>
                     </div>
                     <div class="pillar-bar-bg">
-                        <div class="pillar-bar-fill" style="width: 74%; background: var(--accent);"></div>
+                        <div class="pillar-bar-fill" style="width: 74%; background: #F59E0B;"></div>
                     </div>
-                    <p class="pillar-note">62% dropoff before checkout</p>
+                    <p class="pillar-note">148 rage taps on unlinked size chart</p>
                 </div>
 
                 <div class="pillar-card">
-                    <div class="pillar-header">
-                        <span class="pillar-title">Friction Radar</span>
-                        <span class="pillar-score bad">64%</span>
+                    <div class="pillar-head">
+                        <span class="pillar-name">⚡ Speed & Web Vitals</span>
+                        <span class="pillar-score good">95%</span>
                     </div>
                     <div class="pillar-bar-bg">
-                        <div class="pillar-bar-fill" style="width: 64%; background: var(--danger);"></div>
+                        <div class="pillar-bar-fill" style="width: 95%; background: #10B981;"></div>
                     </div>
-                    <p class="pillar-note">18 rage clicks on pricing button</p>
+                    <p class="pillar-note">1.1s First Contentful Paint on mobile</p>
                 </div>
 
                 <div class="pillar-card">
-                    <div class="pillar-header">
-                        <span class="pillar-title">Mobile UX</span>
+                    <div class="pillar-head">
+                        <span class="pillar-name">🔍 Trust & AI Search (GEO)</span>
                         <span class="pillar-score warning">68%</span>
                     </div>
                     <div class="pillar-bar-bg">
-                        <div class="pillar-bar-fill" style="width: 68%; background: var(--accent);"></div>
+                        <div class="pillar-bar-fill" style="width: 68%; background: #F59E0B;"></div>
                     </div>
-                    <p class="pillar-note">CTA pushed below fold on phones</p>
+                    <p class="pillar-note">Missing product review schema for Google</p>
                 </div>
             </div>
         </div>
 
-        <!-- ─── Section 2: Dashboard Grid ─── -->
-        <div class="dashboard-grid">
+        <!-- Dashboard Layout: 2 Columns -->
+        <div class="dashboard-layout" id="action-plan">
 
-            <!-- Left: "What to Fix Next" Priority Queue -->
+            <!-- Left Column: Ranked Action List -->
             <div>
                 <div class="section-header-row">
-                    <div class="section-heading">
-                        <span>Ranked Action List</span>
-                        <span class="section-count">3 open issues</span>
+                    <div class="section-title-wrap">
+                        <h2 class="section-title">Ranked Action List</h2>
+                        <span class="badge-count" id="open-count">3 open issues</span>
                     </div>
-                    <div style="font-size: 12.5px; color: var(--text-muted);">
-                        Sorted by conversion impact
-                    </div>
+                    <span style="font-size: 0.8125rem; color: var(--text-muted);">Sorted by revenue impact</span>
                 </div>
 
                 <div class="fix-list">
-                    <!-- Issue 1 -->
-                    <div class="fix-card critical">
-                        <div class="fix-top">
-                            <div class="fix-tags">
-                                <span class="tag-pill tag-critical">Critical #1</span>
-                                <span class="fix-page">/pricing</span>
+                    <!-- Fix 1 -->
+                    <div class="fix-card" id="fix-1">
+                        <div class="fix-top-row">
+                            <div class="fix-badge-group">
+                                <span class="severity-badge critical">Critical #1</span>
+                                <span class="fix-path">/cart & checkout</span>
                             </div>
-                            <span class="fix-impact">~8% est. sales lift</span>
+                            <span class="revenue-lift-badge">+$1,840 / mo lift</span>
                         </div>
-                        <div class="fix-title">Unwired Button: 'Upgrade to Pro' CTA has no click handler</div>
-                        <div class="fix-proof">
-                            Target element <code>#pro-plan-btn</code> was clicked repeatedly by 14 visitors (5.2 avg clicks per session) before bouncing.
+                        <h3 class="fix-title">Sticky "Proceed to Checkout" button blocked by cookie banner on iPhone</h3>
+                        <p class="fix-cause">
+                            18% of mobile shoppers on iOS Safari tap the checkout button, but the cookie banner overlay absorbs the click, causing 42 visitors to bounce in frustration.
+                        </p>
+                        <div class="instructions-box">
+                            <div class="instruction-tabs">
+                                <button class="instruction-tab active" onclick="switchFixTab(this, 'plain-1')">Plain English Instructions (Shopify)</button>
+                                <button class="instruction-tab" onclick="switchFixTab(this, 'code-1')">Technical / CSS Fix</button>
+                            </div>
+                            <div id="plain-1" class="instruction-text">
+                                Go to your Shopify Admin &gt; Online Store &gt; Themes &gt; Customize. Open your Cookie Banner settings and change position from "Bottom Sticky" to "Floating Banner" so it doesn't overlap the mobile cart footer.
+                            </div>
+                            <div id="code-1" class="instruction-text" style="display: none; font-family: var(--font-mono); font-size: 0.8125rem; background: #FFFFFF; padding: 0.75rem; border-radius: 6px; border: 1px solid #E2E8F0;">
+                                .sticky-checkout-btn { z-index: 9999 !important; padding-bottom: env(safe-area-inset-bottom); }
+                            </div>
                         </div>
-                        <div class="prompt-preview">
-                            <div class="prompt-header">
-                                <span>🤖 Fix with AI (Cursor / Claude / Lovable)</span>
-                            </div>
-                            <div class="prompt-text">
-                                In /app/pricing/page.tsx, users are rage-clicking the '#pro-plan-btn' CTA because it has no click handler. Add an onClick handler that routes to /checkout?plan=pro and records the checkout_started event.
-                            </div>
-                            <div class="prompt-actions">
-                                <button class="btn-copy-prompt" onclick="copyPromptText(this)">📋 Copy Prompt for AI</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Issue 2 -->
-                    <div class="fix-card high">
-                        <div class="fix-top">
-                            <div class="fix-tags">
-                                <span class="tag-pill tag-high">High #2</span>
-                                <span class="fix-page">/docs</span>
-                            </div>
-                            <span class="fix-impact">~4% conversion lift</span>
-                        </div>
-                        <div class="fix-title">Dead Click Trap: 'API Reference' looks like a link but does nothing</div>
-                        <div class="fix-proof">
-                            Element <code>span.nav-reference</code> has blue underline styling, leading 42 visitors to tap it expecting documentation.
-                        </div>
-                        <div class="prompt-preview">
-                            <div class="prompt-header">
-                                <span>🤖 Fix with AI</span>
-                            </div>
-                            <div class="prompt-text">
-                                In /components/Nav.tsx, change &lt;span class="nav-reference"&gt;API Reference&lt;/span&gt; into an active &lt;a href="/api"&gt; link so users can access the API docs.
-                            </div>
-                            <div class="prompt-actions">
-                                <button class="btn-copy-prompt" onclick="copyPromptText(this)">📋 Copy Prompt for AI</button>
-                            </div>
+                        <div class="fix-actions-row">
+                            <button class="btn-resolved" onclick="resolveIssue('fix-1', 1840)">✓ Mark as Resolved</button>
+                            <span style="font-size: 0.75rem; color: var(--text-muted);">Detected 2 hours ago via Mobile Safari</span>
                         </div>
                     </div>
 
-                    <!-- Issue 3 -->
-                    <div class="fix-card medium">
-                        <div class="fix-top">
-                            <div class="fix-tags">
-                                <span class="tag-pill tag-medium">Medium #3</span>
-                                <span class="fix-page">/</span>
+                    <!-- Fix 2 -->
+                    <div class="fix-card" id="fix-2">
+                        <div class="fix-top-row">
+                            <div class="fix-badge-group">
+                                <span class="severity-badge warning">High Priority #2</span>
+                                <span class="fix-path">/products/cream</span>
                             </div>
-                            <span class="fix-impact">~3% conversion lift</span>
+                            <span class="revenue-lift-badge">+$980 / mo lift</span>
                         </div>
-                        <div class="fix-title">Mobile Fold Barrier: Primary CTA hidden below 840px</div>
-                        <div class="fix-proof">
-                            On mobile screens, 72% of visitors leave without scrolling down to the primary conversion button.
+                        <h3 class="fix-title">Unlinked Size Guide text causes 148 rage clicks</h3>
+                        <p class="fix-cause">
+                            Visitors repeatedly tap the "Size Guide" text badge expecting a popup chart. When nothing opens, they abandon without selecting a product variant.
+                        </p>
+                        <div class="instructions-box">
+                            <div class="instruction-tabs">
+                                <button class="instruction-tab active" onclick="switchFixTab(this, 'plain-2')">Plain English Instructions</button>
+                                <button class="instruction-tab" onclick="switchFixTab(this, 'code-2')">Technical Fix</button>
+                            </div>
+                            <div id="plain-2" class="instruction-text">
+                                In your product template, link the "Size Guide" text to your store's sizing popup modal or link it directly to your size chart page.
+                            </div>
+                            <div id="code-2" class="instruction-text" style="display: none; font-family: var(--font-mono); font-size: 0.8125rem; background: #FFFFFF; padding: 0.75rem; border-radius: 6px; border: 1px solid #E2E8F0;">
+                                &lt;button data-modal-target="#size-modal" class="size-guide-trigger"&gt;Size Guide&lt;/button&gt;
+                            </div>
                         </div>
-                        <div class="prompt-preview">
-                            <div class="prompt-header">
-                                <span>🤖 Fix with AI</span>
-                            </div>
-                            <div class="prompt-text">
-                                On the landing hero, adjust mobile padding and font sizes so the primary CTA button is visible above the fold on mobile screens (viewport height &lt; 750px).
-                            </div>
-                            <div class="prompt-actions">
-                                <button class="btn-copy-prompt" onclick="copyPromptText(this)">📋 Copy Prompt for AI</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Right: Page Heatmap Gallery & Real-Time Feed -->
-            <div class="side-stack">
-                <!-- Heatmap Gallery -->
-                <div class="gallery-card">
-                    <div class="section-header-row" style="margin-bottom: 0;">
-                        <span class="section-heading">Visual Heatmaps</span>
-                        <span style="font-size: 11.5px; color: var(--accent);">Option + H on site</span>
-                    </div>
-
-                    <div class="gallery-list">
-                        <div class="gallery-item" onclick="openHeatmapModal('/pricing')">
-                            <div class="gallery-info">
-                                <span class="gallery-route">/pricing</span>
-                                <span class="gallery-meta">2,847 clicks • 14 rage clusters</span>
-                            </div>
-                            <span class="gallery-heat-pill">🔥 Inspect</span>
-                        </div>
-
-                        <div class="gallery-item" onclick="openHeatmapModal('/')">
-                            <div class="gallery-info">
-                                <span class="gallery-route">/ (Homepage)</span>
-                                <span class="gallery-meta">5,120 clicks • 68% scroll depth</span>
-                            </div>
-                            <span class="gallery-heat-pill">🔥 Inspect</span>
-                        </div>
-
-                        <div class="gallery-item" onclick="openHeatmapModal('/signup')">
-                            <div class="gallery-info">
-                                <span class="gallery-route">/signup</span>
-                                <span class="gallery-meta">1,240 clicks • 92% completion</span>
-                            </div>
-                            <span class="gallery-heat-pill">🔥 Inspect</span>
+                        <div class="fix-actions-row">
+                            <button class="btn-resolved" onclick="resolveIssue('fix-2', 980)">✓ Mark as Resolved</button>
+                            <span style="font-size: 0.75rem; color: var(--text-muted);">148 rage taps logged</span>
                         </div>
                     </div>
-                </div>
 
-                <!-- Live Feed -->
-                <div class="feed-card">
-                    <div class="section-header-row" style="margin-bottom: 0;">
-                        <span class="section-heading">Live Telemetry Feed</span>
-                        <span class="section-count">Streaming</span>
-                    </div>
-
-                    <div class="feed-list" id="dashboard-feed">
-                        <div class="feed-row alert">
-                            <div class="feed-row-top">
-                                <span>⚠️ Rage click</span>
-                                <span>2m ago</span>
+                    <!-- Fix 3 -->
+                    <div class="fix-card" id="fix-3">
+                        <div class="fix-top-row">
+                            <div class="fix-badge-group">
+                                <span class="severity-badge quickwin">Quick Win #3</span>
+                                <span class="fix-path">/cart</span>
                             </div>
-                            <div class="feed-row-text">
-                                Visitor on <strong>Mobile Safari</strong> clicked <code>#pro-plan-btn</code> 5 times in 800ms
+                            <span class="revenue-lift-badge">+$600 / mo lift</span>
+                        </div>
+                        <h3 class="fix-title">Missing Express Checkout (Apple Pay & Google Pay) badges</h3>
+                        <p class="fix-cause">
+                            Mobile buyers drop off at the credit card number step. Adding 1-tap Apple Pay and Google Pay buttons will accelerate checkout by 40%.
+                        </p>
+                        <div class="instructions-box">
+                            <div class="instruction-tabs">
+                                <button class="instruction-tab active" onclick="switchFixTab(this, 'plain-3')">Plain English Instructions</button>
+                                <button class="instruction-tab" onclick="switchFixTab(this, 'code-3')">Technical Fix</button>
+                            </div>
+                            <div id="plain-3" class="instruction-text">
+                                In Shopify Admin &gt; Settings &gt; Payments, enable "Shop Pay" and "Apple Pay" for accelerated 1-click customer checkouts.
+                            </div>
+                            <div id="code-3" class="instruction-text" style="display: none; font-family: var(--font-mono); font-size: 0.8125rem; background: #FFFFFF; padding: 0.75rem; border-radius: 6px; border: 1px solid #E2E8F0;">
+                                &lt;div class="shopify-payment-terms"&gt;&#123;&#123; form | payment_terms &#125;&#125;&lt;/div&gt;
                             </div>
                         </div>
-
-                        <div class="feed-row">
-                            <div class="feed-row-top">
-                                <span>Autocapture</span>
-                                <span>5m ago</span>
-                            </div>
-                            <div class="feed-row-text">
-                                Visitor from <strong>New York</strong> clicked <strong>Start free trial</strong> on <code>/</code>
-                            </div>
-                        </div>
-
-                        <div class="feed-row">
-                            <div class="feed-row-top">
-                                <span>Funnel completion</span>
-                                <span>11m ago</span>
-                            </div>
-                            <div class="feed-row-text">
-                                Visitor completed onboarding: <code>/signup → /workspace</code>
-                            </div>
+                        <div class="fix-actions-row">
+                            <button class="btn-resolved" onclick="resolveIssue('fix-3', 600)">✓ Mark as Resolved</button>
+                            <span style="font-size: 0.75rem; color: var(--text-muted);">Estimated 5 min setup</span>
                         </div>
                     </div>
                 </div>
             </div>
 
+            <!-- Right Column: Visual Heatmaps & Live Telemetry -->
+            <div>
+                <!-- Visual Heatmaps Card -->
+                <div class="sidebar-card">
+                    <div class="sidebar-title">
+                        <span>Visual Click Heatmaps</span>
+                        <span style="font-size: 0.75rem; color: var(--brand-primary); font-weight: 600;">Option+H on site</span>
+                    </div>
+                    <div class="heatmap-pages-list">
+                        <a href="/playground/" class="heatmap-page-item">
+                            <div>
+                                <div class="page-name">/products/day-cream</div>
+                                <div class="page-clicks">3,420 visits • 14 rage clusters</div>
+                            </div>
+                            <span class="btn-inspect-pill">Inspect 🔥</span>
+                        </a>
+
+                        <a href="/playground/" class="heatmap-page-item">
+                            <div>
+                                <div class="page-name">/cart</div>
+                                <div class="page-clicks">1,820 visits • 42 dropoffs</div>
+                            </div>
+                            <span class="btn-inspect-pill">Inspect 🔥</span>
+                        </a>
+
+                        <a href="/playground/" class="heatmap-page-item">
+                            <div>
+                                <div class="page-name">/ (Homepage)</div>
+                                <div class="page-clicks">8,910 visits • 68% scroll depth</div>
+                            </div>
+                            <span class="btn-inspect-pill">Inspect 🔥</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Live Shopper Telemetry Stream -->
+                <div class="sidebar-card">
+                    <div class="sidebar-title">
+                        <span>Live Shopper Activity</span>
+                        <span class="live-dot"></span>
+                    </div>
+                    <div class="live-stream-list">
+                        <div class="stream-item danger">
+                            <div class="stream-time">2 minutes ago • iPhone 15 / Safari</div>
+                            <div class="stream-msg">Rage click detected on <strong>#size-guide-text</strong> (5 taps in 1.2s)</div>
+                        </div>
+
+                        <div class="stream-item success">
+                            <div class="stream-time">5 minutes ago • Desktop Chrome</div>
+                            <div class="stream-msg">Completed purchase: <strong>$148.00</strong> via Apple Pay</div>
+                        </div>
+
+                        <div class="stream-item info">
+                            <div class="stream-time">8 minutes ago • Google Search</div>
+                            <div class="stream-msg">Inbound query: <em>"natural peptide skin cream"</em> → /products/cream</div>
+                        </div>
+
+                        <div class="stream-item danger">
+                            <div class="stream-time">12 minutes ago • Mobile Safari</div>
+                            <div class="stream-msg">Checkout abandoned: cookie banner overlap detected on #btn-checkout</div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
         </div>
-
     </div>
 
-    <!-- Modal for Heatmap Preview -->
-    <div id="heatmap-modal" onclick="closeHeatmapModal(event)">
-        <div class="modal-content" onclick="event.stopPropagation()">
-            <div class="modal-header">
-                <div>
-                    <strong id="modal-route-title" style="font-size: 16px;">Heatmap Inspector</strong>
-                    <div style="font-size: 12px; color: var(--text-muted);">Visual click concentration & dropoff overlay</div>
-                </div>
-                <button onclick="closeHeatmapModal()" style="background:none;border:none;color:var(--text-muted);font-size:18px;cursor:pointer;">✕</button>
+    <!-- Script Installation Modal -->
+    <div class="modal-backdrop" id="script-modal" onclick="if(event.target === this) hideScriptModal()">
+        <div class="modal-box">
+            <h3 style="font-size: 1.35rem; font-weight: 800; margin-bottom: 0.5rem;">Install Hotspot Live Tracking</h3>
+            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1rem;">
+                Paste this single script tag inside your store's <code>&lt;head&gt;</code> tag to enable real-time rage click alerts and live heatmaps.
+            </p>
+            <div class="code-box">
+&lt;script defer src="http://localhost:8000/hotspot.js" data-key="hs_live_nordic_9e4a" data-api-host="http://localhost:8000"&gt;&lt;/script&gt;
             </div>
-            <div class="modal-body" style="text-align: center; padding: 40px;">
-                <div style="background: #09090b; border: 1px solid var(--border); border-radius: 8px; padding: 32px; position: relative; max-width: 640px; margin: 0 auto;">
-                    <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">Simulated Visual Heatmap for <code id="modal-code-route" style="color:var(--accent);">/pricing</code></div>
-                    <div style="height: 140px; background: rgba(255,255,255,0.02); border: 1px dashed var(--border); border-radius: 6px; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;">
-                        <div style="position: absolute; top: 50%; left: 45%; transform: translate(-50%, -50%); width: 120px; height: 80px; border-radius: 50%; background: radial-gradient(circle, rgba(245,158,11,0.8) 0%, transparent 70%); filter: blur(6px);"></div>
-                        <div style="position: relative; z-index: 2; font-weight: 700; color: #fff;">
-                            [ Button: #pro-plan-btn — 1,420 Clicks ]
-                        </div>
-                    </div>
-                    <p style="font-size: 12.5px; color: var(--text-secondary); margin-top: 18px;">
-                        Tip: Open your real website and press <kbd style="background:var(--bg-elevated);border:1px solid var(--border);padding:2px 6px;border-radius:4px;color:var(--accent);font-family:var(--mono);">Option + H</kbd> to inspect this live on your interface.
-                    </p>
-                </div>
+            <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+                <button class="btn btn-outline" onclick="hideScriptModal()">Close</button>
+                <button class="btn btn-primary" onclick="navigator.clipboard.writeText('&lt;script defer src=&quot;http://localhost:8000/hotspot.js&quot; data-key=&quot;hs_live_nordic_9e4a&quot;&gt;&lt;/script&gt;'); alert('Script tag copied to clipboard!');">Copy Script</button>
             </div>
         </div>
     </div>
 
     <script>
-        function switchTab(tab) {
-            document.querySelectorAll('.nav-tab').forEach(function(t) { t.classList.remove('active'); });
-            event.target.classList.add('active');
-            if (tab === 'heatmaps') {
-                openHeatmapModal('/pricing');
+        function showScriptModal() {
+            document.getElementById('script-modal').style.display = 'flex';
+        }
+        function hideScriptModal() {
+            document.getElementById('script-modal').style.display = 'none';
+        }
+
+        function switchFixTab(btn, tabId) {
+            var parent = btn.closest('.instructions-box');
+            var tabs = parent.querySelectorAll('.instruction-tab');
+            tabs.forEach(function(t) { t.classList.remove('active'); });
+            btn.classList.add('active');
+
+            var plain = parent.querySelector('[id^="plain-"]');
+            var code = parent.querySelector('[id^="code-"]');
+            if (tabId.indexOf('plain') !== -1) {
+                if (plain) plain.style.display = 'block';
+                if (code) code.style.display = 'none';
+            } else {
+                if (plain) plain.style.display = 'none';
+                if (code) code.style.display = 'block';
             }
         }
 
-        function copyPromptText(btn) {
-            var promptCard = btn.closest('.prompt-preview');
-            var text = promptCard.querySelector('.prompt-text').textContent.trim();
-            navigator.clipboard.writeText(text).then(function() {
-                var orig = btn.textContent;
-                btn.textContent = '✓ Copied to Clipboard!';
-                btn.style.color = '#22c55e';
-                setTimeout(function() {
-                    btn.textContent = orig;
-                    btn.style.color = '';
-                }, 2000);
-            });
-        }
-
-        function showSnippet() {
-            var s = '<script src="{{ site_url }}/hotspot.js" data-api-key="{{ demo_api_key }}"><\/script>';
-            navigator.clipboard.writeText(s).then(function() {
-                alert('Copied 1-line Hotspot script tag to clipboard:\n\n' + s);
-            });
-        }
-
-        function openHeatmapModal(route) {
-            var m = document.getElementById('heatmap-modal');
-            document.getElementById('modal-route-title').textContent = 'Heatmap Inspector — ' + route;
-            document.getElementById('modal-code-route').textContent = route;
-            m.style.display = 'flex';
-        }
-
-        function closeHeatmapModal() {
-            document.getElementById('heatmap-modal').style.display = 'none';
+        var resolvedCount = 0;
+        function resolveIssue(cardId, liftAmount) {
+            var card = document.getElementById(cardId);
+            if (card) {
+                card.style.opacity = '0.5';
+                card.style.pointerEvents = 'none';
+                var btn = card.querySelector('.btn-resolved');
+                if (btn) btn.textContent = '✓ Resolved';
+                resolvedCount++;
+                var scoreEl = document.getElementById('dashboard-score');
+                if (scoreEl) {
+                    var current = parseInt(scoreEl.textContent, 10);
+                    scoreEl.textContent = Math.min(100, current + 4);
+                }
+                var openEl = document.getElementById('open-count');
+                if (openEl) {
+                    openEl.textContent = (3 - resolvedCount) + ' open issues';
+                }
+            }
         }
     </script>
-
 </body>
 </html>

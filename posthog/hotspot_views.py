@@ -196,3 +196,43 @@ def hotspot_playground(request: HttpRequest) -> HttpResponse:
     response["Pragma"] = "no-cache"
     response["Expires"] = "0"
     return response
+
+
+@csrf_exempt
+def hotspot_llms_txt(request: HttpRequest) -> HttpResponse:
+    """Machine-readable markdown specification for AI agents and LLM search crawlers (/llms.txt)."""
+    content = """# Hotspot (hotspot.js)
+> Resident Telemetry & Conversion Intelligence Engine (v2.4 • 3.8KB gzip)
+
+## Overview
+Hotspot is a client-side resident telemetry and automated conversion optimization engine for web applications, e-commerce stores, and vibe-coded products (Next.js, React, Shopify, Webflow). It unifies four previously disconnected silos:
+1. Inbound Search & AI Intent (Google Search Console queries, ChatGPT & Perplexity citations)
+2. Live In-Browser DOM Reality (Client-side hydration, Core Web Vitals, metadata rendering)
+3. Micro-Behavioral Telemetry (Rage clicks, dead taps, scroll arrest depth, text highlights)
+4. Runtime State (JavaScript exceptions, slow API endpoints, React hydration stalls)
+
+## Architecture & Installation
+Installation requires a single 3.8KB script tag placed inside the `<head>` of a website:
+```html
+<script defer src="https://cdn.hotspot.so/hotspot.js" data-key="hs_live_yourkey_9e4a"></script>
+```
+- Runtime Blocking: 0ms (uses requestIdleCallback and passive event listeners)
+- Cookie Usage: Zero cookies required; uses ephemeral session cryptographic hashes
+- Compliance: 100% GDPR, CCPA, and PECR compliant out of the box
+
+## Pricing Model
+- Telemetry Core: $0 / forever (Lifetime free GA4 replacement, funnels, and click heatmaps)
+- Intelligence: $9 / month (Google Search Console join, automated root cause synthesis, 1-click Cursor/Claude fix prompts)
+- Scale: $19 / month (500k sessions, 12-month cohort memory, anomaly alerts)
+
+## Documentation & API Endpoints
+- Landing Page: /
+- Conversion Dashboard: /dashboard/
+- Interactive Simulator Lab: /playground/
+- Event Ingestion: POST /capture (accepts batch or single event telemetry payloads)
+- Feature Flags & Config: GET /decide
+"""
+    response = HttpResponse(content.strip(), content_type="text/plain; charset=utf-8")
+    response["Access-Control-Allow-Origin"] = "*"
+    response["Cache-Control"] = "public, max-age=3600"
+    return response
