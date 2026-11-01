@@ -3,168 +3,123 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Hotspot • Visual Product Analytics & Heatmaps for AI Builders</title>
-    <meta name="description" content="The visual product analytics engine built for coders using AI. Zero tracking boilerplate, instant neon heatmaps, and continuous telemetry with one script tag.">
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolygon points='16,2 30,10 30,22 16,30 2,22 2,10' stroke='%23CCFF00' stroke-width='2' fill='%2307080D'/%3E%3Ccircle cx='16' cy='16' r='6' fill='%23FF007F'/%3E%3Ccircle cx='16' cy='16' r='2' fill='%23CCFF00'/%3E%3C/svg%3E">
+    <title>Hotspot — Visual product analytics for apps built with AI</title>
+    <meta name="description" content="Visual product analytics for builders using AI. Drop in one script tag. Get heatmaps, rage clicks, and user journeys — self-hosted and free.">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%230a0a0a' stroke='%23F59E0B' stroke-width='1.5'/%3E%3Ccircle cx='16' cy='16' r='6' fill='%23F59E0B' opacity='0.9'/%3E%3Ccircle cx='16' cy='16' r='2.5' fill='%230a0a0a'/%3E%3C/svg%3E">
 
-    <!-- Self-hosted GSAP 3 & ScrollTrigger for reliable cinematic animations -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <!-- Hotspot Single-Script Tracking SDK -->
+    <script src="/hotspot.js" data-api-key="hs_live_demo_sample_token" data-api-host="{{ site_url }}" data-debug="true"></script>
+
+    <!-- GSAP for restrained scroll reveals -->
     <script nonce="{{ request.csp_nonce }}" src="/gsap.js"></script>
     <script nonce="{{ request.csp_nonce }}" src="/ScrollTrigger.js"></script>
 
-    <!-- Hotspot Single Drop-in Tracking SDK -->
-    <script src="/hotspot.js" data-api-key="hs_live_demo_sample_token" data-api-host="{{ site_url }}" data-debug="true"></script>
-
     <style>
         :root {
-            --bg-void: #07080d;
-            --bg-surface: #0c0f17;
-            --bg-card: rgba(16, 22, 35, 0.75);
-            --bg-card-hover: rgba(22, 31, 50, 0.9);
-            --border-glass: rgba(255, 255, 255, 0.08);
-            --border-hover: rgba(204, 255, 0, 0.35);
-            
-            /* Fresh Cyber-Thermal Color Palette */
-            --volt-neon: #ccff00;        /* Thermal Core Peak */
-            --magenta-electric: #ff007f; /* Active Flow Intensity */
-            --cyan-hyper: #00f0ff;       /* Ambient / Cooling Flow */
-            --purple-laser: #a855f7;     /* Energy Midpoint */
-            
-            --text-primary: #f3f4f6;
-            --text-secondary: #9ca3af;
-            --text-muted: #6b7280;
-            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", Helvetica, Arial, sans-serif;
-            --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+            --bg: #09090b;
+            --bg-surface: #111113;
+            --bg-elevated: #18181b;
+            --border: rgba(255, 255, 255, 0.07);
+            --border-hover: rgba(255, 255, 255, 0.15);
+
+            --text-primary: #fafafa;
+            --text-secondary: #a1a1aa;
+            --text-muted: #71717a;
+
+            --accent: #F59E0B;
+            --accent-dim: rgba(245, 158, 11, 0.12);
+            --accent-border: rgba(245, 158, 11, 0.25);
+
+            --danger: #ef4444;
+            --danger-dim: rgba(239, 68, 68, 0.12);
+
+            --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+            --max-w: 1120px;
         }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        html {
-            scroll-behavior: smooth;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; }
 
         body {
-            background-color: var(--bg-void);
+            background: var(--bg);
             color: var(--text-primary);
-            font-family: var(--font-family);
+            font-family: var(--font);
+            font-size: 16px;
             line-height: 1.6;
             -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
             overflow-x: hidden;
             position: relative;
         }
 
-        /* Ambient Glow Backdrop */
-        .ambient-mesh {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            pointer-events: none;
-            z-index: 0;
-            overflow: hidden;
-        }
-
-        .mesh-orb-1 {
+        /* Subtle ambient lighting — extremely restrained */
+        .ambient-glow {
             position: absolute;
-            top: -150px;
+            top: 0;
             left: 50%;
             transform: translateX(-50%);
-            width: 900px;
-            height: 600px;
-            background: radial-gradient(circle, rgba(204, 255, 0, 0.12) 0%, rgba(255, 0, 127, 0.08) 35%, transparent 70%);
-            filter: blur(120px);
-        }
-
-        .mesh-orb-2 {
-            position: absolute;
-            bottom: 10%;
-            right: -100px;
-            width: 700px;
-            height: 600px;
-            background: radial-gradient(circle, rgba(0, 240, 255, 0.1) 0%, rgba(168, 85, 247, 0.06) 40%, transparent 70%);
-            filter: blur(140px);
-        }
-
-        .grid-matrix {
-            position: absolute;
-            inset: 0;
-            background-image: 
-                linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-            background-size: 48px 48px;
-            mask-image: radial-gradient(circle at 50% 30%, black 40%, transparent 80%);
-            -webkit-mask-image: radial-gradient(circle at 50% 30%, black 40%, transparent 80%);
+            width: 800px;
+            height: 480px;
+            background: radial-gradient(ellipse at 50% 0%, rgba(245, 158, 11, 0.05) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
         }
 
         .container {
-            max-width: 1240px;
+            max-width: var(--max-w);
             margin: 0 auto;
             padding: 0 24px;
             position: relative;
             z-index: 2;
         }
 
-        /* Navigation Header */
-        header {
+        /* ─── Navigation ─── */
+        nav {
             position: sticky;
             top: 0;
-            background: rgba(7, 8, 13, 0.8);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border-bottom: 1px solid var(--border-glass);
             z-index: 100;
+            background: rgba(9, 9, 11, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border);
         }
 
         .nav-inner {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            height: 72px;
+            height: 64px;
         }
 
-        .brand-logo {
+        .logo {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
             text-decoration: none;
             color: var(--text-primary);
         }
 
-        .logo-reticle {
-            width: 36px;
-            height: 36px;
-            filter: drop-shadow(0 0 10px rgba(204, 255, 0, 0.4));
+        .logo-mark {
+            width: 26px;
+            height: 26px;
         }
 
-        .brand-title {
-            font-size: 20px;
-            font-weight: 800;
-            letter-spacing: -0.5px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .brand-badge {
-            font-size: 10px;
+        .logo-text {
+            font-size: 16px;
             font-weight: 700;
-            text-transform: uppercase;
-            padding: 2px 7px;
-            border-radius: 999px;
-            background: rgba(204, 255, 0, 0.12);
-            color: var(--volt-neon);
-            border: 1px solid rgba(204, 255, 0, 0.3);
-            letter-spacing: 0.5px;
+            letter-spacing: -0.3px;
         }
 
         .nav-links {
             display: flex;
             align-items: center;
-            gap: 28px;
+            gap: 32px;
         }
 
         .nav-links a {
@@ -172,780 +127,735 @@
             text-decoration: none;
             font-size: 14px;
             font-weight: 500;
-            transition: color 0.2s ease;
+            transition: color 0.15s;
         }
 
         .nav-links a:hover {
-            color: var(--volt-neon);
+            color: var(--text-primary);
         }
 
         .nav-actions {
             display: flex;
             align-items: center;
-            gap: 14px;
+            gap: 12px;
         }
 
-        .btn {
+        .nav-link-btn {
+            font-size: 13px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.15s;
+        }
+
+        .nav-link-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .nav-cta {
             display: inline-flex;
             align-items: center;
-            justify-content: center;
-            padding: 9px 18px;
-            font-size: 14px;
+            padding: 7px 15px;
+            background: var(--text-primary);
+            color: var(--bg);
+            font-size: 13px;
             font-weight: 600;
-            border-radius: 8px;
+            border-radius: 6px;
             text-decoration: none;
-            cursor: pointer;
-            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-            border: 1px solid transparent;
+            transition: opacity 0.15s;
         }
 
-        .btn-ghost {
-            color: var(--text-primary);
-            background: rgba(255, 255, 255, 0.05);
-            border-color: var(--border-glass);
+        .nav-cta:hover {
+            opacity: 0.88;
         }
 
-        .btn-ghost:hover {
-            background: rgba(255, 255, 255, 0.1);
-            border-color: rgba(255, 255, 255, 0.2);
-            transform: translateY(-1px);
-        }
-
-        .btn-volt {
-            background: var(--volt-neon);
-            color: #050608;
-            box-shadow: 0 0 20px rgba(204, 255, 0, 0.35);
-        }
-
-        .btn-volt:hover {
-            background: #d8ff26;
-            box-shadow: 0 0 30px rgba(204, 255, 0, 0.6);
-            transform: translateY(-1px);
-        }
-
-        .btn-large {
-            padding: 13px 26px;
-            font-size: 15px;
-            border-radius: 10px;
-        }
-
-        /* Hero Section */
+        /* ─── Hero Section ─── */
         .hero {
-            padding: 80px 0 60px;
+            padding: 90px 0 70px;
             text-align: center;
         }
 
-        .hero-eyebrow {
+        .hero-badge {
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            padding: 6px 14px;
-            border-radius: 999px;
-            background: rgba(255, 0, 127, 0.1);
-            border: 1px solid rgba(255, 0, 127, 0.3);
-            color: #ff66b2;
-            font-size: 12px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.8px;
-            margin-bottom: 24px;
+            padding: 4px 12px;
+            border-radius: 100px;
+            background: var(--accent-dim);
+            border: 1px solid var(--accent-border);
+            color: var(--accent);
+            font-size: 12.5px;
+            font-weight: 600;
+            margin-bottom: 28px;
+            letter-spacing: 0.01em;
         }
 
-        .hero-eyebrow .pulse-dot {
-            width: 7px;
-            height: 7px;
+        .hero-badge-dot {
+            width: 6px;
+            height: 6px;
             border-radius: 50%;
-            background: var(--magenta-electric);
-            box-shadow: 0 0 8px var(--magenta-electric);
-            animation: pulse-ring 2s infinite;
+            background: var(--accent);
         }
 
-        @keyframes pulse-ring {
-            0% { transform: scale(0.95); opacity: 1; }
-            50% { transform: scale(1.3); opacity: 0.6; }
-            100% { transform: scale(0.95); opacity: 1; }
-        }
-
-        .hero-title {
-            font-size: clamp(40px, 6vw, 68px);
-            font-weight: 900;
+        .hero h1 {
+            font-size: clamp(40px, 5.2vw, 68px);
+            font-weight: 700;
+            letter-spacing: -0.03em;
             line-height: 1.08;
-            letter-spacing: -1.8px;
-            margin-bottom: 24px;
-            color: #ffffff;
+            color: var(--text-primary);
+            margin-bottom: 22px;
+            max-width: 820px;
+            margin-left: auto;
+            margin-right: auto;
         }
 
-        .gradient-text {
-            background: linear-gradient(135deg, #ffffff 0%, var(--volt-neon) 40%, var(--magenta-electric) 80%, var(--cyan-hyper) 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            display: inline-block;
+        .hero h1 span {
+            color: var(--text-muted);
         }
 
-        .hero-subtitle {
-            font-size: clamp(17px, 2vw, 20px);
+        .hero-sub {
+            font-size: 17.5px;
             color: var(--text-secondary);
-            max-width: 740px;
+            max-width: 580px;
             margin: 0 auto 36px;
             line-height: 1.6;
         }
 
-        .hero-cta-group {
+        .hero-actions {
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 16px;
+            gap: 12px;
+            margin-bottom: 56px;
             flex-wrap: wrap;
-            margin-bottom: 48px;
         }
 
-        /* Hero Interactive Stage */
-        .hero-stage {
-            display: grid;
-            grid-template-columns: 1fr 1.3fr;
-            gap: 24px;
-            margin-top: 20px;
-            perspective: 1000px;
+        .btn-primary {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 11px 22px;
+            background: var(--text-primary);
+            color: var(--bg);
+            font-size: 14.5px;
+            font-weight: 600;
+            border-radius: 7px;
+            text-decoration: none;
+            border: none;
+            cursor: pointer;
+            transition: opacity 0.15s;
         }
 
-        @media (max-width: 960px) {
-            .hero-stage {
-                grid-template-columns: 1fr;
-            }
+        .btn-primary:hover {
+            opacity: 0.88;
         }
 
-        /* AI Prompt Editor Card */
-        .prompt-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-glass);
-            border-radius: 16px;
+        .btn-secondary {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 11px 20px;
+            background: transparent;
+            color: var(--text-primary);
+            font-size: 14.5px;
+            font-weight: 500;
+            border-radius: 7px;
+            text-decoration: none;
+            border: 1px solid var(--border-hover);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255,255,255,0.05);
+            border-color: rgba(255,255,255,0.25);
+        }
+
+        /* ─── Hero Product Interface Preview (Linear / Raycast Style) ─── */
+        .hero-preview {
+            position: relative;
+            max-width: 980px;
+            margin: 0 auto;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: var(--bg-surface);
             overflow: hidden;
-            text-align: left;
-            backdrop-filter: blur(16px);
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
-            display: flex;
-            flex-direction: column;
+            box-shadow: 0 30px 100px rgba(0,0,0,0.7);
         }
 
-        .card-topbar {
-            background: rgba(255, 255, 255, 0.03);
-            border-bottom: 1px solid var(--border-glass);
-            padding: 12px 18px;
+        .preview-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
+            padding: 12px 18px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(255,255,255,0.02);
+            flex-wrap: wrap;
+            gap: 12px;
         }
 
-        .window-dots {
+        .preview-window-controls {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .preview-dots {
             display: flex;
             gap: 6px;
         }
 
-        .window-dot {
+        .preview-dot {
             width: 10px;
             height: 10px;
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.15);
         }
 
-        .window-dot:nth-child(1) { background: #ff5f56; }
-        .window-dot:nth-child(2) { background: #ffbd2e; }
-        .window-dot:nth-child(3) { background: #27c93f; }
+        .preview-dot:nth-child(1) { background: #ef4444; }
+        .preview-dot:nth-child(2) { background: #eab308; }
+        .preview-dot:nth-child(3) { background: #22c55e; }
 
-        .topbar-label {
+        .preview-url {
+            font-family: var(--mono);
             font-size: 12px;
             color: var(--text-muted);
-            font-family: var(--font-mono);
         }
 
-        .prompt-body {
-            padding: 20px;
-            flex-grow: 1;
+        .preview-tabs {
             display: flex;
-            flex-direction: column;
-            gap: 18px;
-        }
-
-        .ai-chat-bubble {
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            border-radius: 10px;
-            padding: 14px 16px;
-            font-size: 13.5px;
-            color: var(--text-primary);
-        }
-
-        .ai-author {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 11px;
-            font-weight: 700;
-            color: var(--volt-neon);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 6px;
-        }
-
-        .code-snippet-box {
-            background: #040508;
-            border: 1px solid rgba(204, 255, 0, 0.2);
-            border-radius: 10px;
-            padding: 16px;
-            font-family: var(--font-mono);
-            font-size: 12.5px;
-            color: #d1d5db;
-            position: relative;
-            line-height: 1.5;
-        }
-
-        .code-snippet-box .highlight {
-            color: var(--volt-neon);
-        }
-
-        .code-snippet-box .attr {
-            color: var(--cyan-hyper);
-        }
-
-        .code-snippet-box .val {
-            color: #fca5a5;
-        }
-
-        .copy-pill {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(255, 255, 255, 0.08);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            color: var(--text-primary);
-            font-size: 11px;
-            font-weight: 600;
-            padding: 4px 10px;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .copy-pill:hover {
-            background: var(--volt-neon);
-            color: #000;
-            border-color: var(--volt-neon);
-        }
-
-        .prompt-footer {
-            margin-top: auto;
-            padding-top: 12px;
-            border-top: 1px solid var(--border-glass);
-            font-size: 12px;
-            color: var(--text-muted);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        /* Live Heatmap Interactive Canvas */
-        .simulator-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-glass);
-            border-radius: 16px;
-            overflow: hidden;
-            backdrop-filter: blur(16px);
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-            display: flex;
-            flex-direction: column;
-            text-align: left;
-            position: relative;
-        }
-
-        .sim-toolbar {
-            padding: 12px 18px;
-            background: rgba(255, 255, 255, 0.03);
-            border-bottom: 1px solid var(--border-glass);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            flex-wrap: wrap;
-            gap: 12px;
-        }
-
-        .mode-toggles {
-            display: flex;
-            gap: 6px;
-            background: rgba(0, 0, 0, 0.4);
+            background: var(--bg);
             padding: 3px;
-            border-radius: 8px;
-            border: 1px solid var(--border-glass);
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            gap: 2px;
         }
 
-        .mode-btn {
+        .preview-tab {
             background: transparent;
             border: none;
-            color: var(--text-secondary);
+            color: var(--text-muted);
             font-size: 12px;
-            font-weight: 600;
-            padding: 5px 12px;
-            border-radius: 6px;
+            font-weight: 500;
+            padding: 4px 12px;
+            border-radius: 4px;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.15s;
         }
 
-        .mode-btn.active {
-            background: rgba(204, 255, 0, 0.15);
-            color: var(--volt-neon);
-            box-shadow: 0 0 10px rgba(204, 255, 0, 0.2);
+        .preview-tab.active {
+            background: var(--bg-elevated);
+            color: var(--text-primary);
+            font-weight: 600;
         }
 
-        .sim-canvas {
+        /* Inner Simulated Product Canvas */
+        .preview-viewport {
+            padding: 24px 32px 32px;
+            background: #09090b;
             position: relative;
-            height: 380px;
-            background: #090c14;
-            overflow: hidden;
-            cursor: crosshair;
-            padding: 24px;
+            min-height: 420px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
             user-select: none;
         }
 
-        /* Mock UI inside Simulator */
-        .mock-app-shell {
-            background: rgba(18, 24, 38, 0.95);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 12px;
-            height: 100%;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-            position: relative;
-            z-index: 2;
-        }
-
-        .mock-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-            padding-bottom: 12px;
-        }
-
-        .mock-title {
-            font-size: 14px;
-            font-weight: 700;
-            color: #fff;
-        }
-
-        .mock-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 12px;
-            flex-grow: 1;
-        }
-
-        .mock-tile {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.06);
+        /* Mock Web App Frame */
+        .mock-app {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
             border-radius: 10px;
-            padding: 14px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            transition: all 0.2s ease;
-            position: relative;
-        }
-
-        .mock-tile:hover {
-            border-color: rgba(204, 255, 0, 0.4);
-            transform: translateY(-2px);
-        }
-
-        .mock-btn-primary {
-            background: linear-gradient(135deg, var(--volt-neon) 0%, #a6d900 100%);
-            color: #000;
-            font-weight: 700;
-            font-size: 12px;
-            padding: 8px 12px;
-            border-radius: 6px;
-            border: none;
-            cursor: pointer;
-            box-shadow: 0 0 15px rgba(204, 255, 0, 0.3);
-        }
-
-        .mock-btn-secondary {
-            background: rgba(255, 255, 255, 0.08);
-            color: #fff;
-            font-size: 12px;
-            padding: 8px 12px;
-            border-radius: 6px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            cursor: pointer;
-        }
-
-        /* Real-Time Hotspot Particle Layer */
-        .hotspot-particle {
-            position: absolute;
-            transform: translate(-50%, -50%);
-            border-radius: 50%;
-            pointer-events: none;
-            z-index: 10;
-            mix-blend-mode: screen;
-        }
-
-        .coord-hud {
-            position: absolute;
-            bottom: 12px;
-            left: 14px;
-            font-family: var(--font-mono);
-            font-size: 11px;
-            color: var(--volt-neon);
-            background: rgba(0, 0, 0, 0.7);
-            border: 1px solid rgba(204, 255, 0, 0.3);
-            padding: 4px 10px;
-            border-radius: 6px;
-            z-index: 20;
-            pointer-events: none;
-        }
-
-        .counter-hud {
-            position: absolute;
-            bottom: 12px;
-            right: 14px;
-            font-family: var(--font-mono);
-            font-size: 11px;
-            color: var(--cyan-hyper);
-            background: rgba(0, 0, 0, 0.7);
-            border: 1px solid rgba(0, 240, 255, 0.3);
-            padding: 4px 10px;
-            border-radius: 6px;
-            z-index: 20;
-            pointer-events: none;
-        }
-
-        /* Dead Click Alert Layer */
-        .dead-click-box {
-            position: absolute;
-            border: 2px dashed #ff0055;
-            background: rgba(255, 0, 85, 0.15);
-            border-radius: 8px;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            color: #ff3377;
-            font-size: 11px;
-            font-weight: 700;
-            font-family: var(--font-mono);
-            z-index: 15;
-            animation: dead-pulse 1.2s infinite;
-        }
-
-        @keyframes dead-pulse {
-            0% { opacity: 0.6; }
-            50% { opacity: 1; box-shadow: 0 0 15px rgba(255, 0, 85, 0.4); }
-            100% { opacity: 0.6; }
-        }
-
-        /* Section Title Section */
-        .section-header {
-            text-align: center;
-            margin: 100px 0 50px;
-        }
-
-        .section-pill {
-            display: inline-block;
-            font-size: 11px;
-            font-weight: 800;
-            color: var(--cyan-hyper);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            padding: 4px 12px;
-            border-radius: 999px;
-            background: rgba(0, 240, 255, 0.08);
-            border: 1px solid rgba(0, 240, 255, 0.25);
-            margin-bottom: 16px;
-        }
-
-        .section-title {
-            font-size: clamp(32px, 4vw, 44px);
-            font-weight: 800;
-            letter-spacing: -1px;
-            margin-bottom: 16px;
-        }
-
-        .section-desc {
-            font-size: 17px;
-            color: var(--text-secondary);
-            max-width: 680px;
-            margin: 0 auto;
-        }
-
-        /* Comparison Matrix */
-        .comparison-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 24px;
-            margin-bottom: 80px;
-        }
-
-        @media (max-width: 768px) {
-            .comparison-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .compare-card {
-            border-radius: 16px;
-            padding: 32px;
-            position: relative;
-        }
-
-        .compare-card.old-way {
-            background: rgba(20, 10, 15, 0.6);
-            border: 1px solid rgba(255, 50, 50, 0.15);
-        }
-
-        .compare-card.hotspot-way {
-            background: rgba(10, 25, 20, 0.6);
-            border: 1px solid rgba(204, 255, 0, 0.35);
-            box-shadow: 0 0 40px rgba(204, 255, 0, 0.08);
-        }
-
-        .compare-badge {
-            font-size: 12px;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 0.8px;
-            margin-bottom: 16px;
-            display: inline-block;
-        }
-
-        .old-way .compare-badge { color: #ff5566; }
-        .hotspot-way .compare-badge { color: var(--volt-neon); }
-
-        .compare-list {
-            list-style: none;
-            margin-top: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 14px;
-        }
-
-        .compare-item {
-            display: flex;
-            align-items: flex-start;
-            gap: 12px;
-            font-size: 15px;
-        }
-
-        .compare-item .icon {
-            font-size: 16px;
-            line-height: 1.4;
-        }
-
-        /* Superpowers Grid */
-        .superpowers-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 24px;
-            margin-bottom: 90px;
-        }
-
-        @media (max-width: 960px) {
-            .superpowers-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .power-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-glass);
-            border-radius: 16px;
-            padding: 32px;
-            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-        }
-
-        .power-card:hover {
-            border-color: var(--border-hover);
-            transform: translateY(-4px);
-            box-shadow: 0 15px 35px rgba(204, 255, 0, 0.08);
-        }
-
-        .power-icon {
-            width: 48px;
-            height: 48px;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 22px;
-            margin-bottom: 24px;
-        }
-
-        .power-card:nth-child(1) .power-icon { background: rgba(204, 255, 0, 0.12); color: var(--volt-neon); border: 1px solid rgba(204, 255, 0, 0.3); }
-        .power-card:nth-child(2) .power-icon { background: rgba(255, 0, 127, 0.12); color: var(--magenta-electric); border: 1px solid rgba(255, 0, 127, 0.3); }
-        .power-card:nth-child(3) .power-icon { background: rgba(0, 240, 255, 0.12); color: var(--cyan-hyper); border: 1px solid rgba(0, 240, 255, 0.3); }
-
-        .power-title {
-            font-size: 20px;
-            font-weight: 700;
-            margin-bottom: 12px;
-            color: #fff;
-        }
-
-        .power-text {
-            color: var(--text-secondary);
-            font-size: 14.5px;
-            line-height: 1.6;
-        }
-
-        /* Live Ingestion Playground Terminal */
-        .terminal-section {
-            background: #040609;
-            border: 1px solid var(--border-glass);
-            border-radius: 18px;
-            padding: 32px;
-            margin-bottom: 100px;
-            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
-        }
-
-        .terminal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid var(--border-glass);
-            padding-bottom: 20px;
-            margin-bottom: 24px;
-            flex-wrap: wrap;
-            gap: 16px;
-        }
-
-        .terminal-title-group h3 {
-            font-size: 18px;
-            font-weight: 700;
-            margin-bottom: 4px;
-        }
-
-        .terminal-title-group p {
-            font-size: 13px;
-            color: var(--text-muted);
-        }
-
-        .test-trigger-buttons {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-
-        .test-btn {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid var(--border-glass);
-            color: var(--text-primary);
-            padding: 8px 14px;
-            font-size: 12.5px;
-            font-weight: 600;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .test-btn:hover {
-            background: rgba(204, 255, 0, 0.15);
-            border-color: var(--volt-neon);
-            color: var(--volt-neon);
-        }
-
-        .terminal-feed {
-            height: 240px;
-            background: #020305;
-            border-radius: 10px;
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            padding: 16px;
-            font-family: var(--font-mono);
-            font-size: 12.5px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column-reverse;
-            gap: 8px;
-        }
-
-        .feed-row {
-            display: flex;
-            gap: 12px;
-            padding: 6px 8px;
-            border-radius: 4px;
-            background: rgba(255, 255, 255, 0.02);
-            animation: feed-in 0.3s ease;
-        }
-
-        @keyframes feed-in {
-            from { opacity: 0; transform: translateY(-4px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .feed-time { color: var(--text-muted); }
-        .feed-event-name { color: var(--volt-neon); font-weight: 700; }
-        .feed-payload { color: var(--cyan-hyper); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-        /* Bottom Quickstart CTA */
-        .bottom-cta {
-            background: radial-gradient(circle at 50% 0%, rgba(204, 255, 0, 0.15) 0%, rgba(255, 0, 127, 0.05) 50%, transparent 80%), var(--bg-card);
-            border: 1px solid var(--border-glass);
-            border-radius: 24px;
-            padding: 60px 32px;
-            text-align: center;
-            margin-bottom: 80px;
+            padding: 28px;
             position: relative;
             overflow: hidden;
         }
 
-        .bottom-cta h2 {
-            font-size: clamp(32px, 4vw, 48px);
-            font-weight: 900;
-            letter-spacing: -1.2px;
+        .mock-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 16px;
+            margin-bottom: 24px;
+        }
+
+        .mock-brand {
+            font-size: 13.5px;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .mock-nav-links {
+            display: flex;
+            gap: 20px;
+            font-size: 12.5px;
+            color: var(--text-muted);
+        }
+
+        .mock-hero-content {
+            text-align: center;
+            padding: 20px 0 28px;
+        }
+
+        .mock-h2 {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-bottom: 8px;
+        }
+
+        .mock-p {
+            font-size: 13.5px;
+            color: var(--text-muted);
+            max-width: 440px;
+            margin: 0 auto 20px;
+        }
+
+        .mock-cta-row {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            position: relative;
+        }
+
+        .mock-primary-btn {
+            background: var(--text-primary);
+            color: var(--bg);
+            font-size: 13px;
+            font-weight: 600;
+            padding: 9px 18px;
+            border-radius: 6px;
+            border: none;
+            position: relative;
+        }
+
+        .mock-secondary-btn {
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 500;
+            padding: 9px 16px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            position: relative;
+        }
+
+        .mock-broken-link {
+            font-size: 12px;
+            color: #f87171;
+            text-decoration: underline;
+            cursor: pointer;
+            position: relative;
+        }
+
+        /* ─── Heatmap Cluster Overlays ─── */
+        .heat-cluster {
+            position: absolute;
+            pointer-events: none;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: opacity 0.3s ease;
+        }
+
+        .heat-primary {
+            width: 140px;
+            height: 90px;
+            background: radial-gradient(ellipse at center, rgba(245, 158, 11, 0.75) 0%, rgba(245, 158, 11, 0.35) 45%, transparent 75%);
+            filter: blur(4px);
+        }
+
+        .heat-secondary {
+            width: 90px;
+            height: 60px;
+            background: radial-gradient(ellipse at center, rgba(245, 158, 11, 0.45) 0%, rgba(245, 158, 11, 0.15) 50%, transparent 75%);
+            filter: blur(4px);
+        }
+
+        /* Inspection Badge Tooltips */
+        .inspect-badge {
+            position: absolute;
+            top: -28px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #18181b;
+            border: 1px solid rgba(245, 158, 11, 0.35);
+            color: var(--text-primary);
+            font-family: var(--mono);
+            font-size: 10.5px;
+            font-weight: 500;
+            padding: 2px 8px;
+            border-radius: 4px;
+            white-space: nowrap;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            pointer-events: none;
+        }
+
+        .inspect-badge span {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        /* Rage Click Alert Box */
+        .rage-callout {
+            position: absolute;
+            bottom: -32px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(239, 68, 68, 0.12);
+            border: 1px solid rgba(239, 68, 68, 0.35);
+            color: #fca5a5;
+            font-family: var(--mono);
+            font-size: 10.5px;
+            font-weight: 600;
+            padding: 3px 10px;
+            border-radius: 4px;
+            white-space: nowrap;
+            display: none;
+        }
+
+        /* Preview Bottom Bar */
+        .preview-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            color: var(--text-muted);
+            border-top: 1px solid var(--border);
+            padding-top: 16px;
+        }
+
+        .preview-footer-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .live-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #22c55e;
+        }
+
+        /* ─── Code Section (1-Line Integration) ─── */
+        .code-section {
+            padding: 100px 0 120px;
+        }
+
+        .code-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 64px;
+            align-items: center;
+        }
+
+        .code-text h2 {
+            font-size: 36px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            line-height: 1.15;
             margin-bottom: 16px;
         }
 
-        .bottom-cta p {
+        .code-text p {
             color: var(--text-secondary);
-            font-size: 18px;
-            max-width: 600px;
-            margin: 0 auto 32px;
+            font-size: 16px;
+            line-height: 1.7;
+            margin-bottom: 20px;
         }
 
-        .quickstart-cmd {
-            background: #000;
-            border: 1px solid rgba(204, 255, 0, 0.3);
+        .code-block {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
             border-radius: 10px;
-            padding: 14px 20px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .code-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(255,255,255,0.02);
+        }
+
+        .code-tab {
+            font-family: var(--mono);
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .code-copy {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            background: transparent;
+            border: 1px solid var(--border);
+            padding: 4px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: var(--font);
+            transition: all 0.15s;
+        }
+
+        .code-copy:hover {
+            color: var(--text-primary);
+            border-color: var(--border-hover);
+        }
+
+        .code-body {
+            padding: 24px;
+            font-family: var(--mono);
+            font-size: 13px;
+            line-height: 1.75;
+            color: var(--text-secondary);
+            overflow-x: auto;
+        }
+
+        .code-body .tag { color: #f87171; }
+        .code-body .attr { color: #c084fc; }
+        .code-body .str { color: #34d399; }
+        .code-body .comment { color: var(--text-muted); }
+
+        /* ─── Features Bento Grid ─── */
+        .features {
+            padding: 40px 0 120px;
+        }
+
+        .features-header {
+            text-align: center;
+            margin-bottom: 56px;
+        }
+
+        .features-header h2 {
+            font-size: 36px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-bottom: 12px;
+        }
+
+        .features-header p {
+            font-size: 16.5px;
+            color: var(--text-secondary);
+            max-width: 480px;
+            margin: 0 auto;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1px;
+            background: var(--border);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .feature-card {
+            background: var(--bg);
+            padding: 36px 30px;
+            transition: background 0.2s;
+        }
+
+        .feature-card:hover {
+            background: rgba(255, 255, 255, 0.015);
+        }
+
+        .feature-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 8px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            color: var(--accent);
+        }
+
+        .feature-card h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .feature-card p {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        /* ─── Comparison Matrix ─── */
+        .comparison {
+            padding: 40px 0 120px;
+        }
+
+        .comparison-header {
+            text-align: center;
+            margin-bottom: 48px;
+        }
+
+        .comparison-header h2 {
+            font-size: 36px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-bottom: 12px;
+        }
+
+        .comparison-header p {
+            font-size: 16.5px;
+            color: var(--text-secondary);
+        }
+
+        .comparison-table {
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            background: var(--bg-surface);
+        }
+
+        .comparison-row {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr 1fr;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .comparison-row:last-child {
+            border-bottom: none;
+        }
+
+        .comparison-row.header {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .comparison-cell {
+            padding: 16px 24px;
+            font-size: 14px;
+            color: var(--text-secondary);
+            border-right: 1px solid var(--border);
+        }
+
+        .comparison-cell:last-child {
+            border-right: none;
+        }
+
+        .comparison-cell.label {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .comparison-cell.header-cell {
+            font-weight: 600;
+            font-size: 12px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .comparison-cell.highlight {
+            color: var(--accent);
+            font-weight: 500;
+        }
+
+        /* ─── CTA Box ─── */
+        .cta-section {
+            padding: 40px 0 120px;
+        }
+
+        .cta-box {
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 72px 36px;
+            text-align: center;
+            background: var(--bg-surface);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cta-box::before {
+            content: '';
+            position: absolute;
+            top: -150px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 500px;
+            height: 300px;
+            background: radial-gradient(circle, rgba(245, 158, 11, 0.06) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .cta-box h2 {
+            font-size: clamp(30px, 4vw, 42px);
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-bottom: 14px;
+            position: relative;
+        }
+
+        .cta-box p {
+            font-size: 16.5px;
+            color: var(--text-secondary);
+            max-width: 480px;
+            margin: 0 auto 30px;
+            position: relative;
+        }
+
+        .cta-code {
             display: inline-flex;
             align-items: center;
-            gap: 14px;
-            font-family: var(--font-mono);
-            font-size: 14px;
-            color: var(--volt-neon);
+            gap: 12px;
+            padding: 11px 20px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 7px;
+            font-family: var(--mono);
+            font-size: 13.5px;
+            color: var(--text-secondary);
             margin-bottom: 30px;
             cursor: pointer;
-            transition: border-color 0.2s;
+            transition: border-color 0.15s;
+            position: relative;
         }
 
-        .quickstart-cmd:hover {
-            border-color: var(--volt-neon);
+        .cta-code:hover {
+            border-color: var(--border-hover);
         }
 
-        /* Footer */
-        footer {
-            border-top: 1px solid var(--border-glass);
-            padding: 40px 0;
+        .cta-code .prompt {
             color: var(--text-muted);
-            font-size: 13.5px;
+        }
+
+        .cta-actions {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            position: relative;
+        }
+
+        /* ─── Footer ─── */
+        footer {
+            border-top: 1px solid var(--border);
+            padding: 32px 0;
         }
 
         .footer-inner {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            flex-wrap: wrap;
-            gap: 20px;
+        }
+
+        .footer-left {
+            font-size: 13px;
+            color: var(--text-muted);
         }
 
         .footer-links {
@@ -954,542 +864,447 @@
         }
 
         .footer-links a {
-            color: var(--text-secondary);
+            font-size: 13px;
+            color: var(--text-muted);
             text-decoration: none;
-            transition: color 0.2s ease;
+            transition: color 0.15s;
         }
 
         .footer-links a:hover {
-            color: var(--volt-neon);
+            color: var(--text-secondary);
+        }
+
+        /* ─── Responsive ─── */
+        @media (max-width: 768px) {
+            .nav-links { display: none; }
+            .hero { padding: 60px 0 40px; }
+            .hero-actions { flex-direction: column; }
+            .code-layout { grid-template-columns: 1fr; gap: 40px; }
+            .features-grid { grid-template-columns: 1fr; }
+            .comparison-row { grid-template-columns: 1fr; }
+            .comparison-row.header { display: none; }
+            .comparison-cell { border-right: none; }
+            .footer-inner { flex-direction: column; gap: 16px; }
+        }
+
+        /* Scroll reveal */
+        .reveal {
+            opacity: 0;
+            transform: translateY(18px);
         }
     </style>
 </head>
 <body>
-    <!-- Ambient Cyber-Thermal Mesh -->
-    <div class="ambient-mesh">
-        <div class="mesh-orb-1"></div>
-        <div class="mesh-orb-2"></div>
-        <div class="grid-matrix"></div>
-    </div>
 
-    <!-- Navigation Header -->
-    <header>
+    <div class="ambient-glow"></div>
+
+    <!-- Navigation -->
+    <nav>
         <div class="container nav-inner">
-            <a href="/" class="brand-logo">
-                <!-- Precision Hexagon Beacon Reticle -->
-                <svg class="logo-reticle" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <polygon points="18,3 33,11.5 33,28.5 18,37 3,28.5 3,11.5" stroke="var(--volt-neon)" stroke-width="2" stroke-opacity="0.8" fill="#07080D"/>
-                    <circle cx="18" cy="20" r="10" stroke="var(--cyan-hyper)" stroke-width="1.5" stroke-dasharray="2 3"/>
-                    <circle cx="18" cy="20" r="5" fill="var(--magenta-electric)"/>
-                    <circle cx="18" cy="20" r="2.2" fill="var(--volt-neon)"/>
+            <a href="/" class="logo">
+                <svg class="logo-mark" viewBox="0 0 28 28" fill="none">
+                    <circle cx="14" cy="14" r="13" stroke="var(--accent)" stroke-width="1.5" fill="none"/>
+                    <circle cx="14" cy="14" r="5" fill="var(--accent)" opacity="0.9"/>
+                    <circle cx="14" cy="14" r="2" fill="var(--bg)"/>
                 </svg>
-                <span class="brand-title">
-                    HOTSPOT
-                    <span class="brand-badge">FOR AI BUILDERS</span>
-                </span>
+                <span class="logo-text">Hotspot</span>
             </a>
 
             <div class="nav-links">
-                <a href="#simulator">Live Simulator</a>
-                <a href="/playground/" style="color: var(--cyan-hyper); font-weight: 700;">🎮 AI Playground</a>
-                <a href="#superpowers">Superpowers</a>
-                <a href="#compare">Why Not GA4?</a>
-                <a href="#playground">Telemetry Console</a>
-                <a href="/hotspot.js" target="_blank">hotspot.js</a>
+                <a href="#features">Features</a>
+                <a href="#setup">Setup</a>
+                <a href="#compare">Compare</a>
+                <a href="/playground/">Playground</a>
             </div>
 
             <div class="nav-actions">
-                <a href="/playground/" class="btn btn-ghost" style="border-color: rgba(0, 240, 255, 0.4); color: var(--cyan-hyper);">🎮 Live Playground</a>
-                <a href="/login" class="btn btn-volt">Open Workspace</a>
+                <a href="/playground/" class="nav-link-btn">Demo app</a>
+                <a href="/login" class="nav-cta">Open dashboard</a>
             </div>
         </div>
-    </header>
+    </nav>
 
     <main>
-        <!-- Hero Section -->
+
+        <!-- Hero -->
         <section class="container hero">
-            <div class="hero-eyebrow">
-                <span class="pulse-dot"></span>
-                Built for builders coding with AI • Cursor • v0 • Claude • Bolt • Lovable
+            <div class="hero-badge">
+                <span class="hero-badge-dot"></span>
+                Built for apps created with AI
             </div>
 
-            <h1 class="hero-title">
-                You built your app with AI.<br>
-                <span class="gradient-text">See how humans actually use it.</span>
+            <h1>
+                See where people click.<br>
+                <span>Find what's broken.</span>
             </h1>
 
-            <p class="hero-subtitle">
-                Don’t spend 20 hours writing tracking boilerplate your AI might hallucinate. Drop in one script tag. Get instant visual heatmaps, rage click detection, and user journeys — 100% self-hosted & free.
+            <p class="hero-sub">
+                Drop one script tag into your app. Hotspot autocaptures every
+                interaction, heatmaps real user clicks, and flags broken buttons.
+                Self-hosted, private, and free.
             </p>
 
-            <div class="hero-cta-group">
-                <a href="/playground/" class="btn btn-volt btn-large">🎮 Open Live Playground</a>
-                <a href="/login" class="btn btn-ghost btn-large">Launch Free Workspace ↗</a>
-                <button onclick="copySnippet()" class="btn btn-ghost btn-large" id="hero-copy-btn">
-                    📋 Copy 1-Line Script Tag
-                </button>
+            <div class="hero-actions">
+                <a href="/login" class="btn-primary">Open workspace</a>
+                <a href="/playground/" class="btn-secondary">Try live playground →</a>
             </div>
 
-            <!-- Hero Interactive Stage: Prompt -> Heatmap Result -->
-            <div class="hero-stage" id="simulator">
-                <!-- Left: AI Prompt Box -->
-                <div class="prompt-card">
-                    <div class="card-topbar">
-                        <div class="window-dots">
-                            <div class="window-dot"></div>
-                            <div class="window-dot"></div>
-                            <div class="window-dot"></div>
+            <!-- Product Preview: Authentic Product Visual with View Modes -->
+            <div class="hero-preview reveal">
+                <div class="preview-header">
+                    <div class="preview-window-controls">
+                        <div class="preview-dots">
+                            <span class="preview-dot"></span>
+                            <span class="preview-dot"></span>
+                            <span class="preview-dot"></span>
                         </div>
-                        <span class="topbar-label">AI_PROMPT_WORKFLOW.tsx</span>
+                        <span class="preview-url">hotspot-dashboard / heatmaps / acme-landing</span>
                     </div>
 
-                    <div class="prompt-body">
-                        <div class="ai-chat-bubble">
-                            <div class="ai-author">
-                                <span>🤖 Cursor / Claude Code Prompt</span>
-                            </div>
-                            "Add Hotspot visual analytics to my app layout so I can see what users click and where they drop off."
-                        </div>
-
-                        <div class="code-snippet-box">
-                            <button class="copy-pill" onclick="copySnippet()">Copy</button>
-                            &lt;<span class="highlight">script</span><br>
-                            &nbsp;&nbsp;<span class="attr">src</span>=<span class="val">"{{ site_url }}/hotspot.js"</span><br>
-                            &nbsp;&nbsp;<span class="attr">data-api-key</span>=<span class="val">"hs_live_demo_sample_token"</span><br>
-                            &nbsp;&nbsp;<span class="attr">data-api-host</span>=<span class="val">"{{ site_url }}"</span>&gt;<br>
-                            &lt;/<span class="highlight">script</span>&gt;
-                        </div>
-
-                        <div class="prompt-footer">
-                            <span>⚡ 12KB zero-dependency SDK</span>
-                            <span>🔒 100% Private & Self-Hosted</span>
-                        </div>
+                    <div class="preview-tabs">
+                        <button class="preview-tab active" onclick="setPreviewMode('heat', this)">Click map</button>
+                        <button class="preview-tab" onclick="setPreviewMode('rage', this)">Rage clicks</button>
+                        <button class="preview-tab" onclick="setPreviewMode('dead', this)">Dead links</button>
                     </div>
                 </div>
 
-                <!-- Right: Live Interactive Heatmap Simulator -->
-                <div class="simulator-card">
-                    <div class="sim-toolbar">
-                        <div style="font-size: 13px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px;">
-                            <span>🎯 Live Heatmap Engine</span>
-                            <span style="font-size: 11px; color: var(--text-muted);">(Move mouse & click anywhere)</span>
+                <div class="preview-viewport">
+                    <!-- Simulated App Interface Being Analyzed -->
+                    <div class="mock-app">
+                        <div class="mock-nav">
+                            <div class="mock-brand">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+                                    <polyline points="2 17 12 22 22 17"/>
+                                    <polyline points="2 12 12 17 22 12"/>
+                                </svg>
+                                <span>Acme App</span>
+                            </div>
+                            <div class="mock-nav-links">
+                                <span>Features</span>
+                                <span>Pricing</span>
+                                <span>Changelog</span>
+                            </div>
                         </div>
-                        <div class="mode-toggles">
-                            <button class="mode-btn active" id="btn-mode-heat" onclick="setMode('heat')">🔥 Click Heatmap</button>
-                            <button class="mode-btn" id="btn-mode-dead" onclick="setMode('dead')">💥 Dead Clicks</button>
-                            <button class="mode-btn" id="btn-mode-funnel" onclick="setMode('funnel')">📉 Drop-off</button>
+
+                        <div class="mock-hero-content">
+                            <div class="mock-h2">Build software at the speed of thought</div>
+                            <p class="mock-p">The fastest way to take ideas from prompt to production in your browser.</p>
+
+                            <div class="mock-cta-row">
+                                <!-- Primary CTA with Heat Cluster -->
+                                <button class="mock-primary-btn" id="mock-primary">
+                                    Start building free
+                                    <div class="heat-cluster heat-primary" id="heat-primary" style="top: 50%; left: 50%;"></div>
+                                    <div class="inspect-badge" id="inspect-primary">
+                                        <span>1,420 clicks</span> (68.4%)
+                                    </div>
+                                </button>
+
+                                <!-- Secondary CTA with subtle heat -->
+                                <button class="mock-secondary-btn" id="mock-secondary">
+                                    View template
+                                    <div class="heat-cluster heat-secondary" id="heat-secondary" style="top: 50%; left: 50%;"></div>
+                                </button>
+
+                                <!-- Broken Link with Dead/Rage Indicator -->
+                                <div style="position: relative; display: inline-block;">
+                                    <span class="mock-broken-link" id="mock-broken">API Reference →</span>
+                                    <div class="rage-callout" id="rage-callout">
+                                        ⚠️ 24 rage clicks • Dead link
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="sim-canvas" id="sim-canvas">
-                        <!-- Mock UI inside simulator -->
-                        <div class="mock-app-shell">
-                            <div class="mock-header">
-                                <span class="mock-title">SaaS Workspace • Live Feed</span>
-                                <button class="mock-btn-primary" id="demo-target-1">⚡ Deploy AI Model</button>
-                            </div>
-
-                            <div class="mock-grid">
-                                <div class="mock-tile" id="demo-target-2">
-                                    <div>
-                                        <div style="font-size: 11px; color: var(--cyan-hyper); font-weight: 700; margin-bottom: 4px;">PRO PLAN</div>
-                                        <div style="font-size: 18px; font-weight: 800; color: #fff;">$29/mo</div>
-                                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Unlimited AI generations</div>
-                                    </div>
-                                    <button class="mock-btn-secondary" style="margin-top: 10px;">Select Plan</button>
-                                </div>
-
-                                <div class="mock-tile" id="demo-target-3">
-                                    <div>
-                                        <div style="font-size: 11px; color: var(--magenta-electric); font-weight: 700; margin-bottom: 4px;">TEAM SEATS</div>
-                                        <div style="font-size: 18px; font-weight: 800; color: #fff;">4 Members</div>
-                                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Shared prompt library</div>
-                                    </div>
-                                    <button class="mock-btn-secondary" style="margin-top: 10px;">Invite User</button>
-                                </div>
-
-                                <div class="mock-tile" id="demo-target-dead">
-                                    <div>
-                                        <div style="font-size: 11px; color: #ff5566; font-weight: 700; margin-bottom: 4px;">BROKEN AI BUTTON</div>
-                                        <div style="font-size: 13px; font-weight: 700; color: #fff;">Unlinked Link</div>
-                                        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">AI forgot href target</div>
-                                    </div>
-                                    <span style="font-size: 11px; color: #ff5566; text-decoration: underline; margin-top: 10px; cursor: pointer;">Learn more →</span>
-                                </div>
-                            </div>
+                    <!-- Telemetry Footer Bar -->
+                    <div class="preview-footer">
+                        <div class="preview-footer-left">
+                            <span class="live-dot"></span>
+                            <span>Autocapture streaming</span>
+                            <span style="color: var(--text-muted);">•</span>
+                            <span style="font-family: var(--mono); font-size: 11px;">4,291 visits captured</span>
                         </div>
-
-                        <!-- Dead click highlight layer -->
-                        <div class="dead-click-box" id="dead-click-indicator">
-                            ⚠️ 14 RAGE CLICKS (DEAD LINK)
+                        <div style="font-family: var(--mono); font-size: 11px; color: var(--text-muted);">
+                            SDK latency: 8ms
                         </div>
-
-                        <!-- Live Coordinate HUD -->
-                        <div class="coord-hud" id="hud-coords">X: 0 | Y: 0</div>
-                        <div class="counter-hud" id="hud-counter">Hotspots Plotted: 0</div>
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- Act 2: Comparison (Why GA4 Sucks for AI Builders) -->
-        <section class="container" id="compare">
-            <div class="section-header">
-                <span class="section-pill">NO ENTERPRISE CRAP</span>
-                <h2 class="section-title">Built for how people build software in 2026</h2>
-                <p class="section-desc">
-                    You shouldn't need a certified Google Analytics administrator to understand if someone clicked your pricing card.
+        <!-- Setup (1 Line Script Tag) -->
+        <section class="container code-section" id="setup">
+            <div class="code-layout reveal">
+                <div class="code-text">
+                    <h2>One script tag.<br>Zero config.</h2>
+                    <p>
+                        No npm dependencies. No build steps. No custom event schemas.
+                        Paste the snippet into your HTML head and Hotspot automatically
+                        records every click coordinate, page view, and user journey.
+                    </p>
+                    <p>
+                        Your AI tools build the interface. Hotspot shows you
+                        how humans actually interact with it.
+                    </p>
+                    <a href="/playground/" class="btn-secondary" style="display: inline-flex; margin-top: 8px;">
+                        Test in playground →
+                    </a>
+                </div>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span class="code-tab">index.html</span>
+                        <button class="code-copy" id="copy-btn" onclick="copySnippet()">Copy</button>
+                    </div>
+                    <div class="code-body">
+                        <span class="comment">&lt;!-- Drop into your &lt;head&gt; --&gt;</span><br><br>
+                        &lt;<span class="tag">script</span><br>
+                        &nbsp;&nbsp;<span class="attr">src</span>=<span class="str">"{{ site_url }}/hotspot.js"</span><br>
+                        &nbsp;&nbsp;<span class="attr">data-api-key</span>=<span class="str">"your-project-key"</span><br>
+                        &nbsp;&nbsp;<span class="attr">data-api-host</span>=<span class="str">"{{ site_url }}"</span>&gt;<br>
+                        &lt;/<span class="tag">script</span>&gt;
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features Bento Grid -->
+        <section class="container features" id="features">
+            <div class="features-header reveal">
+                <h2>Built for visual clarity</h2>
+                <p>Everything captured automatically. No analytics background required.</p>
+            </div>
+
+            <div class="features-grid reveal">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <circle cx="12" cy="12" r="3"/>
+                        </svg>
+                    </div>
+                    <h3>Click heatmaps</h3>
+                    <p>See exactly where users click and tap on every page. High-density visual clusters show what captures attention.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                        </svg>
+                    </div>
+                    <h3>Rage click alerts</h3>
+                    <p>Detects rapid, repeated clicks on unresponsive elements. Instantly spots UI components your AI forgot to link.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="15" y1="9" x2="9" y2="15"/>
+                            <line x1="9" y1="9" x2="15" y2="15"/>
+                        </svg>
+                    </div>
+                    <h3>Dead click detection</h3>
+                    <p>Flags non-interactive elements that users treat as links. The most common silent bug in generated frontend code.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                        </svg>
+                    </div>
+                    <h3>Full autocapture</h3>
+                    <p>Every page view, button click, and form interaction is captured with full context. No manual tracking code needed.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="11" width="18" height="11" rx="2"/>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                        </svg>
+                    </div>
+                    <h3>100% Self-hosted</h3>
+                    <p>Runs on your own machine or private Docker instance. No cookie consent banners, no third-party tracking, no surprise bills.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 20h9"/>
+                            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                        </svg>
+                    </div>
+                    <h3>Retroactive funnels</h3>
+                    <p>Build conversion funnels after you release features. Because all data is captured upfront, historical analysis is instant.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Comparison Section -->
+        <section class="container comparison" id="compare">
+            <div class="comparison-header reveal">
+                <h2>No enterprise complexity</h2>
+                <p>Traditional analytics platforms were designed for corporate data teams.</p>
+            </div>
+
+            <div class="comparison-table reveal">
+                <div class="comparison-row header">
+                    <div class="comparison-cell header-cell"></div>
+                    <div class="comparison-cell header-cell">Traditional analytics</div>
+                    <div class="comparison-cell header-cell" style="color: var(--accent);">Hotspot</div>
+                </div>
+                <div class="comparison-row">
+                    <div class="comparison-cell label">Implementation</div>
+                    <div class="comparison-cell">NPM packages, API keys, schemas</div>
+                    <div class="comparison-cell highlight">1 HTML script tag</div>
+                </div>
+                <div class="comparison-row">
+                    <div class="comparison-cell label">Event instrumentation</div>
+                    <div class="comparison-cell">Manual analytics.track() hooks</div>
+                    <div class="comparison-cell highlight">Automatic autocapture</div>
+                </div>
+                <div class="comparison-row">
+                    <div class="comparison-cell label">Visual heatmaps</div>
+                    <div class="comparison-cell" style="color: var(--text-muted);">Separate paid subscription</div>
+                    <div class="comparison-cell highlight">Built-in visualizer</div>
+                </div>
+                <div class="comparison-row">
+                    <div class="comparison-cell label">Broken UI detection</div>
+                    <div class="comparison-cell" style="color: var(--text-muted);">Not available</div>
+                    <div class="comparison-cell highlight">Rage & dead click radar</div>
+                </div>
+                <div class="comparison-row">
+                    <div class="comparison-cell label">Data privacy</div>
+                    <div class="comparison-cell">Cookie banners required</div>
+                    <div class="comparison-cell highlight">Self-hosted, cookieless</div>
+                </div>
+                <div class="comparison-row">
+                    <div class="comparison-cell label">Pricing</div>
+                    <div class="comparison-cell">Free tier to steep cloud pricing</div>
+                    <div class="comparison-cell highlight">Free & open source</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CTA Section -->
+        <section class="container cta-section">
+            <div class="cta-box reveal">
+                <h2>Start seeing what your users see</h2>
+                <p>
+                    Run Hotspot locally or in your private Docker environment.
+                    Single command to start. No account required.
                 </p>
-            </div>
 
-            <div class="comparison-grid">
-                <div class="compare-card old-way">
-                    <span class="compare-badge">❌ Traditional Analytics (GA4 / Mixpanel)</span>
-                    <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 8px;">The Manual Boilerplate Trap</h3>
-                    <p style="color: var(--text-muted); font-size: 14px;">Designed for corporate teams with dedicated telemetry engineers.</p>
-                    <ul class="compare-list">
-                        <li class="compare-item">
-                            <span class="icon">🚫</span>
-                            <span>Requires writing dozens of <code>analytics.track()</code> hooks that clutter your code</span>
-                        </li>
-                        <li class="compare-item">
-                            <span class="icon">🚫</span>
-                            <span>AI models hallucinate event schemas, causing silent data drops</span>
-                        </li>
-                        <li class="compare-item">
-                            <span class="icon">🚫</span>
-                            <span>Forces annoying GDPR cookie popups that destroy 30% of signups</span>
-                        </li>
-                        <li class="compare-item">
-                            <span class="icon">🚫</span>
-                            <span>Surprise $400 monthly cloud invoices once your app gets traffic</span>
-                        </li>
-                    </ul>
+                <div class="cta-code" onclick="copyCommand()">
+                    <span class="prompt">$</span>
+                    <span>./bin/hotspot start</span>
                 </div>
 
-                <div class="compare-card hotspot-way">
-                    <span class="compare-badge">✨ The Hotspot Standard</span>
-                    <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 8px;">Zero-Boilerplate Thermal Vision</h3>
-                    <p style="color: var(--text-secondary); font-size: 14px;">Designed for rapid AI builders who just want visual answers.</p>
-                    <ul class="compare-list">
-                        <li class="compare-item">
-                            <span class="icon">✅</span>
-                            <span><strong>1 script tag</strong>. Automatically captures every click, tap, scroll, and coordinate</span>
-                        </li>
-                        <li class="compare-item">
-                            <span class="icon">✅</span>
-                            <span><strong>Visual thermal heatmaps</strong> rendered straight onto your real interface</span>
-                        </li>
-                        <li class="compare-item">
-                            <span class="icon">✅</span>
-                            <span><strong>Dead-click & rage-click radar</strong> catches broken AI buttons instantly</span>
-                        </li>
-                        <li class="compare-item">
-                            <span class="icon">✅</span>
-                            <span><strong>100% Self-hosted & free forever</strong> on your own Docker or local machine</span>
-                        </li>
-                    </ul>
+                <div class="cta-actions">
+                    <a href="/login" class="btn-primary">Open workspace</a>
+                    <a href="/playground/" class="btn-secondary">Test the playground →</a>
                 </div>
             </div>
         </section>
 
-        <!-- Act 3: Three Superpowers -->
-        <section class="container" id="superpowers">
-            <div class="section-header">
-                <span class="section-pill">PRODUCT SUPERPOWERS</span>
-                <h2 class="section-title">Everything you need to optimize your app</h2>
-                <p class="section-desc">
-                    Actionable, visual insight into your users' real behavior from day one.
-                </p>
-            </div>
-
-            <div class="superpowers-grid">
-                <div class="power-card">
-                    <div>
-                        <div class="power-icon">🔥</div>
-                        <h3 class="power-title">Laser Click Heatmaps</h3>
-                        <p class="power-text">
-                            See exactly where users click, tap, and hover. Visual thermal clusters in Neon Volt highlight high-converting CTAs and navigation dead zones.
-                        </p>
-                    </div>
-                </div>
-
-                <div class="power-card">
-                    <div>
-                        <div class="power-icon">💥</div>
-                        <h3 class="power-title">Rage Click & Bug Radar</h3>
-                        <p class="power-text">
-                            AI-generated UI often looks pretty but contains unlinked tags or broken event handlers. Hotspot automatically flags rapid multi-clicks on dead elements.
-                        </p>
-                    </div>
-                </div>
-
-                <div class="power-card">
-                    <div>
-                        <div class="power-icon">⏳</div>
-                        <h3 class="power-title">Retroactive Funnels</h3>
-                        <p class="power-text">
-                            Forgot to configure a conversion goal last week? Because Hotspot auto-records every user interaction, you can build a funnel today and analyze historical conversions.
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Act 4: Live Telemetry Terminal Playground -->
-        <section class="container" id="playground">
-            <div class="terminal-section">
-                <div class="terminal-header">
-                    <div class="terminal-title-group">
-                        <h3>Interactive Telemetry Stream</h3>
-                        <p>Click the buttons below to fire live Hotspot events into your local instance:</p>
-                    </div>
-                    <div class="test-trigger-buttons">
-                        <button class="test-btn" onclick="fireTestEvent('user_signup_click', { plan: 'pro_ai', source: 'hero_cta' })">⚡ Trigger Signup</button>
-                        <button class="test-btn" onclick="fireRageClick()">💥 Simulate Rage Click</button>
-                        <button class="test-btn" onclick="fireIdentifyUser()">👤 Identify User</button>
-                        <button class="test-btn" onclick="fireTestEvent('model_generated', { latency_ms: 420, tokens: 1250 })">🤖 AI Event</button>
-                    </div>
-                </div>
-
-                <div class="terminal-feed" id="terminal-feed">
-                    <div class="feed-row">
-                        <span class="feed-time">[Ready]</span>
-                        <span class="feed-event-name">Hotspot Engine Active</span>
-                        <span class="feed-payload">Listening for live telemetry on {{ site_url }}/capture/</span>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Act 5: Bottom CTA & Quickstart -->
-        <section class="container">
-            <div class="bottom-cta">
-                <h2>Ready to see how users use your app?</h2>
-                <p>Launch your private Hotspot instance with a single command. No credit card, no cloud lock-in.</p>
-
-                <div class="quickstart-cmd" onclick="copySnippet('./bin/hotspot start')">
-                    <span>$ ./bin/hotspot start</span>
-                    <span style="font-size: 11px; color: var(--text-muted);">(click to copy)</span>
-                </div>
-
-                <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
-                    <a href="/login" class="btn btn-volt btn-large">Open Workspace Dashboard</a>
-                    <a href="/signup" class="btn btn-ghost btn-large">Create Local Account</a>
-                </div>
-            </div>
-        </section>
     </main>
 
     <!-- Footer -->
     <footer>
         <div class="container footer-inner">
-            <div style="display: flex; align-items: center; gap: 10px;">
-                <span style="color: var(--volt-neon); font-weight: 800;">HOTSPOT</span>
-                <span>• The Visual Telemetry Platform for AI Builders.</span>
-            </div>
+            <span class="footer-left">Hotspot • Visual product analytics for AI builders</span>
             <div class="footer-links">
                 <a href="/login">Dashboard</a>
-                <a href="/signup">Sign Up</a>
-                <a href="/hotspot.js" target="_blank">SDK Source</a>
-                <a href="https://github.com/posthog/posthog" target="_blank">Engine Core</a>
+                <a href="/playground/">Playground</a>
+                <a href="/hotspot.js" target="_blank">SDK source</a>
             </div>
         </div>
     </footer>
 
-    <!-- GSAP Animations & Interactive Particle Logic -->
     <script nonce="{{ request.csp_nonce }}">
-        // Initialize GSAP & ScrollTrigger
-        if (typeof gsap !== 'undefined') {
-            gsap.registerPlugin(ScrollTrigger);
-
-            // Hero entrance animation
-            var heroTl = gsap.timeline({ defaults: { ease: 'power3.out' } });
-            heroTl.from('.hero-eyebrow', { opacity: 0, y: -20, duration: 0.8 })
-                  .from('.hero-title', { opacity: 0, y: 30, duration: 1 }, '-=0.5')
-                  .from('.hero-subtitle', { opacity: 0, y: 20, duration: 0.8 }, '-=0.6')
-                  .from('.hero-cta-group', { opacity: 0, scale: 0.95, duration: 0.6 }, '-=0.5')
-                  .from('.hero-stage', { opacity: 0, y: 40, duration: 1 }, '-=0.4');
-
-            // Scroll animations for cards
-            gsap.from('.compare-card', {
-                scrollTrigger: { trigger: '#compare', start: 'top 80%' },
-                opacity: 0,
-                y: 40,
-                stagger: 0.2,
-                duration: 0.8,
-                ease: 'power2.out'
-            });
-
-            gsap.from('.power-card', {
-                scrollTrigger: { trigger: '#superpowers', start: 'top 80%' },
-                opacity: 0,
-                y: 35,
-                stagger: 0.15,
-                duration: 0.8,
-                ease: 'power2.out'
-            });
-
-            gsap.from('.terminal-section', {
-                scrollTrigger: { trigger: '#playground', start: 'top 85%' },
-                opacity: 0,
-                scale: 0.98,
-                duration: 0.8,
-                ease: 'power2.out'
-            });
-        }
-
-        // Copy functionality
-        function copySnippet(text) {
-            var snippet = text || '<script src="{{ site_url }}/hotspot.js" data-api-key="hs_live_demo_sample_token" data-api-host="{{ site_url }}"><\/script>';
-            navigator.clipboard.writeText(snippet).then(function() {
-                var btn = document.getElementById('hero-copy-btn');
+        function copySnippet() {
+            var s = '<script src="{{ site_url }}/hotspot.js" data-api-key="your-project-key" data-api-host="{{ site_url }}"><\/script>';
+            navigator.clipboard.writeText(s).then(function() {
+                var btn = document.getElementById('copy-btn');
                 if (btn) {
-                    var original = btn.textContent;
-                    btn.textContent = '✅ Copied to Clipboard!';
-                    btn.style.color = 'var(--volt-neon)';
-                    setTimeout(function() {
-                        btn.textContent = original;
-                        btn.style.color = '';
-                    }, 2200);
+                    btn.textContent = 'Copied';
+                    setTimeout(function() { btn.textContent = 'Copy'; }, 2000);
                 }
             });
         }
 
-        // Live Telemetry Feed Logger
-        function logToTerminal(eventName, payload) {
-            var feed = document.getElementById('terminal-feed');
-            var row = document.createElement('div');
-            row.className = 'feed-row';
-            var timeStr = new Date().toLocaleTimeString();
-            row.innerHTML = '<span class="feed-time">[' + timeStr + ']</span> ' +
-                            '<span class="feed-event-name">' + eventName + '</span> ' +
-                            '<span class="feed-payload">' + JSON.stringify(payload) + '</span>';
-            feed.insertBefore(row, feed.firstChild);
+        function copyCommand() {
+            navigator.clipboard.writeText('./bin/hotspot start');
         }
 
-        function fireTestEvent(eventName, props) {
-            if (window.hotspot) {
-                window.hotspot.capture(eventName, props);
-            }
-            logToTerminal(eventName, props);
-        }
-
-        function fireRageClick() {
-            var props = { target: '#broken-ai-btn', consecutive_clicks: 5, time_window_ms: 800 };
-            if (window.hotspot) {
-                window.hotspot.capture('$rageclick', props);
-            }
-            logToTerminal('$rageclick [ALERT]', props);
-            setMode('dead');
-        }
-
-        function fireIdentifyUser() {
-            var randomId = 'builder_' + Math.floor(Math.random() * 8999 + 1000);
-            var props = { email: randomId + '@example.com', tool: 'cursor_ide', plan: 'ai_tier' };
-            if (window.hotspot) {
-                window.hotspot.identify(randomId, props);
-            }
-            logToTerminal('$identify', { distinct_id: randomId, properties: props });
-        }
-
-        // Interactive Heatmap Physics & Particle Generation
-        var canvas = document.getElementById('sim-canvas');
-        var hudCoords = document.getElementById('hud-coords');
-        var hudCounter = document.getElementById('hud-counter');
-        var deadIndicator = document.getElementById('dead-click-indicator');
-        var plottedCount = 0;
-        var currentMode = 'heat';
-
-        canvas.addEventListener('mousemove', function(e) {
-            var rect = canvas.getBoundingClientRect();
-            var x = Math.round(e.clientX - rect.left);
-            var y = Math.round(e.clientY - rect.top);
-            hudCoords.textContent = 'X: ' + x + ' | Y: ' + y;
-        });
-
-        canvas.addEventListener('click', function(e) {
-            var rect = canvas.getBoundingClientRect();
-            var x = e.clientX - rect.left;
-            var y = e.clientY - rect.top;
-
-            createThermalParticle(x, y);
-            plottedCount++;
-            hudCounter.textContent = 'Hotspots Plotted: ' + plottedCount;
-
-            logToTerminal('ui_click_heatmap', {
-                canvas_x: Math.round(x),
-                canvas_y: Math.round(y),
-                mode: currentMode
+        // Preview Mode Switcher (Heatmap vs Rage Clicks vs Dead Links)
+        function setPreviewMode(mode, btn) {
+            document.querySelectorAll('.preview-tab').forEach(function(b) {
+                b.classList.remove('active');
             });
-        });
+            btn.classList.add('active');
 
-        function createThermalParticle(x, y) {
-            var particle = document.createElement('div');
-            particle.className = 'hotspot-particle';
-            particle.style.left = x + 'px';
-            particle.style.top = y + 'px';
-            particle.style.width = '38px';
-            particle.style.height = '38px';
-            
-            if (currentMode === 'dead') {
-                particle.style.background = 'radial-gradient(circle, #ff0055 0%, rgba(255, 0, 85, 0.4) 40%, transparent 70%)';
-            } else {
-                // Fresh Neon Volt Core -> Electric Magenta -> Hyper Cyan Aura
-                particle.style.background = 'radial-gradient(circle, #ccff00 0%, #ff007f 40%, #00f0ff 70%, transparent 100%)';
-            }
-
-            canvas.appendChild(particle);
-
-            if (typeof gsap !== 'undefined') {
-                gsap.fromTo(particle, 
-                    { scale: 0.2, opacity: 1 }, 
-                    { scale: 2.2, opacity: 0.6, duration: 1.2, ease: 'power2.out', onComplete: function() {
-                        gsap.to(particle, { opacity: 0.35, duration: 3 });
-                    }}
-                );
-            } else {
-                setTimeout(function() {
-                    particle.style.opacity = '0.35';
-                }, 1000);
-            }
-        }
-
-        // Mode Switching
-        function setMode(mode) {
-            currentMode = mode;
-            document.querySelectorAll('.mode-btn').forEach(function(b) { b.classList.remove('active'); });
+            var heatPrimary = document.getElementById('heat-primary');
+            var heatSecondary = document.getElementById('heat-secondary');
+            var inspectPrimary = document.getElementById('inspect-primary');
+            var rageCallout = document.getElementById('rage-callout');
+            var mockBroken = document.getElementById('mock-broken');
 
             if (mode === 'heat') {
-                document.getElementById('btn-mode-heat').classList.add('active');
-                deadIndicator.style.display = 'none';
-                // Pre-seed some winning heatmaps on primary buttons
-                var btn1 = document.getElementById('demo-target-1');
-                var r1 = btn1.getBoundingClientRect();
-                var cr = canvas.getBoundingClientRect();
-                createThermalParticle(r1.left - cr.left + r1.width / 2, r1.top - cr.top + r1.height / 2);
+                heatPrimary.style.opacity = '1';
+                heatSecondary.style.opacity = '1';
+                inspectPrimary.style.display = 'block';
+                rageCallout.style.display = 'none';
+                mockBroken.style.border = 'none';
+            } else if (mode === 'rage') {
+                heatPrimary.style.opacity = '0.15';
+                heatSecondary.style.opacity = '0.15';
+                inspectPrimary.style.display = 'none';
+                rageCallout.style.display = 'block';
+                mockBroken.style.border = '1px dashed #ef4444';
+                mockBroken.style.padding = '2px 6px';
+                mockBroken.style.borderRadius = '4px';
             } else if (mode === 'dead') {
-                document.getElementById('btn-mode-dead').classList.add('active');
-                var target = document.getElementById('demo-target-dead');
-                var tr = target.getBoundingClientRect();
-                var cr = canvas.getBoundingClientRect();
-                deadIndicator.style.left = (tr.left - cr.left) + 'px';
-                deadIndicator.style.top = (tr.top - cr.top) + 'px';
-                deadIndicator.style.width = tr.width + 'px';
-                deadIndicator.style.height = tr.height + 'px';
-                deadIndicator.style.display = 'flex';
-                createThermalParticle(tr.left - cr.left + tr.width / 2, tr.top - cr.top + tr.height / 2);
-            } else if (mode === 'funnel') {
-                document.getElementById('btn-mode-funnel').classList.add('active');
-                deadIndicator.style.display = 'none';
-                logToTerminal('funnel_analysis', { step1: '100% Pageview', step2: '64% View Pricing', step3: '18% Deploy' });
+                heatPrimary.style.opacity = '0.1';
+                heatSecondary.style.opacity = '0.1';
+                inspectPrimary.style.display = 'none';
+                rageCallout.style.display = 'block';
+                rageCallout.innerHTML = '⚠️ Dead click • AI forgot href target';
+                mockBroken.style.border = '1px dashed #F59E0B';
+                mockBroken.style.padding = '2px 6px';
+                mockBroken.style.borderRadius = '4px';
             }
         }
 
-        // Auto-seed initial interactive state
-        setTimeout(function() {
-            setMode('heat');
-        }, 600);
+        // GSAP Scroll Reveals
+        if (typeof gsap !== 'undefined' && typeof ScrollTrigger !== 'undefined') {
+            gsap.registerPlugin(ScrollTrigger);
+
+            document.querySelectorAll('.reveal').forEach(function(el) {
+                gsap.to(el, {
+                    scrollTrigger: {
+                        trigger: el,
+                        start: 'top 88%',
+                        once: true
+                    },
+                    opacity: 1,
+                    y: 0,
+                    duration: 0.65,
+                    ease: 'power2.out'
+                });
+            });
+
+            gsap.from('.hero-badge', { opacity: 0, y: -8, duration: 0.45, delay: 0.1 });
+            gsap.from('.hero h1', { opacity: 0, y: 14, duration: 0.55, delay: 0.2 });
+            gsap.from('.hero-sub', { opacity: 0, y: 10, duration: 0.45, delay: 0.32 });
+            gsap.from('.hero-actions', { opacity: 0, y: 8, duration: 0.45, delay: 0.42 });
+        }
     </script>
+
 </body>
 </html>
