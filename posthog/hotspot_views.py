@@ -14,6 +14,7 @@ logger = structlog.get_logger(__name__)
 HOTSPOT_JS_PATH = os.path.join(settings.BASE_DIR, "posthog", "static", "hotspot.js")
 GSAP_JS_PATH = os.path.join(settings.BASE_DIR, "posthog", "static", "gsap.min.js")
 SCROLL_TRIGGER_JS_PATH = os.path.join(settings.BASE_DIR, "posthog", "static", "ScrollTrigger.min.js")
+LUCIDE_JS_PATH = os.path.join(settings.BASE_DIR, "posthog", "static", "lucide.min.js")
 
 
 def _add_cors_headers(response: HttpResponse) -> HttpResponse:
@@ -51,6 +52,21 @@ def scroll_trigger_js(request: HttpRequest) -> HttpResponse:
             content = f.read()
     except Exception:
         content = "// ScrollTrigger unavailable"
+    response = HttpResponse(content, content_type="application/javascript; charset=utf-8")
+    response["Cache-Control"] = "public, max-age=86400"
+    return _add_cors_headers(response)
+
+
+@csrf_exempt
+def lucide_js(request: HttpRequest) -> HttpResponse:
+    """Serves local Lucide icons library with CORS headers."""
+    if request.method == "OPTIONS":
+        return _add_cors_headers(HttpResponse(status=200))
+    try:
+        with open(LUCIDE_JS_PATH, "r", encoding="utf-8") as f:
+            content = f.read()
+    except Exception:
+        content = "// Lucide unavailable"
     response = HttpResponse(content, content_type="application/javascript; charset=utf-8")
     response["Cache-Control"] = "public, max-age=86400"
     return _add_cors_headers(response)

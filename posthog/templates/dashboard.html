@@ -13,6 +13,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 
+    <!-- Local Libraries: Lucide Icons & GSAP -->
+    <script src="/lucide.js"></script>
+    <script src="/gsap.js"></script>
+
     <!-- Silent Telemetry -->
     <script src="/hotspot.js" data-api-key="hs_live_dashboard" data-api-host="http://localhost:8000" data-visualizer="false"></script>
 
@@ -62,6 +66,8 @@
             -webkit-font-smoothing: antialiased;
             min-height: 100vh;
             padding-bottom: 5rem;
+            background-image: radial-gradient(#E2E8F0 1px, transparent 1px);
+            background-size: 32px 32px;
         }
 
         /* ─── Top Header ─── */
@@ -206,8 +212,15 @@
             align-items: center;
             gap: 0.75rem;
         }
-        .recovery-icon {
-            font-size: 1.5rem;
+        .recovery-icon-box {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            background: rgba(16, 185, 129, 0.2);
+            color: #34D399;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         .recovery-bold {
             font-size: 1.2rem;
@@ -338,8 +351,20 @@
             color: var(--text-primary);
             display: flex;
             align-items: center;
-            gap: 0.4rem;
+            gap: 0.5rem;
         }
+        .pillar-icon-box {
+            width: 26px;
+            height: 26px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .pillar-icon-box.emerald { background: var(--success-light); color: var(--success); }
+        .pillar-icon-box.amber { background: var(--warning-light); color: var(--warning); }
+        .pillar-icon-box.blue { background: var(--brand-light); color: var(--brand-primary); }
+
         .pillar-score {
             font-size: 0.8125rem;
             font-weight: 700;
@@ -348,7 +373,6 @@
         }
         .pillar-score.good { background: var(--success-light); color: var(--success); }
         .pillar-score.warning { background: var(--warning-light); color: #B45309; }
-        .pillar-score.danger { background: var(--danger-light); color: var(--danger); }
         .pillar-bar-bg {
             height: 6px;
             background: #E2E8F0;
@@ -459,6 +483,9 @@
             background: var(--success-light);
             padding: 0.25rem 0.625rem;
             border-radius: 6px;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
         }
         .fix-title {
             font-size: 1.05rem;
@@ -473,7 +500,6 @@
             line-height: 1.5;
         }
 
-        /* Instructions Box (Layman vs Tech switch) */
         .instructions-box {
             background: #F8FAFC;
             border: 1px solid var(--border-light);
@@ -524,6 +550,9 @@
             border-radius: 6px;
             cursor: pointer;
             transition: all 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
         }
         .btn-resolved:hover {
             background: var(--success-light);
@@ -608,6 +637,9 @@
             font-size: 0.6875rem;
             color: var(--text-muted);
             margin-bottom: 0.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
         }
         .stream-msg {
             color: var(--text-primary);
@@ -659,26 +691,29 @@
             <div class="brand-group">
                 <a href="/" class="logo">
                     <div class="logo-icon">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                            <circle cx="12" cy="12" r="8"/>
-                            <circle cx="12" cy="12" r="3" fill="currentColor"/>
-                        </svg>
+                        <i data-lucide="target" style="width: 18px; height: 18px;"></i>
                     </div>
                     <span>Hotspot</span>
                 </a>
 
                 <div class="store-selector">
                     <span class="live-dot"></span>
-                    <span>🛍️ Nordic Skincare (Shopify)</span>
-                    <span style="font-size: 0.75rem; color: var(--text-muted);">▾</span>
+                    <span>Nordic Skincare (Shopify)</span>
+                    <i data-lucide="chevron-down" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
                 </div>
 
                 <span class="plan-badge">Growth Plan</span>
             </div>
 
             <div class="header-actions">
-                <a href="/" class="btn btn-outline">Back to Landing</a>
-                <button class="btn btn-primary" onclick="showScriptModal()">+ Install Script</button>
+                <a href="/" class="btn btn-outline">
+                    <i data-lucide="arrow-left" style="width: 15px; height: 15px;"></i>
+                    <span>Back to Landing</span>
+                </a>
+                <button class="btn btn-primary" onclick="showScriptModal()">
+                    <i data-lucide="plus" style="width: 15px; height: 15px;"></i>
+                    <span>Install Script</span>
+                </button>
             </div>
         </div>
     </header>
@@ -688,7 +723,9 @@
         <!-- Top Revenue Recovery Strip -->
         <div class="top-recovery-strip">
             <div class="recovery-title-group">
-                <span class="recovery-icon">💡</span>
+                <div class="recovery-icon-box">
+                    <i data-lucide="sparkles" style="width: 22px; height: 22px;"></i>
+                </div>
                 <div>
                     <div>Potential Monthly Revenue Recovery: <span class="recovery-bold">+$3,420 / month</span></div>
                     <div class="recovery-sub">Resolving the 3 items below will lift checkout completion by an estimated ~14%.</div>
@@ -696,7 +733,8 @@
             </div>
             <div>
                 <a href="#action-plan" class="btn btn-primary" style="background: #10B981; border: none;">
-                    Review Fixes Below ↓
+                    <span>Review Fixes Below</span>
+                    <i data-lucide="arrow-down" style="width: 15px; height: 15px;"></i>
                 </a>
             </div>
         </div>
@@ -722,7 +760,10 @@
             <div class="pillars-grid">
                 <div class="pillar-card">
                     <div class="pillar-head">
-                        <span class="pillar-title">🛒 Cart & Checkout</span>
+                        <span class="pillar-title">
+                            <span class="pillar-icon-box emerald"><i data-lucide="shopping-cart" style="width: 15px; height: 15px;"></i></span>
+                            <span>Cart & Checkout</span>
+                        </span>
                         <span class="pillar-score good">92%</span>
                     </div>
                     <div class="pillar-bar-bg">
@@ -733,7 +774,10 @@
 
                 <div class="pillar-card">
                     <div class="pillar-head">
-                        <span class="pillar-name">📱 Mobile UX & Rage Clicks</span>
+                        <span class="pillar-title">
+                            <span class="pillar-icon-box amber"><i data-lucide="mouse-pointer-click" style="width: 15px; height: 15px;"></i></span>
+                            <span>Mobile UX & Rage Clicks</span>
+                        </span>
                         <span class="pillar-score warning">74%</span>
                     </div>
                     <div class="pillar-bar-bg">
@@ -744,7 +788,10 @@
 
                 <div class="pillar-card">
                     <div class="pillar-head">
-                        <span class="pillar-name">⚡ Speed & Web Vitals</span>
+                        <span class="pillar-title">
+                            <span class="pillar-icon-box emerald"><i data-lucide="zap" style="width: 15px; height: 15px;"></i></span>
+                            <span>Speed & Web Vitals</span>
+                        </span>
                         <span class="pillar-score good">95%</span>
                     </div>
                     <div class="pillar-bar-bg">
@@ -755,7 +802,10 @@
 
                 <div class="pillar-card">
                     <div class="pillar-head">
-                        <span class="pillar-name">🔍 Trust & AI Search (GEO)</span>
+                        <span class="pillar-title">
+                            <span class="pillar-icon-box blue"><i data-lucide="search" style="width: 15px; height: 15px;"></i></span>
+                            <span>Trust & AI Search (GEO)</span>
+                        </span>
                         <span class="pillar-score warning">68%</span>
                     </div>
                     <div class="pillar-bar-bg">
@@ -787,7 +837,10 @@
                                 <span class="severity-badge critical">Critical #1</span>
                                 <span class="fix-path">/cart & checkout</span>
                             </div>
-                            <span class="revenue-lift-badge">+$1,840 / mo lift</span>
+                            <span class="revenue-lift-badge">
+                                <i data-lucide="trending-up" style="width: 13px; height: 13px;"></i>
+                                <span>+$1,840 / mo lift</span>
+                            </span>
                         </div>
                         <h3 class="fix-title">Sticky "Proceed to Checkout" button blocked by cookie banner on iPhone</h3>
                         <p class="fix-cause">
@@ -806,7 +859,10 @@
                             </div>
                         </div>
                         <div class="fix-actions-row">
-                            <button class="btn-resolved" onclick="resolveIssue('fix-1', 1840)">✓ Mark as Resolved</button>
+                            <button class="btn-resolved" onclick="resolveIssue('fix-1', 1840)">
+                                <i data-lucide="check" style="width: 14px; height: 14px;"></i>
+                                <span>Mark as Resolved</span>
+                            </button>
                             <span style="font-size: 0.75rem; color: var(--text-muted);">Detected 2 hours ago via Mobile Safari</span>
                         </div>
                     </div>
@@ -818,7 +874,10 @@
                                 <span class="severity-badge warning">High Priority #2</span>
                                 <span class="fix-path">/products/cream</span>
                             </div>
-                            <span class="revenue-lift-badge">+$980 / mo lift</span>
+                            <span class="revenue-lift-badge">
+                                <i data-lucide="trending-up" style="width: 13px; height: 13px;"></i>
+                                <span>+$980 / mo lift</span>
+                            </span>
                         </div>
                         <h3 class="fix-title">Unlinked Size Guide text causes 148 rage clicks</h3>
                         <p class="fix-cause">
@@ -837,7 +896,10 @@
                             </div>
                         </div>
                         <div class="fix-actions-row">
-                            <button class="btn-resolved" onclick="resolveIssue('fix-2', 980)">✓ Mark as Resolved</button>
+                            <button class="btn-resolved" onclick="resolveIssue('fix-2', 980)">
+                                <i data-lucide="check" style="width: 14px; height: 14px;"></i>
+                                <span>Mark as Resolved</span>
+                            </button>
                             <span style="font-size: 0.75rem; color: var(--text-muted);">148 rage taps logged</span>
                         </div>
                     </div>
@@ -849,7 +911,10 @@
                                 <span class="severity-badge quickwin">Quick Win #3</span>
                                 <span class="fix-path">/cart</span>
                             </div>
-                            <span class="revenue-lift-badge">+$600 / mo lift</span>
+                            <span class="revenue-lift-badge">
+                                <i data-lucide="trending-up" style="width: 13px; height: 13px;"></i>
+                                <span>+$600 / mo lift</span>
+                            </span>
                         </div>
                         <h3 class="fix-title">Missing Express Checkout (Apple Pay & Google Pay) badges</h3>
                         <p class="fix-cause">
@@ -868,7 +933,10 @@
                             </div>
                         </div>
                         <div class="fix-actions-row">
-                            <button class="btn-resolved" onclick="resolveIssue('fix-3', 600)">✓ Mark as Resolved</button>
+                            <button class="btn-resolved" onclick="resolveIssue('fix-3', 600)">
+                                <i data-lucide="check" style="width: 14px; height: 14px;"></i>
+                                <span>Mark as Resolved</span>
+                            </button>
                             <span style="font-size: 0.75rem; color: var(--text-muted);">Estimated 5 min setup</span>
                         </div>
                     </div>
@@ -889,7 +957,10 @@
                                 <div class="page-name">/products/day-cream</div>
                                 <div class="page-clicks">3,420 visits • 14 rage clusters</div>
                             </div>
-                            <span class="btn-inspect-pill">Inspect 🔥</span>
+                            <span class="btn-inspect-pill">
+                                <span>Inspect</span>
+                                <i data-lucide="flame" style="width: 14px; height: 14px; color: #EF4444;"></i>
+                            </span>
                         </a>
 
                         <a href="/playground/" class="heatmap-page-item">
@@ -897,7 +968,10 @@
                                 <div class="page-name">/cart</div>
                                 <div class="page-clicks">1,820 visits • 42 dropoffs</div>
                             </div>
-                            <span class="btn-inspect-pill">Inspect 🔥</span>
+                            <span class="btn-inspect-pill">
+                                <span>Inspect</span>
+                                <i data-lucide="flame" style="width: 14px; height: 14px; color: #EF4444;"></i>
+                            </span>
                         </a>
 
                         <a href="/playground/" class="heatmap-page-item">
@@ -905,7 +979,10 @@
                                 <div class="page-name">/ (Homepage)</div>
                                 <div class="page-clicks">8,910 visits • 68% scroll depth</div>
                             </div>
-                            <span class="btn-inspect-pill">Inspect 🔥</span>
+                            <span class="btn-inspect-pill">
+                                <span>Inspect</span>
+                                <i data-lucide="flame" style="width: 14px; height: 14px; color: #EF4444;"></i>
+                            </span>
                         </a>
                     </div>
                 </div>
@@ -918,22 +995,34 @@
                     </div>
                     <div class="live-stream-list">
                         <div class="stream-item danger">
-                            <div class="stream-time">2 minutes ago • iPhone 15 / Safari</div>
+                            <div class="stream-time">
+                                <i data-lucide="clock" style="width: 12px; height: 12px;"></i>
+                                <span>2 minutes ago • iPhone 15 / Safari</span>
+                            </div>
                             <div class="stream-msg">Rage click detected on <strong>#size-guide-text</strong> (5 taps in 1.2s)</div>
                         </div>
 
                         <div class="stream-item success">
-                            <div class="stream-time">5 minutes ago • Desktop Chrome</div>
+                            <div class="stream-time">
+                                <i data-lucide="clock" style="width: 12px; height: 12px;"></i>
+                                <span>5 minutes ago • Desktop Chrome</span>
+                            </div>
                             <div class="stream-msg">Completed purchase: <strong>$148.00</strong> via Apple Pay</div>
                         </div>
 
                         <div class="stream-item info">
-                            <div class="stream-time">8 minutes ago • Google Search</div>
+                            <div class="stream-time">
+                                <i data-lucide="clock" style="width: 12px; height: 12px;"></i>
+                                <span>8 minutes ago • Google Search</span>
+                            </div>
                             <div class="stream-msg">Inbound query: <em>"natural peptide skin cream"</em> → /products/cream</div>
                         </div>
 
                         <div class="stream-item danger">
-                            <div class="stream-time">12 minutes ago • Mobile Safari</div>
+                            <div class="stream-time">
+                                <i data-lucide="clock" style="width: 12px; height: 12px;"></i>
+                                <span>12 minutes ago • Mobile Safari</span>
+                            </div>
                             <div class="stream-msg">Checkout abandoned: cookie banner overlap detected on #btn-checkout</div>
                         </div>
                     </div>
@@ -961,6 +1050,11 @@
     </div>
 
     <script>
+        // Initialize Lucide Icons
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+
         function showScriptModal() {
             document.getElementById('script-modal').style.display = 'flex';
         }
@@ -992,16 +1086,22 @@
                 card.style.opacity = '0.5';
                 card.style.pointerEvents = 'none';
                 var btn = card.querySelector('.btn-resolved');
-                if (btn) btn.textContent = '✓ Resolved';
+                if (btn) btn.innerHTML = '<i data-lucide="check-check" style="width: 14px; height: 14px;"></i> <span>Resolved</span>';
                 resolvedCount++;
                 var scoreEl = document.getElementById('dashboard-score');
                 if (scoreEl) {
                     var current = parseInt(scoreEl.textContent, 10);
                     scoreEl.textContent = Math.min(100, current + 4);
+                    if (typeof gsap !== 'undefined') {
+                        gsap.fromTo(scoreEl, { scale: 1.25, color: '#10B981' }, { scale: 1, color: '#0F172A', duration: 0.3 });
+                    }
                 }
                 var openEl = document.getElementById('open-count');
                 if (openEl) {
                     openEl.textContent = (3 - resolvedCount) + ' open issues';
+                }
+                if (typeof lucide !== 'undefined') {
+                    lucide.createIcons();
                 }
             }
         }

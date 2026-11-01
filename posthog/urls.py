@@ -409,6 +409,7 @@ urlpatterns = [
     path("hotspot.js", hotspot_views.hotspot_js, name="hotspot_js"),
     path("static/hotspot.js", hotspot_views.hotspot_js, name="hotspot_js_static"),
     path("llms.txt", hotspot_views.hotspot_llms_txt, name="hotspot_llms_txt"),
+    path("lucide.js", hotspot_views.lucide_js, name="lucide_js"),
     path("gsap.js", hotspot_views.gsap_js, name="gsap_js"),
     path("ScrollTrigger.js", hotspot_views.scroll_trigger_js, name="scroll_trigger_js"),
     opt_slash_path("capture", hotspot_views.hotspot_capture, name="hotspot_capture"),
