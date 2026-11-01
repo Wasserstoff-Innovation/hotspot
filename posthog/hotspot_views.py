@@ -163,7 +163,11 @@ def hotspot_landing(request: HttpRequest) -> HttpResponse:
         "site_url": settings.SITE_URL or "http://localhost:8000",
         "demo_api_key": "hs_live_demo_sample_token",
     }
-    return render(request, "landing.html", context)
+    response = render(request, "landing.html", context)
+    response["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response["Pragma"] = "no-cache"
+    response["Expires"] = "0"
+    return response
 
 
 def hotspot_dashboard(request: HttpRequest) -> HttpResponse:
@@ -173,7 +177,11 @@ def hotspot_dashboard(request: HttpRequest) -> HttpResponse:
         "site_url": settings.SITE_URL or "http://localhost:8000",
         "demo_api_key": "hs_live_demo_sample_token",
     }
-    return render(request, "dashboard.html", context)
+    response = render(request, "dashboard.html", context)
+    response["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response["Pragma"] = "no-cache"
+    response["Expires"] = "0"
+    return response
 
 
 def hotspot_playground(request: HttpRequest) -> HttpResponse:
@@ -183,4 +191,8 @@ def hotspot_playground(request: HttpRequest) -> HttpResponse:
         "site_url": settings.SITE_URL or "http://localhost:8000",
         "demo_api_key": "hs_live_demo_sample_token",
     }
-    return render(request, "playground.html", context)
+    response = render(request, "playground.html", context)
+    response["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response["Pragma"] = "no-cache"
+    response["Expires"] = "0"
+    return response
