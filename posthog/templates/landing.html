@@ -25,18 +25,19 @@
     <meta name="twitter:title" content="Hotspot — Find Out Why Visitors Leave Without Buying">
     <meta name="twitter:description" content="Automated e-commerce & website conversion audit. Instant 0–100 health score and prioritized fixes.">
 
-    <!-- Modern Crisp Favicon: Precision Vector Target -->
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%232563EB'/%3E%3Cstop offset='100%25' stop-color='%231D4ED8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%23FFFFFF' stroke-width='2' stroke-dasharray='4 2'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%2310B981'/%3E%3Cline x1='16' y1='3' x2='16' y2='7' stroke='%23FFFFFF' stroke-width='2' stroke-linecap='round'/%3E%3Cline x1='16' y1='25' x2='16' y2='29' stroke='%23FFFFFF' stroke-width='2' stroke-linecap='round'/%3E%3Cline x1='3' y1='16' x2='7' y2='16' stroke='%23FFFFFF' stroke-width='2' stroke-linecap='round'/%3E%3Cline x1='25' y1='16' x2='29' y2='16' stroke='%23FFFFFF' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
+    <!-- New Favicon: Precision Hotspot Target "O" Mark -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%232563EB'/%3E%3Cstop offset='100%25' stop-color='%231D4ED8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='16' cy='16' r='14' fill='none' stroke='url(%23g)' stroke-width='3.5'/%3E%3Ccircle cx='16' cy='16' r='8' fill='none' stroke='%233B82F6' stroke-width='1.75' stroke-dasharray='3 2'/%3E%3Ccircle cx='16' cy='16' r='4.5' fill='%2310B981'/%3E%3Ccircle cx='16' cy='16' r='1.8' fill='%23FFFFFF'/%3E%3C/svg%3E">
     <meta name="theme-color" content="#2563EB">
 
-    <!-- Typography: Plus Jakarta Sans / Inter -->
+    <!-- Typography: Caveat (Cursive Logo) + Dancing Script + Plus Jakarta Sans + JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Dancing+Script:wght@700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 
-    <!-- Local Libraries: Lucide Icons & GSAP Animation Engine -->
+    <!-- Local Libraries: Lucide Icons, GSAP & ScrollTrigger Engine -->
     <script src="/lucide.js"></script>
     <script src="/gsap.js"></script>
+    <script src="/ScrollTrigger.js"></script>
 
     <!-- Structured Data (JSON-LD) for SEO & GEO -->
     <script type="application/ld+json">
@@ -87,13 +88,13 @@
             --danger-border: #FECACA;
 
             --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --font-cursive: 'Caveat', 'Dancing Script', cursive;
             --font-mono: 'JetBrains Mono', monospace;
 
             --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
             --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.06), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
             --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.07), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
             --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
-            --shadow-glow: 0 0 50px rgba(37, 99, 235, 0.12);
         }
 
         *, *::before, *::after {
@@ -122,17 +123,11 @@
         /* ─── Global Container & Layout ─── */
         .container {
             width: 100%;
-            max-width: 1280px;
+            max-width: 1360px;
             margin-left: auto;
             margin-right: auto;
             padding-left: 1.5rem;
             padding-right: 1.5rem;
-        }
-
-        @media (min-width: 1536px) {
-            .container {
-                max-width: 1360px;
-            }
         }
 
         /* ─── Top Notification Bar ─── */
@@ -159,43 +154,76 @@
             letter-spacing: 0.05em;
         }
 
-        /* ─── Navigation Header ─── */
+        /* ─── Unified Navigation Header ─── */
         .header {
             position: sticky;
             top: 0;
             z-index: 50;
-            background: rgba(255, 255, 255, 0.92);
+            background: rgba(255, 255, 255, 0.94);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
             border-bottom: 1px solid var(--border-light);
+            height: 4.5rem;
+            width: 100%;
         }
         .header-inner {
+            max-width: 1360px;
+            width: 100%;
+            height: 100%;
+            margin: 0 auto;
+            padding: 0 1.5rem;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            height: 4.5rem;
         }
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 0.625rem;
-            text-decoration: none;
+
+        /* ─── Cursive Brand Logo with "o" Icon Mark ─── */
+        .logo-brand {
+            font-family: var(--font-cursive);
+            font-size: 2.35rem;
+            font-weight: 700;
             color: var(--text-primary);
-            font-weight: 800;
-            font-size: 1.35rem;
-            letter-spacing: -0.025em;
+            display: inline-flex;
+            align-items: center;
+            line-height: 1;
+            text-decoration: none;
+            user-select: none;
+            letter-spacing: -0.01em;
+            transition: transform 0.2s ease;
         }
-        .logo-icon {
-            width: 36px;
-            height: 36px;
-            border-radius: 10px;
-            background: linear-gradient(135deg, #2563EB, #1D4ED8);
-            display: flex;
+        .logo-brand:hover {
+            transform: scale(1.02);
+        }
+        .logo-cursive-h {
+            font-size: 2.55rem;
+            color: var(--text-primary);
+            margin-right: -1px;
+        }
+        .logo-icon-o {
+            display: inline-flex;
             align-items: center;
             justify-content: center;
-            color: #FFFFFF;
-            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.28);
+            width: 24px;
+            height: 24px;
+            margin: 0 1px;
+            position: relative;
+            top: 3px;
+            transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
         }
+        .logo-icon-o svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        .logo-brand:hover .logo-icon-o {
+            transform: scale(1.2) rotate(45deg);
+        }
+        .logo-cursive-tail {
+            font-size: 2.35rem;
+            color: var(--text-primary);
+            margin-left: -1px;
+        }
+
         .nav-links {
             display: none;
             align-items: center;
@@ -246,8 +274,8 @@
         }
         .btn-primary:hover {
             background-color: var(--brand-hover);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(37, 99, 235, 0.25), 0 8px 20px rgba(37, 99, 235, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(37, 99, 235, 0.25), 0 8px 20px rgba(37, 99, 235, 0.35);
         }
         .btn-outline {
             background-color: #FFFFFF;
@@ -257,6 +285,7 @@
         .btn-outline:hover {
             background-color: var(--bg-page);
             border-color: var(--border-hover);
+            transform: translateY(-1px);
         }
         .btn-lg {
             padding: 0.875rem 1.75rem;
@@ -266,13 +295,13 @@
 
         /* ─── Hero Section ─── */
         .hero-section {
-            padding-top: 4rem;
+            padding-top: 4.5rem;
             padding-bottom: 6rem;
             position: relative;
         }
         .hero-header {
             text-align: center;
-            max-width: 900px;
+            max-width: 920px;
             margin: 0 auto 3rem auto;
             position: relative;
         }
@@ -281,8 +310,8 @@
             top: -60px;
             left: 50%;
             transform: translateX(-50%);
-            width: 700px;
-            height: 350px;
+            width: 750px;
+            height: 380px;
             background: radial-gradient(ellipse at center, rgba(37, 99, 235, 0.12) 0%, rgba(16, 185, 129, 0.05) 50%, transparent 70%);
             z-index: -1;
             pointer-events: none;
@@ -409,7 +438,7 @@
             box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
         }
         .btn-audit:hover {
-            transform: translateY(-1px);
+            transform: translateY(-2px);
             box-shadow: 0 6px 18px rgba(37, 99, 235, 0.35);
         }
         .hero-audit-microcopy {
@@ -845,6 +874,11 @@
             font-weight: 700;
             font-size: 1.05rem;
             color: var(--text-secondary);
+            transition: transform 0.2s ease;
+        }
+        .platform-pill:hover {
+            transform: translateY(-2px);
+            color: var(--brand-primary);
         }
 
         /* ─── High-Impact Bento Grid ─── */
@@ -868,14 +902,14 @@
             border-radius: 18px;
             padding: 2.25rem;
             box-shadow: var(--shadow-sm);
-            transition: all 0.2s ease;
+            transition: all 0.25s ease;
             display: flex;
             flex-direction: column;
             position: relative;
             overflow: hidden;
         }
         .bento-card:hover {
-            transform: translateY(-3px);
+            transform: translateY(-4px);
             box-shadow: var(--shadow-xl);
             border-color: #CBD5E1;
         }
@@ -1065,10 +1099,10 @@
             justify-content: space-between;
             box-shadow: var(--shadow-sm);
             position: relative;
-            transition: all 0.2s ease;
+            transition: all 0.25s ease;
         }
         .pricing-card:hover {
-            transform: translateY(-4px);
+            transform: translateY(-5px);
             box-shadow: var(--shadow-xl);
         }
         .pricing-card.featured {
@@ -1150,6 +1184,7 @@
             border: 1px solid var(--border-light);
             border-radius: 14px;
             overflow: hidden;
+            transition: all 0.2s ease;
         }
         .faq-header {
             padding: 1.25rem 1.5rem;
@@ -1224,15 +1259,6 @@
             .footer-grid {
                 grid-template-columns: 2fr 1fr 1fr 1fr;
             }
-        }
-        .footer-logo {
-            color: #FFFFFF;
-            font-weight: 800;
-            font-size: 1.25rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            margin-bottom: 0.75rem;
         }
         .footer-links-list {
             list-style: none;
@@ -1310,36 +1336,45 @@
         <span>Over 1,450+ e-commerce & SaaS stores audited • $8.4M+ in lost checkout revenue recovered</span>
     </div>
 
-    <!-- Navigation Header -->
+    <!-- Navigation Header (Pixel-Perfect Alignment: 4.5rem / 72px) -->
     <header class="header">
-        <div class="container">
-            <div class="header-inner">
-                <a href="/" class="logo">
-                    <div class="logo-icon">
-                        <i data-lucide="target" style="width: 22px; height: 22px;"></i>
-                    </div>
-                    <span>Hotspot</span>
+        <div class="header-inner">
+            <!-- Cursive Logo with "o" Icon Mark -->
+            <a href="/" class="logo-brand">
+                <span class="logo-cursive-h">H</span><span class="logo-icon-o" title="Hotspot">
+                    <svg viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <linearGradient id="logoOGrad" x1="2" y1="2" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+                                <stop stop-color="#2563EB"/>
+                                <stop offset="1" stop-color="#1D4ED8"/>
+                            </linearGradient>
+                        </defs>
+                        <circle cx="13" cy="13" r="11" stroke="url(#logoOGrad)" stroke-width="2.75"/>
+                        <circle cx="13" cy="13" r="6.25" stroke="#3B82F6" stroke-width="1.5" stroke-dasharray="2.5 1.5"/>
+                        <circle cx="13" cy="13" r="3.75" fill="#10B981"/>
+                        <circle cx="13" cy="13" r="1.5" fill="#FFFFFF"/>
+                    </svg>
+                </span><span class="logo-cursive-tail">tspot</span>
+            </a>
+
+            <ul class="nav-links">
+                <li><a href="#how-it-works" class="nav-link">How It Works</a></li>
+                <li><a href="#showcase" class="nav-link">Store Workbench</a></li>
+                <li><a href="#features" class="nav-link">Features</a></li>
+                <li><a href="#comparison" class="nav-link">Why Not GA4?</a></li>
+                <li><a href="#calculator" class="nav-link">ROI Calculator</a></li>
+                <li><a href="#pricing" class="nav-link">Pricing</a></li>
+            </ul>
+
+            <div class="header-cta-group">
+                <a href="/dashboard/" class="btn btn-outline">
+                    <i data-lucide="layout-dashboard" style="width: 16px; height: 16px;"></i>
+                    <span>Live Demo</span>
                 </a>
-
-                <ul class="nav-links">
-                    <li><a href="#how-it-works" class="nav-link">How It Works</a></li>
-                    <li><a href="#showcase" class="nav-link">Store Workbench</a></li>
-                    <li><a href="#features" class="nav-link">Features</a></li>
-                    <li><a href="#comparison" class="nav-link">Why Not GA4?</a></li>
-                    <li><a href="#calculator" class="nav-link">ROI Calculator</a></li>
-                    <li><a href="#pricing" class="nav-link">Pricing</a></li>
-                </ul>
-
-                <div class="header-cta-group">
-                    <a href="/dashboard/" class="btn btn-outline">
-                        <i data-lucide="layout-dashboard" style="width: 16px; height: 16px;"></i>
-                        <span>Live Demo</span>
-                    </a>
-                    <a href="#audit-hero" class="btn btn-primary">
-                        <span>Run Free Audit</span>
-                        <i data-lucide="arrow-right" style="width: 16px; height: 16px;"></i>
-                    </a>
-                </div>
+                <a href="#audit-hero" class="btn btn-primary">
+                    <span>Run Free Audit</span>
+                    <i data-lucide="arrow-right" style="width: 16px; height: 16px;"></i>
+                </a>
             </div>
         </div>
     </header>
@@ -1409,7 +1444,7 @@
                 </div>
             </div>
 
-            <!-- Hero Visual Workbench Showcase -->
+            <!-- Hero Visual Workbench Showcase (Scroll Animated) -->
             <div class="showcase-wrap" id="showcase">
                 <div class="workbench-window">
                     <div class="workbench-topbar">
@@ -1712,8 +1747,8 @@
         </div>
     </section>
 
-    <!-- Platform Compatibility Ribbon -->
-    <section class="platforms-section" id="how-it-works">
+    <!-- Platform Compatibility Ribbon (Scroll Animated) -->
+    <section class="platforms-section scroll-section" id="how-it-works">
         <div class="container">
             <div class="platforms-title">Works with every modern e-commerce & website platform</div>
             <div class="platforms-row">
@@ -1745,8 +1780,8 @@
         </div>
     </section>
 
-    <!-- Bento Grid Feature Section -->
-    <section class="bento-section" id="features">
+    <!-- Bento Grid Feature Section (Scroll Animated) -->
+    <section class="bento-section scroll-section" id="features">
         <div class="container">
             <div style="text-align: center; max-width: 760px; margin: 0 auto 3.5rem auto;">
                 <div style="font-size: 0.8125rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #2563EB; margin-bottom: 0.75rem;">
@@ -1762,7 +1797,7 @@
 
             <div class="bento-grid">
                 <!-- Card 1: Wide 2-Column Spotlight -->
-                <div class="bento-card col-span-2">
+                <div class="bento-card col-span-2 bento-anim-item">
                     <div class="bento-icon-wrap" style="background: #EFF6FF; color: #2563EB;">
                         <i data-lucide="shopping-bag" style="width: 24px; height: 24px;"></i>
                     </div>
@@ -1794,7 +1829,7 @@
                 </div>
 
                 <!-- Card 2: 1-Column Radar -->
-                <div class="bento-card">
+                <div class="bento-card bento-anim-item">
                     <div class="bento-icon-wrap" style="background: #FFFBEB; color: #D97706;">
                         <i data-lucide="mouse-pointer-click" style="width: 24px; height: 24px;"></i>
                     </div>
@@ -1812,7 +1847,7 @@
                 </div>
 
                 <!-- Card 3: 1-Column AI/GEO -->
-                <div class="bento-card">
+                <div class="bento-card bento-anim-item">
                     <div class="bento-icon-wrap" style="background: #F3E8FF; color: #7E22CE;">
                         <i data-lucide="bot" style="width: 24px; height: 24px;"></i>
                     </div>
@@ -1834,7 +1869,7 @@
                 </div>
 
                 <!-- Card 4: Wide 2-Column Spotlight -->
-                <div class="bento-card col-span-2">
+                <div class="bento-card col-span-2 bento-anim-item">
                     <div class="bento-icon-wrap" style="background: #ECFDF5; color: #059669;">
                         <i data-lucide="check-circle-2" style="width: 24px; height: 24px;"></i>
                     </div>
@@ -1856,8 +1891,8 @@
         </div>
     </section>
 
-    <!-- Comparison Table: Why Not GA4 or PostHog -->
-    <section class="comparison-section" id="comparison">
+    <!-- Comparison Table: Why Not GA4 or PostHog (Scroll Animated) -->
+    <section class="comparison-section scroll-section" id="comparison">
         <div class="container">
             <div style="text-align: center; max-width: 760px; margin: 0 auto 3.5rem auto;">
                 <div style="font-size: 0.8125rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #2563EB; margin-bottom: 0.75rem;">
@@ -1918,8 +1953,8 @@
         </div>
     </section>
 
-    <!-- Revenue ROI Calculator -->
-    <section class="calc-section" id="calculator">
+    <!-- Revenue ROI Calculator (Scroll Animated) -->
+    <section class="calc-section scroll-section" id="calculator">
         <div class="container">
             <div class="calc-chassis">
                 <div class="calc-grid">
@@ -1978,8 +2013,8 @@
         </div>
     </section>
 
-    <!-- Pricing Section -->
-    <section class="pricing-section" id="pricing">
+    <!-- Pricing Section (Scroll Animated) -->
+    <section class="pricing-section scroll-section" id="pricing">
         <div class="container">
             <div style="text-align: center; max-width: 760px; margin: 0 auto 3.5rem auto;">
                 <div style="font-size: 0.8125rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #2563EB; margin-bottom: 0.75rem;">
@@ -1995,7 +2030,7 @@
 
             <div class="pricing-grid">
                 <!-- Plan 1 -->
-                <div class="pricing-card">
+                <div class="pricing-card pricing-anim-item">
                     <div>
                         <h3 class="tier-title">Free Store Audit</h3>
                         <p style="font-size: 0.875rem; color: #64748B; margin-bottom: 1rem;">For stores testing their conversion health.</p>
@@ -2030,7 +2065,7 @@
                 </div>
 
                 <!-- Plan 2: Featured -->
-                <div class="pricing-card featured">
+                <div class="pricing-card featured pricing-anim-item">
                     <span class="featured-ribbon">Most Popular</span>
                     <div>
                         <h3 class="tier-title">Growth Store</h3>
@@ -2073,7 +2108,7 @@
                 </div>
 
                 <!-- Plan 3 -->
-                <div class="pricing-card">
+                <div class="pricing-card pricing-anim-item">
                     <div>
                         <h3 class="tier-title">Agency / Multi-Store</h3>
                         <p style="font-size: 0.875rem; color: #64748B; margin-bottom: 1rem;">For agencies, freelancers, and portfolio brand owners.</p>
@@ -2110,8 +2145,8 @@
         </div>
     </section>
 
-    <!-- FAQ Section -->
-    <section class="faq-section" id="faq">
+    <!-- FAQ Section (Scroll Animated) -->
+    <section class="faq-section scroll-section" id="faq">
         <div class="container">
             <div style="text-align: center; max-width: 760px; margin: 0 auto 3.5rem auto;">
                 <div style="font-size: 0.8125rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #2563EB; margin-bottom: 0.75rem;">
@@ -2176,8 +2211,8 @@
         </div>
     </section>
 
-    <!-- Pre-Footer CTA -->
-    <section class="pre-footer-cta">
+    <!-- Pre-Footer CTA (Scroll Animated) -->
+    <section class="pre-footer-cta scroll-section">
         <div class="container">
             <div class="cta-banner">
                 <h2>Stop losing customers to broken buttons and hidden friction.</h2>
@@ -2206,11 +2241,17 @@
         <div class="container">
             <div class="footer-grid">
                 <div>
-                    <div class="footer-logo">
-                        <i data-lucide="target" style="width: 22px; height: 22px; color: #2563EB;"></i>
-                        <span>Hotspot</span>
-                    </div>
-                    <p style="line-height: 1.6; max-width: 320px; margin-bottom: 1.5rem;">
+                    <a href="/" class="logo-brand" style="margin-bottom: 0.75rem; display: inline-flex;">
+                        <span class="logo-cursive-h" style="color: #FFFFFF;">H</span><span class="logo-icon-o" title="Hotspot">
+                            <svg viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="13" cy="13" r="11" stroke="url(#logoOGrad)" stroke-width="2.75"/>
+                                <circle cx="13" cy="13" r="6.25" stroke="#3B82F6" stroke-width="1.5" stroke-dasharray="2.5 1.5"/>
+                                <circle cx="13" cy="13" r="3.75" fill="#10B981"/>
+                                <circle cx="13" cy="13" r="1.5" fill="#FFFFFF"/>
+                            </svg>
+                        </span><span class="logo-cursive-tail" style="color: #FFFFFF;">tspot</span>
+                    </a>
+                    <p style="line-height: 1.6; max-width: 320px; margin-bottom: 1.5rem; margin-top: 0.5rem;">
                         Automated conversion intelligence and store audit platform. Find out why visitors leave without buying.
                     </p>
                     <p style="font-size: 0.8125rem; color: #64748B;">
@@ -2316,14 +2357,161 @@
         </div>
     </div>
 
-    <!-- Script Execution -->
+    <!-- Script Execution & GSAP Scroll-Based Animations -->
     <script>
         // Initialize Lucide Icons
         if (typeof lucide !== 'undefined') {
             lucide.createIcons();
         }
 
-        // Workbench Tab Switcher
+        // Initialize GSAP ScrollTrigger Animations
+        function initScrollAnimations() {
+            if (typeof gsap === 'undefined') return;
+            if (typeof ScrollTrigger !== 'undefined') {
+                gsap.registerPlugin(ScrollTrigger);
+            }
+
+            // 1. Showcase Window Scroll Animation
+            if (typeof ScrollTrigger !== 'undefined') {
+                gsap.from('#showcase', {
+                        scrollTrigger: {
+                            trigger: '#showcase',
+                            start: 'top 85%',
+                            toggleActions: 'play none none none'
+                        },
+                        opacity: 0,
+                        y: 40,
+                        scale: 0.98,
+                        duration: 0.9,
+                        ease: 'power3.out'
+                    });
+
+                    // Animate Score Counter on Scroll
+                    ScrollTrigger.create({
+                        trigger: '#showcase',
+                        start: 'top 75%',
+                        onEnter: function() {
+                            var numEl = document.getElementById('hero-score-num');
+                            if (numEl) {
+                                var obj = { val: 0 };
+                                gsap.to(obj, {
+                                    val: 68,
+                                    duration: 1.4,
+                                    ease: 'power2.out',
+                                    onUpdate: function() {
+                                        numEl.textContent = Math.round(obj.val);
+                                    }
+                                });
+                            }
+                        }
+                    });
+
+                    // 3. Platform Ribbon Scroll Animation
+                    gsap.from('.platforms-row .platform-pill', {
+                        scrollTrigger: {
+                            trigger: '.platforms-section',
+                            start: 'top 85%',
+                            toggleActions: 'play none none none'
+                        },
+                        opacity: 0,
+                        y: 20,
+                        duration: 0.6,
+                        stagger: 0.08,
+                        ease: 'power2.out'
+                    });
+
+                    // 4. Bento Grid Cards Staggered Animation
+                    gsap.from('.bento-anim-item', {
+                        scrollTrigger: {
+                            trigger: '.bento-grid',
+                            start: 'top 80%',
+                            toggleActions: 'play none none none'
+                        },
+                        opacity: 0,
+                        y: 35,
+                        duration: 0.8,
+                        stagger: 0.14,
+                        ease: 'power2.out'
+                    });
+
+                    // 5. Comparison Table Slide Up
+                    gsap.from('.comp-table-wrap', {
+                        scrollTrigger: {
+                            trigger: '.comparison-section',
+                            start: 'top 80%',
+                            toggleActions: 'play none none none'
+                        },
+                        opacity: 0,
+                        y: 35,
+                        duration: 0.8,
+                        ease: 'power3.out'
+                    });
+
+                    // 6. ROI Calculator Chassis
+                    gsap.from('.calc-chassis', {
+                        scrollTrigger: {
+                            trigger: '.calc-section',
+                            start: 'top 80%',
+                            toggleActions: 'play none none none'
+                        },
+                        opacity: 0,
+                        scale: 0.96,
+                        y: 35,
+                        duration: 0.85,
+                        ease: 'power3.out'
+                    });
+
+                    // 7. Pricing Cards Staggered Animation
+                    gsap.from('.pricing-anim-item', {
+                        scrollTrigger: {
+                            trigger: '.pricing-grid',
+                            start: 'top 80%',
+                            toggleActions: 'play none none none'
+                        },
+                        opacity: 0,
+                        y: 40,
+                        duration: 0.8,
+                        stagger: 0.15,
+                        ease: 'power2.out'
+                    });
+
+                    // 8. FAQ Cards Stagger
+                    gsap.from('.faq-card', {
+                        scrollTrigger: {
+                            trigger: '.faq-accordion',
+                            start: 'top 85%',
+                            toggleActions: 'play none none none'
+                        },
+                        opacity: 0,
+                        y: 20,
+                        duration: 0.6,
+                        stagger: 0.1,
+                        ease: 'power2.out'
+                    });
+
+                    // 9. Pre-Footer CTA Banner
+                    gsap.from('.cta-banner', {
+                        scrollTrigger: {
+                            trigger: '.pre-footer-cta',
+                            start: 'top 85%',
+                            toggleActions: 'play none none none'
+                        },
+                        opacity: 0,
+                        y: 35,
+                        duration: 0.8,
+                        ease: 'power3.out'
+                    });
+                }
+            }
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initScrollAnimations);
+        } else {
+            initScrollAnimations();
+        }
+
+        // Workbench Tab Switcher with GSAP Animation
         function switchWorkbenchTab(tab, btn) {
             document.querySelectorAll('.wb-tab').forEach(function(b) { b.classList.remove('active'); });
             btn.classList.add('active');
@@ -2333,15 +2521,21 @@
             var vGeo = document.getElementById('view-geo');
             var vFixes = document.getElementById('view-fixes');
 
-            if (vAudit) vAudit.style.display = 'none';
-            if (vMobile) vMobile.style.display = 'none';
-            if (vGeo) vGeo.style.display = 'none';
-            if (vFixes) vFixes.style.display = 'none';
+            var views = [vAudit, vMobile, vGeo, vFixes];
+            views.forEach(function(v) { if (v) v.style.display = 'none'; });
 
-            if (tab === 'audit' && vAudit) vAudit.style.display = 'block';
-            if (tab === 'mobile' && vMobile) vMobile.style.display = 'grid';
-            if (tab === 'geo' && vGeo) vGeo.style.display = 'block';
-            if (tab === 'fixes' && vFixes) vFixes.style.display = 'block';
+            var targetView = null;
+            if (tab === 'audit' && vAudit) targetView = vAudit;
+            if (tab === 'mobile' && vMobile) { targetView = vMobile; vMobile.style.display = 'grid'; }
+            if (tab === 'geo' && vGeo) targetView = vGeo;
+            if (tab === 'fixes' && vFixes) targetView = vFixes;
+
+            if (targetView) {
+                if (tab !== 'mobile') targetView.style.display = 'block';
+                if (typeof gsap !== 'undefined') {
+                    gsap.fromTo(targetView, { opacity: 0, y: 15 }, { opacity: 1, y: 0, duration: 0.35, ease: 'power2.out' });
+                }
+            }
 
             if (typeof lucide !== 'undefined') {
                 lucide.createIcons();
