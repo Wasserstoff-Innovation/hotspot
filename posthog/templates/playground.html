@@ -7,9 +7,10 @@
     <!-- New Favicon: Precision Hotspot Target "O" Mark -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%232563EB'/%3E%3Cstop offset='100%25' stop-color='%231D4ED8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='16' cy='16' r='14' fill='none' stroke='url(%23g)' stroke-width='3.5'/%3E%3Ccircle cx='16' cy='16' r='8' fill='none' stroke='%233B82F6' stroke-width='1.75' stroke-dasharray='3 2'/%3E%3Ccircle cx='16' cy='16' r='4.5' fill='%2310B981'/%3E%3Ccircle cx='16' cy='16' r='1.8' fill='%23FFFFFF'/%3E%3C/svg%3E">
 
+    <!-- Typography: Satisfy (Refined Cursive Logo) + Inter + JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Dancing+Script:wght@700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Satisfy&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
     <!-- Hotspot Single-Script SDK with Visualizer enabled -->
     <script src="/hotspot.js" data-api-key="hs_live_demo_sample_token" data-visualizer="true"></script>
@@ -35,7 +36,7 @@
             --danger-border: rgba(239, 68, 68, 0.25);
 
             --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            --font-cursive: 'Caveat', 'Dancing Script', cursive;
+            --font-cursive: 'Satisfy', cursive;
             --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
         }
 
@@ -159,10 +160,10 @@
             color: var(--text-primary);
         }
 
-        /* ─── Cursive Logo with 'o' Icon Mark ─── */
+        /* ─── Cursive Brand Logo with Seamless "O" Icon Mark ─── */
         .logo-brand {
             font-family: var(--font-cursive);
-            font-size: 2.2rem;
+            font-size: 2.15rem;
             font-weight: 700;
             color: #FFFFFF;
             display: inline-flex;
@@ -177,17 +178,18 @@
             transform: scale(1.02);
         }
         .logo-cursive-h {
-            font-size: 2.4rem;
+            font-size: 2.35rem;
             color: #FFFFFF;
-            margin-right: -1px;
+            margin-right: -2px;
         }
         .logo-icon-o {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 22px;
-            height: 22px;
-            margin: 0 1px;
+            width: 20px;
+            height: 20px;
+            margin-left: -1px;
+            margin-right: -2px;
             position: relative;
             top: 2px;
             transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
@@ -198,12 +200,11 @@
             display: block;
         }
         .logo-brand:hover .logo-icon-o {
-            transform: scale(1.2) rotate(45deg);
+            transform: scale(1.15) rotate(45deg);
         }
         .logo-cursive-tail {
-            font-size: 2.2rem;
+            font-size: 2.15rem;
             color: #FFFFFF;
-            margin-left: -1px;
         }
         .playground-badge-pill {
             font-size: 0.6875rem;
@@ -552,8 +553,8 @@
         </div>
         <div class="banner-actions">
             <button class="btn-banner" onclick="toggleOverlayGuide()">How it works</button>
-            <a href="/" class="btn-banner">Back to Landing</a>
-            <a href="/dashboard/" class="btn-banner btn-banner-primary">Open Dashboard</a>
+            <a href="/" class="btn-banner">← Landing</a>
+            <a href="/dashboard/" class="btn-banner btn-banner-primary">Sample Store Dashboard →</a>
         </div>
     </div>
 
