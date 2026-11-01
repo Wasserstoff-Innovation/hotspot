@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ page_title|default:"Hotspot Dashboard • Conversion Health & Fix Queue" }}</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%230a0a0a' stroke='%23F59E0B' stroke-width='1.5'/%3E%3Ccircle cx='16' cy='16' r='6' fill='%23F59E0B' opacity='0.9'/%3E%3Ccircle cx='16' cy='16' r='2.5' fill='%230a0a0a'/%3E%3C/svg%3E">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <!-- Hotspot Single-Script SDK -->
+    <script src="/hotspot.js" data-api-key="{{ demo_api_key }}" data-api-host="{{ site_url }}"></script>
+
+    <style>
+        :root {
+            --bg: #09090b;
+            --bg-surface: #111113;
+            --bg-elevated: #18181b;
+            --border: rgba(255, 255, 255, 0.08);
+            --border-hover: rgba(255, 255, 255, 0.16);
+
+            --text-primary: #fafafa;
+            --text-secondary: #a1a1aa;
+            --text-muted: #71717a;
+
+            --accent: #F59E0B;
+            --accent-dim: rgba(245, 158, 11, 0.12);
+            --accent-border: rgba(245, 158, 11, 0.25);
+
+            --success: #22c55e;
+            --success-dim: rgba(34, 197, 94, 0.12);
+            --danger: #ef4444;
+            --danger-dim: rgba(239, 68, 68, 0.12);
+
+            --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+            --max-w: 1200px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: var(--bg);
+            color: var(--text-primary);
+            font-family: var(--font);
+            font-size: 14.5px;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            min-height: 100vh;
+            padding-bottom: 80px;
+        }
+
+        /* ─── Top Header ─── */
+        header {
+            background: rgba(17, 17, 19, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-inner {
+            max-width: var(--max-w);
+            margin: 0 auto;
+            padding: 0 24px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .brand-group {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            color: var(--text-primary);
+        }
+
+        .logo-mark {
+            width: 24px;
+            height: 24px;
+        }
+
+        .logo-text {
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: -0.3px;
+        }
+
+        .app-selector {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 12px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 12.5px;
+            color: var(--text-secondary);
+        }
+
+        .live-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--success);
+            box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
+        }
+
+        .nav-tabs {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            background: var(--bg);
+            padding: 3px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .nav-tab {
+            padding: 6px 14px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-muted);
+            border: none;
+            background: transparent;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .nav-tab:hover {
+            color: var(--text-primary);
+        }
+
+        .nav-tab.active {
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-header {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-secondary);
+            font-size: 12.5px;
+            font-weight: 500;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .btn-header:hover {
+            color: var(--text-primary);
+            border-color: var(--border-hover);
+        }
+
+        .btn-header-primary {
+            background: var(--text-primary);
+            color: var(--bg);
+            border-color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .btn-header-primary:hover {
+            opacity: 0.88;
+        }
+
+        /* ─── Main Container ─── */
+        .container {
+            max-width: var(--max-w);
+            margin: 0 auto;
+            padding: 32px 24px;
+        }
+
+        /* ─── Section 1: Health & Audit Score Banner (Ecomhint Model) ─── */
+        .audit-hero-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 28px;
+            margin-bottom: 32px;
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 32px;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .score-side {
+            display: flex;
+            align-items: center;
+            gap: 22px;
+            border-right: 1px solid var(--border);
+            padding-right: 32px;
+        }
+
+        .score-circle {
+            width: 92px;
+            height: 92px;
+            border-radius: 50%;
+            border: 4px solid var(--accent);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: rgba(245, 158, 11, 0.06);
+            flex-shrink: 0;
+            box-shadow: 0 0 25px rgba(245, 158, 11, 0.15);
+        }
+
+        .score-number {
+            font-size: 34px;
+            font-weight: 800;
+            letter-spacing: -1px;
+            color: var(--text-primary);
+            line-height: 1;
+        }
+
+        .score-max {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .score-meta h2 {
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: -0.3px;
+            margin-bottom: 4px;
+        }
+
+        .score-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: var(--accent-dim);
+            border: 1px solid var(--accent-border);
+            color: var(--accent);
+            font-size: 11px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .score-desc {
+            font-size: 12.5px;
+            color: var(--text-muted);
+            line-height: 1.45;
+        }
+
+        /* 4 Core Health Areas Breakdown */
+        .pillars-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 14px;
+        }
+
+        .pillar-card {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .pillar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .pillar-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .pillar-score {
+            font-size: 16px;
+            font-weight: 700;
+            font-family: var(--mono);
+        }
+
+        .pillar-score.good { color: var(--success); }
+        .pillar-score.warning { color: var(--accent); }
+        .pillar-score.bad { color: var(--danger); }
+
+        .pillar-bar-bg {
+            height: 4px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+
+        .pillar-bar-fill {
+            height: 100%;
+            border-radius: 2px;
+        }
+
+        .pillar-note {
+            font-size: 11px;
+            color: var(--text-muted);
+            line-height: 1.35;
+        }
+
+        /* ─── Dashboard Body Layout ─── */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1.55fr 1fr;
+            gap: 28px;
+            align-items: start;
+        }
+
+        /* Section Headings */
+        .section-header-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .section-heading {
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: -0.2px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section-count {
+            font-size: 12px;
+            color: var(--text-muted);
+            background: var(--bg-surface);
+            padding: 2px 8px;
+            border-radius: 100px;
+            border: 1px solid var(--border);
+        }
+
+        /* ─── The Fix Queue (Ecomhint Ranked Tasks) ─── */
+        .fix-list {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .fix-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 20px;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .fix-card:hover {
+            border-color: var(--border-hover);
+        }
+
+        .fix-card.critical {
+            border-left: 3px solid var(--danger);
+        }
+
+        .fix-card.high {
+            border-left: 3px solid var(--accent);
+        }
+
+        .fix-card.medium {
+            border-left: 3px solid #38bdf8;
+        }
+
+        .fix-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .fix-tags {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tag-pill {
+            font-size: 10.5px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .tag-critical { background: var(--danger-dim); color: #fca5a5; }
+        .tag-high { background: var(--accent-dim); color: var(--accent); }
+        .tag-medium { background: rgba(56, 189, 248, 0.12); color: #7dd3fc; }
+
+        .fix-page {
+            font-family: var(--mono);
+            font-size: 11.5px;
+            color: var(--text-muted);
+        }
+
+        .fix-impact {
+            font-size: 11.5px;
+            font-weight: 600;
+            color: var(--success);
+        }
+
+        .fix-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 6px;
+        }
+
+        .fix-proof {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 14px;
+            line-height: 1.5;
+        }
+
+        .fix-proof code {
+            font-family: var(--mono);
+            font-size: 12px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            padding: 1px 5px;
+            border-radius: 4px;
+            color: var(--accent);
+        }
+
+        /* Expandable AI Prompt Box */
+        .prompt-preview {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 14px;
+            margin-top: 12px;
+        }
+
+        .prompt-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 11.5px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .prompt-text {
+            font-family: var(--mono);
+            font-size: 12px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .prompt-actions {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 10px;
+            gap: 8px;
+        }
+
+        .btn-copy-prompt {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: var(--accent-dim);
+            border: 1px solid var(--accent-border);
+            color: var(--accent);
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .btn-copy-prompt:hover {
+            background: rgba(245, 158, 11, 0.2);
+            color: #fbbf24;
+        }
+
+        /* ─── Right Column: Visual Heatmaps & Live Feed ─── */
+        .side-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        /* Visual Heatmap Gallery */
+        .gallery-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .gallery-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 14px;
+        }
+
+        .gallery-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .gallery-item:hover {
+            border-color: var(--accent-border);
+            transform: translateX(2px);
+        }
+
+        .gallery-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .gallery-route {
+            font-family: var(--mono);
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .gallery-meta {
+            font-size: 11.5px;
+            color: var(--text-muted);
+        }
+
+        .gallery-heat-pill {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11.5px;
+            font-weight: 600;
+            color: var(--accent);
+            padding: 4px 10px;
+            background: var(--accent-dim);
+            border-radius: 100px;
+        }
+
+        /* Live Activity Stream */
+        .feed-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .feed-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 14px;
+            max-height: 340px;
+            overflow-y: auto;
+        }
+
+        .feed-row {
+            padding: 10px 12px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .feed-row-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .feed-row-text {
+            font-size: 12.5px;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        .feed-row-text strong {
+            color: var(--text-primary);
+        }
+
+        .feed-row.alert {
+            border-left: 3px solid var(--danger);
+        }
+
+        /* Interactive Heatmap Modal */
+        #heatmap-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(12px);
+            z-index: 500;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .modal-content {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            max-width: 900px;
+            width: 100%;
+            overflow: hidden;
+            box-shadow: 0 30px 100px rgba(0,0,0,0.8);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .modal-body {
+            padding: 24px;
+            min-height: 400px;
+            position: relative;
+        }
+
+        @media (max-width: 900px) {
+            .audit-hero-card { grid-template-columns: 1fr; }
+            .score-side { border-right: none; padding-right: 0; border-bottom: 1px solid var(--border); padding-bottom: 24px; }
+            .pillars-grid { grid-template-columns: 1fr 1fr; }
+            .dashboard-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header>
+        <div class="header-inner">
+            <div class="brand-group">
+                <a href="/" class="logo">
+                    <svg class="logo-mark" viewBox="0 0 28 28" fill="none">
+                        <circle cx="14" cy="14" r="13" stroke="var(--accent)" stroke-width="1.5" fill="none"/>
+                        <circle cx="14" cy="14" r="5" fill="var(--accent)" opacity="0.9"/>
+                        <circle cx="14" cy="14" r="2" fill="var(--bg)"/>
+                    </svg>
+                    <span class="logo-text">Hotspot</span>
+                </a>
+                <div class="app-selector">
+                    <span class="live-dot"></span>
+                    <span>Acme App (Live)</span>
+                </div>
+                <div style="font-size: 11px; font-weight: 700; color: var(--accent); background: var(--accent-dim); border: 1px solid var(--accent-border); padding: 3px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em;">
+                    Pro Plan (Trial)
+                </div>
+            </div>
+
+            <div class="nav-tabs">
+                <button class="nav-tab active" onclick="switchTab('queue')">Fix Queue</button>
+                <button class="nav-tab" onclick="switchTab('heatmaps')">Heatmaps</button>
+                <button class="nav-tab" onclick="switchTab('radar')">Friction Radar</button>
+                <button class="nav-tab" onclick="switchTab('stream')">Live Stream</button>
+            </div>
+
+            <div class="header-actions">
+                <a href="/playground/" class="btn-header">Demo Store</a>
+                <a href="/#pricing" class="btn-header" style="color: var(--accent); border-color: var(--accent-border);">Upgrade</a>
+                <button class="btn-header btn-header-primary" onclick="showSnippet()">+ Install Script</button>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+
+        <!-- ─── Section 1: Health Score Audit Card (Ecomhint Style) ─── -->
+        <div class="audit-hero-card">
+            <div class="score-side">
+                <div class="score-circle">
+                    <div class="score-number">88</div>
+                    <div class="score-max">/ 100</div>
+                </div>
+                <div class="score-meta">
+                    <div class="score-badge">Audit Score • 3 Fixes Found</div>
+                    <h2>Conversion Health</h2>
+                    <p class="score-desc">
+                        Healthy traffic flow, but broken elements on <code>/pricing</code> are causing rage-clicks and dropping ~14% of potential buyers.
+                    </p>
+                </div>
+            </div>
+
+            <!-- 4 Pillar Breakdown -->
+            <div class="pillars-grid">
+                <div class="pillar-card">
+                    <div class="pillar-header">
+                        <span class="pillar-title">Click Health</span>
+                        <span class="pillar-score good">92%</span>
+                    </div>
+                    <div class="pillar-bar-bg">
+                        <div class="pillar-bar-fill" style="width: 92%; background: var(--success);"></div>
+                    </div>
+                    <p class="pillar-note">92% of clicks trigger real actions</p>
+                </div>
+
+                <div class="pillar-card">
+                    <div class="pillar-header">
+                        <span class="pillar-title">Funnel Flow</span>
+                        <span class="pillar-score warning">74%</span>
+                    </div>
+                    <div class="pillar-bar-bg">
+                        <div class="pillar-bar-fill" style="width: 74%; background: var(--accent);"></div>
+                    </div>
+                    <p class="pillar-note">62% dropoff before checkout</p>
+                </div>
+
+                <div class="pillar-card">
+                    <div class="pillar-header">
+                        <span class="pillar-title">Friction Radar</span>
+                        <span class="pillar-score bad">64%</span>
+                    </div>
+                    <div class="pillar-bar-bg">
+                        <div class="pillar-bar-fill" style="width: 64%; background: var(--danger);"></div>
+                    </div>
+                    <p class="pillar-note">18 rage clicks on pricing button</p>
+                </div>
+
+                <div class="pillar-card">
+                    <div class="pillar-header">
+                        <span class="pillar-title">Mobile UX</span>
+                        <span class="pillar-score warning">68%</span>
+                    </div>
+                    <div class="pillar-bar-bg">
+                        <div class="pillar-bar-fill" style="width: 68%; background: var(--accent);"></div>
+                    </div>
+                    <p class="pillar-note">CTA pushed below fold on phones</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ─── Section 2: Dashboard Grid ─── -->
+        <div class="dashboard-grid">
+
+            <!-- Left: "What to Fix Next" Priority Queue -->
+            <div>
+                <div class="section-header-row">
+                    <div class="section-heading">
+                        <span>Ranked Action List</span>
+                        <span class="section-count">3 open issues</span>
+                    </div>
+                    <div style="font-size: 12.5px; color: var(--text-muted);">
+                        Sorted by conversion impact
+                    </div>
+                </div>
+
+                <div class="fix-list">
+                    <!-- Issue 1 -->
+                    <div class="fix-card critical">
+                        <div class="fix-top">
+                            <div class="fix-tags">
+                                <span class="tag-pill tag-critical">Critical #1</span>
+                                <span class="fix-page">/pricing</span>
+                            </div>
+                            <span class="fix-impact">~8% est. sales lift</span>
+                        </div>
+                        <div class="fix-title">Unwired Button: 'Upgrade to Pro' CTA has no click handler</div>
+                        <div class="fix-proof">
+                            Target element <code>#pro-plan-btn</code> was clicked repeatedly by 14 visitors (5.2 avg clicks per session) before bouncing.
+                        </div>
+                        <div class="prompt-preview">
+                            <div class="prompt-header">
+                                <span>🤖 Fix with AI (Cursor / Claude / Lovable)</span>
+                            </div>
+                            <div class="prompt-text">
+                                In /app/pricing/page.tsx, users are rage-clicking the '#pro-plan-btn' CTA because it has no click handler. Add an onClick handler that routes to /checkout?plan=pro and records the checkout_started event.
+                            </div>
+                            <div class="prompt-actions">
+                                <button class="btn-copy-prompt" onclick="copyPromptText(this)">📋 Copy Prompt for AI</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Issue 2 -->
+                    <div class="fix-card high">
+                        <div class="fix-top">
+                            <div class="fix-tags">
+                                <span class="tag-pill tag-high">High #2</span>
+                                <span class="fix-page">/docs</span>
+                            </div>
+                            <span class="fix-impact">~4% conversion lift</span>
+                        </div>
+                        <div class="fix-title">Dead Click Trap: 'API Reference' looks like a link but does nothing</div>
+                        <div class="fix-proof">
+                            Element <code>span.nav-reference</code> has blue underline styling, leading 42 visitors to tap it expecting documentation.
+                        </div>
+                        <div class="prompt-preview">
+                            <div class="prompt-header">
+                                <span>🤖 Fix with AI</span>
+                            </div>
+                            <div class="prompt-text">
+                                In /components/Nav.tsx, change &lt;span class="nav-reference"&gt;API Reference&lt;/span&gt; into an active &lt;a href="/api"&gt; link so users can access the API docs.
+                            </div>
+                            <div class="prompt-actions">
+                                <button class="btn-copy-prompt" onclick="copyPromptText(this)">📋 Copy Prompt for AI</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Issue 3 -->
+                    <div class="fix-card medium">
+                        <div class="fix-top">
+                            <div class="fix-tags">
+                                <span class="tag-pill tag-medium">Medium #3</span>
+                                <span class="fix-page">/</span>
+                            </div>
+                            <span class="fix-impact">~3% conversion lift</span>
+                        </div>
+                        <div class="fix-title">Mobile Fold Barrier: Primary CTA hidden below 840px</div>
+                        <div class="fix-proof">
+                            On mobile screens, 72% of visitors leave without scrolling down to the primary conversion button.
+                        </div>
+                        <div class="prompt-preview">
+                            <div class="prompt-header">
+                                <span>🤖 Fix with AI</span>
+                            </div>
+                            <div class="prompt-text">
+                                On the landing hero, adjust mobile padding and font sizes so the primary CTA button is visible above the fold on mobile screens (viewport height &lt; 750px).
+                            </div>
+                            <div class="prompt-actions">
+                                <button class="btn-copy-prompt" onclick="copyPromptText(this)">📋 Copy Prompt for AI</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Page Heatmap Gallery & Real-Time Feed -->
+            <div class="side-stack">
+                <!-- Heatmap Gallery -->
+                <div class="gallery-card">
+                    <div class="section-header-row" style="margin-bottom: 0;">
+                        <span class="section-heading">Visual Heatmaps</span>
+                        <span style="font-size: 11.5px; color: var(--accent);">Option + H on site</span>
+                    </div>
+
+                    <div class="gallery-list">
+                        <div class="gallery-item" onclick="openHeatmapModal('/pricing')">
+                            <div class="gallery-info">
+                                <span class="gallery-route">/pricing</span>
+                                <span class="gallery-meta">2,847 clicks • 14 rage clusters</span>
+                            </div>
+                            <span class="gallery-heat-pill">🔥 Inspect</span>
+                        </div>
+
+                        <div class="gallery-item" onclick="openHeatmapModal('/')">
+                            <div class="gallery-info">
+                                <span class="gallery-route">/ (Homepage)</span>
+                                <span class="gallery-meta">5,120 clicks • 68% scroll depth</span>
+                            </div>
+                            <span class="gallery-heat-pill">🔥 Inspect</span>
+                        </div>
+
+                        <div class="gallery-item" onclick="openHeatmapModal('/signup')">
+                            <div class="gallery-info">
+                                <span class="gallery-route">/signup</span>
+                                <span class="gallery-meta">1,240 clicks • 92% completion</span>
+                            </div>
+                            <span class="gallery-heat-pill">🔥 Inspect</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live Feed -->
+                <div class="feed-card">
+                    <div class="section-header-row" style="margin-bottom: 0;">
+                        <span class="section-heading">Live Telemetry Feed</span>
+                        <span class="section-count">Streaming</span>
+                    </div>
+
+                    <div class="feed-list" id="dashboard-feed">
+                        <div class="feed-row alert">
+                            <div class="feed-row-top">
+                                <span>⚠️ Rage click</span>
+                                <span>2m ago</span>
+                            </div>
+                            <div class="feed-row-text">
+                                Visitor on <strong>Mobile Safari</strong> clicked <code>#pro-plan-btn</code> 5 times in 800ms
+                            </div>
+                        </div>
+
+                        <div class="feed-row">
+                            <div class="feed-row-top">
+                                <span>Autocapture</span>
+                                <span>5m ago</span>
+                            </div>
+                            <div class="feed-row-text">
+                                Visitor from <strong>New York</strong> clicked <strong>Start free trial</strong> on <code>/</code>
+                            </div>
+                        </div>
+
+                        <div class="feed-row">
+                            <div class="feed-row-top">
+                                <span>Funnel completion</span>
+                                <span>11m ago</span>
+                            </div>
+                            <div class="feed-row-text">
+                                Visitor completed onboarding: <code>/signup → /workspace</code>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- Modal for Heatmap Preview -->
+    <div id="heatmap-modal" onclick="closeHeatmapModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div>
+                    <strong id="modal-route-title" style="font-size: 16px;">Heatmap Inspector</strong>
+                    <div style="font-size: 12px; color: var(--text-muted);">Visual click concentration & dropoff overlay</div>
+                </div>
+                <button onclick="closeHeatmapModal()" style="background:none;border:none;color:var(--text-muted);font-size:18px;cursor:pointer;">✕</button>
+            </div>
+            <div class="modal-body" style="text-align: center; padding: 40px;">
+                <div style="background: #09090b; border: 1px solid var(--border); border-radius: 8px; padding: 32px; position: relative; max-width: 640px; margin: 0 auto;">
+                    <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">Simulated Visual Heatmap for <code id="modal-code-route" style="color:var(--accent);">/pricing</code></div>
+                    <div style="height: 140px; background: rgba(255,255,255,0.02); border: 1px dashed var(--border); border-radius: 6px; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;">
+                        <div style="position: absolute; top: 50%; left: 45%; transform: translate(-50%, -50%); width: 120px; height: 80px; border-radius: 50%; background: radial-gradient(circle, rgba(245,158,11,0.8) 0%, transparent 70%); filter: blur(6px);"></div>
+                        <div style="position: relative; z-index: 2; font-weight: 700; color: #fff;">
+                            [ Button: #pro-plan-btn — 1,420 Clicks ]
+                        </div>
+                    </div>
+                    <p style="font-size: 12.5px; color: var(--text-secondary); margin-top: 18px;">
+                        Tip: Open your real website and press <kbd style="background:var(--bg-elevated);border:1px solid var(--border);padding:2px 6px;border-radius:4px;color:var(--accent);font-family:var(--mono);">Option + H</kbd> to inspect this live on your interface.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function switchTab(tab) {
+            document.querySelectorAll('.nav-tab').forEach(function(t) { t.classList.remove('active'); });
+            event.target.classList.add('active');
+            if (tab === 'heatmaps') {
+                openHeatmapModal('/pricing');
+            }
+        }
+
+        function copyPromptText(btn) {
+            var promptCard = btn.closest('.prompt-preview');
+            var text = promptCard.querySelector('.prompt-text').textContent.trim();
+            navigator.clipboard.writeText(text).then(function() {
+                var orig = btn.textContent;
+                btn.textContent = '✓ Copied to Clipboard!';
+                btn.style.color = '#22c55e';
+                setTimeout(function() {
+                    btn.textContent = orig;
+                    btn.style.color = '';
+                }, 2000);
+            });
+        }
+
+        function showSnippet() {
+            var s = '<script src="{{ site_url }}/hotspot.js" data-api-key="{{ demo_api_key }}"><\/script>';
+            navigator.clipboard.writeText(s).then(function() {
+                alert('Copied 1-line Hotspot script tag to clipboard:\n\n' + s);
+            });
+        }
+
+        function openHeatmapModal(route) {
+            var m = document.getElementById('heatmap-modal');
+            document.getElementById('modal-route-title').textContent = 'Heatmap Inspector — ' + route;
+            document.getElementById('modal-code-route').textContent = route;
+            m.style.display = 'flex';
+        }
+
+        function closeHeatmapModal() {
+            document.getElementById('heatmap-modal').style.display = 'none';
+        }
+    </script>
+
+</body>
+</html>

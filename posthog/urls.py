@@ -418,6 +418,8 @@ urlpatterns = [
     opt_slash_path("flags", hotspot_views.hotspot_decide, name="hotspot_flags"),
     opt_slash_path("landing", hotspot_views.hotspot_landing, name="hotspot_landing"),
     opt_slash_path("playground", hotspot_views.hotspot_playground, name="hotspot_playground"),
+    opt_slash_path("dashboard", hotspot_views.hotspot_dashboard, name="hotspot_dashboard"),
+    opt_slash_path("app", hotspot_views.hotspot_dashboard, name="hotspot_app"),
     path("", hotspot_views.hotspot_landing, name="hotspot_root_landing"),
     re_path(r"^.*", home_with_region_redirect),
 ]

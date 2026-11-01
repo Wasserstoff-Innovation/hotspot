@@ -683,7 +683,7 @@
                 '</div>' +
                 '<div style="display:flex;gap:8px;">' +
                 '  <button id="__hotspot_action_clear" style="flex:1;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#FAFAFA;border-radius:8px;padding:7px 0;font-size:11px;font-weight:600;cursor:pointer;">Clear</button>' +
-                '  <a id="__hotspot_action_dash" href="' + config.api_host + '" target="_blank" style="flex:1;display:flex;align-items:center;justify-content:center;text-decoration:none;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.25);color:#F59E0B;border-radius:8px;padding:7px 0;font-size:11px;font-weight:600;">Open Dashboard ↗</a>' +
+                '  <a id="__hotspot_action_dash" href="' + config.api_host + '/dashboard/" target="_blank" style="flex:1;display:flex;align-items:center;justify-content:center;text-decoration:none;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.25);color:#F59E0B;border-radius:8px;padding:7px 0;font-size:11px;font-weight:600;">Open Dashboard ↗</a>' +
                 '</div>'
 
             hudContainer.appendChild(hudPill)

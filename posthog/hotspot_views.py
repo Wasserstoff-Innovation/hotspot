@@ -158,16 +158,22 @@ def hotspot_decide(request: HttpRequest) -> HttpResponse:
 
 def hotspot_landing(request: HttpRequest) -> HttpResponse:
     """Hotspot high-converting modern landing page."""
-    if request.user.is_authenticated:
-        # If user is already logged in, redirect them straight into the app
-        return HttpResponseRedirect("/project")
-
     context = {
-        "page_title": "Hotspot • Unified Product Analytics & Heatmaps",
+        "page_title": "Hotspot • See Why Visitors Don't Convert",
         "site_url": settings.SITE_URL or "http://localhost:8000",
         "demo_api_key": "hs_live_demo_sample_token",
     }
     return render(request, "landing.html", context)
+
+
+def hotspot_dashboard(request: HttpRequest) -> HttpResponse:
+    """Clean, layman-friendly, organized Hotspot audit & telemetry dashboard."""
+    context = {
+        "page_title": "Hotspot Dashboard • Conversion Health & Fix Queue",
+        "site_url": settings.SITE_URL or "http://localhost:8000",
+        "demo_api_key": "hs_live_demo_sample_token",
+    }
+    return render(request, "dashboard.html", context)
 
 
 def hotspot_playground(request: HttpRequest) -> HttpResponse:
