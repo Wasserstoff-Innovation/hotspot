@@ -134,6 +134,7 @@ PRODUCTS_APPS = [
     "products.subscriptions.backend.apps.SubscriptionsConfig",
     "products.uptime_monitoring.backend.apps.UptimeMonitoringConfig",
     "products.authorization.backend.apps.AuthorizationConfig",
+    "products.hotspot.backend.apps.HotspotConfig",
 ]
 
 INSTALLED_APPS = [

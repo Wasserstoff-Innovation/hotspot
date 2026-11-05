@@ -1,0 +1,2966 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hotspot — Autonomous In-Browser Telemetry, Behavioral Physics & Plain-English Fixes</title>
+    <meta name="description" content="One script tag. Every user movement. Plain-English fixes. Drop hotspot.js into your head tag once for zero-config autocapture, rage click radar, and client-side SEO/GEO audits across any SaaS, web app, or digital platform.">
+
+    <!-- OpenGraph / Social Meta Tags -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://hotspot.so/">
+    <meta property="og:title" content="Hotspot — Autonomous In-Browser Telemetry & Conversion Engine">
+    <meta property="og:description" content="One line of JS. Total site awareness. Autocapture rage clicks, dead taps, and AI crawler visibility in 3.8KB. Core telemetry free forever.">
+    <meta property="og:image" content="https://hotspot.so/og-preview.png">
+
+    <!-- Twitter Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Hotspot — Autonomous In-Browser Telemetry & Conversion Engine">
+    <meta name="twitter:description" content="One line of JS. Total site awareness. Autocapture rage clicks, dead taps, and AI crawler visibility in 3.8KB.">
+
+    <!-- Favicon: Precision Hotspot Target "O" Mark -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%232563EB'/%3E%3Cstop offset='100%25' stop-color='%231D4ED8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='16' cy='16' r='14' fill='none' stroke='url(%23g)' stroke-width='3.5'/%3E%3Ccircle cx='16' cy='16' r='8' fill='none' stroke='%233B82F6' stroke-width='1.75' stroke-dasharray='3 2'/%3E%3Ccircle cx='16' cy='16' r='4.5' fill='%2310B981'/%3E%3Ccircle cx='16' cy='16' r='1.8' fill='%23FFFFFF'/%3E%3C/svg%3E">
+    <meta name="theme-color" content="#2563EB">
+
+    <!-- Typography: Satisfy (Cursive Logo) + Inter (Clean Modern Sans) + JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Satisfy&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Local Libraries: Lucide Icons & GSAP -->
+    <script src="/lucide.js"></script>
+    <script src="/gsap.js"></script>
+
+    <!-- Hotspot Telemetry SDK (Autonomous In-Browser Observation) -->
+    <script defer src="/hotspot.js" data-key="hs_live_hotspot_internal" data-project="hotspot_landing"></script>
+
+    <style>
+        :root {
+            --brand-primary: #2563EB;
+            --brand-hover: #1D4ED8;
+            --brand-glow: rgba(37, 99, 235, 0.16);
+
+            --bg-page: #FAF9F6;
+            --bg-surface: #FFFFFF;
+            --bg-dark: #0F172A;
+            --bg-obsidian: #0B0F17;
+            --bg-card-dark: #111827;
+
+            --text-primary: #0F172A;
+            --text-secondary: #475569;
+            --text-muted: #94A3B8;
+
+            --border-light: #E2E8F0;
+            --border-medium: #CBD5E1;
+            --border-dark: rgba(255, 255, 255, 0.12);
+
+            --success: #10B981;
+            --success-light: #ECFDF5;
+            --warning: #F59E0B;
+            --warning-light: #FFFBEB;
+            --danger: #EF4444;
+            --danger-light: #FEF2F2;
+
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --font-cursive: 'Satisfy', cursive;
+            --font-mono: 'JetBrains Mono', monospace;
+
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background-color: var(--bg-page);
+            color: var(--text-primary);
+            line-height: 1.5;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+            background-image: radial-gradient(rgba(148, 163, 184, 0.12) 1px, transparent 1px);
+            background-size: 32px 32px;
+        }
+
+        /* ─── Eradicate Any Injected Visualizer HUD or Buttons Permanently ─── */
+        #__hotspot_hud_root,
+        #__hotspot_hud_pill,
+        #__hotspot_hud_expanded,
+        #__hotspot_overlay_canvas,
+        [id*="__hotspot_hud"] {
+            display: none !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
+            opacity: 0 !important;
+        }
+
+        h1, h2, h3, h4 {
+            text-wrap: balance;
+            letter-spacing: -0.025em;
+        }
+        p {
+            text-wrap: pretty;
+        }
+
+        /* ─── Global Scroll Margin (Fixes Sticky Header Overlap) ─── */
+        section[id], .scroll-section {
+            scroll-margin-top: 5.5rem;
+        }
+
+        /* ─── Global Container & Layout ─── */
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+        }
+
+        /* ─── Top Announcement Bar ─── */
+        .top-banner {
+            background-color: var(--bg-dark);
+            color: #E2E8F0;
+            padding: 0.5rem 1rem;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+            z-index: 60;
+        }
+        .top-banner .badge-pill {
+            background: rgba(37, 99, 235, 0.25);
+            color: #60A5FA;
+            padding: 0.15rem 0.5rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            border: 1px solid rgba(96, 165, 250, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* ─── Navigation Header ─── */
+        .header {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border-light);
+            height: 4.5rem;
+            width: 100%;
+        }
+        .header-inner {
+            max-width: 1360px;
+            width: 100%;
+            height: 100%;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* ─── Cursive Brand Logo with Seamless "O" Target Mark ─── */
+        .logo-brand {
+            font-family: var(--font-cursive) !important;
+            font-size: 2.15rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: inline-flex;
+            align-items: center;
+            line-height: 1;
+            text-decoration: none;
+            user-select: none;
+            letter-spacing: -0.01em;
+            transition: transform 0.2s ease;
+        }
+        .logo-brand:hover {
+            transform: scale(1.02);
+        }
+        .logo-cursive-h {
+            font-family: var(--font-cursive) !important;
+            font-size: 2.35rem;
+            color: var(--text-primary);
+            margin-right: -2px;
+        }
+        .logo-icon-o {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+            margin-left: -1px;
+            margin-right: -2px;
+            position: relative;
+            top: 2px;
+            transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .logo-icon-o svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        .logo-brand:hover .logo-icon-o {
+            transform: scale(1.15) rotate(45deg);
+        }
+        .logo-cursive-tail {
+            font-family: var(--font-cursive) !important;
+            font-size: 2.15rem;
+            color: var(--text-primary);
+        }
+
+        .nav-links {
+            display: none;
+            align-items: center;
+            gap: 2rem;
+            list-style: none;
+        }
+        @media (min-width: 1024px) {
+            .nav-links {
+                display: flex;
+            }
+        }
+        .nav-link {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: color 0.15s ease;
+            position: relative;
+            padding: 0.25rem 0;
+        }
+        .nav-link:hover {
+            color: var(--brand-primary);
+        }
+
+        .header-cta-group {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            padding: 0.625rem 1.125rem;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            border: 1px solid transparent;
+            white-space: nowrap;
+        }
+        .btn-primary {
+            background-color: var(--brand-primary);
+            color: #FFFFFF;
+            box-shadow: 0 1px 2px rgba(37, 99, 235, 0.2);
+        }
+        .btn-primary:hover {
+            background-color: var(--brand-hover);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+            transform: translateY(-1px);
+        }
+        .btn-outline {
+            background: #FFFFFF;
+            color: var(--text-primary);
+            border-color: var(--border-medium);
+        }
+        .btn-outline:hover {
+            background: #F8FAFC;
+            border-color: #94A3B8;
+            transform: translateY(-1px);
+        }
+        .btn-lg {
+            padding: 0.875rem 1.75rem;
+            font-size: 1rem;
+            border-radius: 10px;
+        }
+
+        /* ─── SECTION 01: DUAL-COLUMN PASSKEY HERO ─── */
+        .hero-section {
+            padding: 4rem 0 5rem 0;
+            position: relative;
+            overflow: hidden;
+        }
+        .hero-dual-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 3rem;
+            align-items: center;
+        }
+        @media (min-width: 1024px) {
+            .hero-dual-grid {
+                grid-template-columns: 1.1fr 0.95fr;
+                gap: 3.5rem;
+            }
+        }
+
+        /* Left Pitch Column */
+        .hero-pitch {
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+        .hero-engine-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-family: var(--font-mono);
+            font-size: 0.8125rem;
+            font-weight: 700;
+            color: var(--brand-primary);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+        .hero-engine-tag .tag-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 2px;
+            background: var(--brand-primary);
+        }
+        .hero-title {
+            font-size: 2.85rem;
+            font-weight: 800;
+            line-height: 1.12;
+            letter-spacing: -0.035em;
+            color: var(--text-primary);
+        }
+        @media (min-width: 640px) {
+            .hero-title {
+                font-size: 3.5rem;
+            }
+        }
+        .text-highlight {
+            color: var(--brand-primary);
+            position: relative;
+            display: inline-block;
+        }
+        .hero-subtitle {
+            font-size: 1.15rem;
+            line-height: 1.6;
+            color: var(--text-secondary);
+            max-width: 580px;
+        }
+        .hero-code-inline {
+            font-family: var(--font-mono);
+            font-size: 0.925em;
+            background: #E2E8F0;
+            color: var(--text-primary);
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        /* Hardware Telemetry Specs Counters */
+        .hero-specs-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.75rem;
+            padding: 1.25rem 0;
+            border-top: 1px solid var(--border-light);
+            border-bottom: 1px solid var(--border-light);
+            margin-top: 0.5rem;
+        }
+        .spec-item {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+        .spec-label {
+            font-family: var(--font-mono);
+            font-size: 0.6875rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+        }
+        .spec-value {
+            font-family: var(--font-mono);
+            font-size: 1.35rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            line-height: 1.1;
+        }
+        .spec-sub {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .hero-checkmarks-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.6rem 1.25rem;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+        .hero-checkmarks-row span {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .hero-checkmarks-row i {
+            color: var(--success);
+            width: 15px;
+            height: 15px;
+        }
+
+        /* Right Column: Passkey Auth & Provisioner Chassis */
+        .passkey-provisioner-chassis {
+            background: #0B0F17;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 16px;
+            padding: 1.85rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+            position: relative;
+            overflow: hidden;
+        }
+        .passkey-provisioner-chassis::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.6), transparent);
+        }
+        .provisioner-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .provisioner-title-tag {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #94A3B8;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+        .provisioner-status-badge {
+            background: rgba(16, 185, 129, 0.15);
+            color: #34D399;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 9999px;
+            padding: 0.2rem 0.6rem;
+            font-family: var(--font-mono);
+            font-size: 0.6875rem;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+        .status-dot-pulse {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #10B981;
+            box-shadow: 0 0 6px #10B981;
+        }
+
+        .provisioner-step-label {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #E2E8F0;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .provisioner-input-group {
+            position: relative;
+            margin-bottom: 1rem;
+        }
+        .provisioner-input {
+            width: 100%;
+            background: #111827;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            padding: 0.75rem 1rem 0.75rem 1rem;
+            font-family: var(--font-mono);
+            font-size: 0.875rem;
+            color: #FFFFFF;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+        .provisioner-input:focus {
+            border-color: #3B82F6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+        }
+
+        .provisioner-tabs {
+            display: flex;
+            gap: 0.4rem;
+            background: #111827;
+            padding: 0.3rem;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            margin-bottom: 1.25rem;
+            overflow-x: auto;
+        }
+        .provisioner-tab {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: #94A3B8;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.45rem 0.6rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+            text-align: center;
+        }
+        .provisioner-tab.active {
+            background: #2563EB;
+            color: #FFFFFF;
+        }
+
+        /* Passkey Action Button */
+        .btn-passkey-cta {
+            width: 100%;
+            background: linear-gradient(135deg, #2563EB, #1D4ED8);
+            color: #FFFFFF;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 9px;
+            padding: 0.875rem 1.25rem;
+            font-family: var(--font-sans);
+            font-size: 0.9375rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.6rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+            margin-bottom: 0.75rem;
+        }
+        .btn-passkey-cta:hover {
+            background: linear-gradient(135deg, #1D4ED8, #1E40AF);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(37, 99, 235, 0.5);
+        }
+        .btn-passkey-cta:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .passkey-microcopy {
+            font-size: 0.75rem;
+            color: #64748B;
+            text-align: center;
+            line-height: 1.4;
+        }
+
+        /* Authenticated State Container */
+        .auth-active-card {
+            display: none;
+            flex-direction: column;
+            gap: 1rem;
+            animation: fadeInAuth 0.3s ease;
+        }
+        @keyframes fadeInAuth {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .auth-verified-banner {
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 8px;
+            padding: 0.6rem 0.85rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            font-family: var(--font-mono);
+        }
+        .auth-verified-banner span.verified-label {
+            color: #34D399;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+        .auth-verified-banner span.verified-email {
+            color: #E2E8F0;
+        }
+
+        .auth-key-box {
+            background: #06090F;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 0.85rem 1rem;
+            font-family: var(--font-mono);
+            font-size: 0.8125rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .auth-key-box span.key-label {
+            color: #64748B;
+            font-size: 0.6875rem;
+            text-transform: uppercase;
+        }
+        .auth-key-box code.key-val {
+            color: #38BDF8;
+            font-weight: 700;
+        }
+
+        .provisioner-code-container {
+            background: #06090F;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: var(--font-mono);
+            font-size: 0.8125rem;
+            line-height: 1.6;
+            color: #E2E8F0;
+            overflow-x: auto;
+        }
+        .provisioner-file-badge {
+            font-size: 0.75rem;
+            color: #64748B;
+            margin-bottom: 0.5rem;
+        }
+
+        .auth-actions-row {
+            display: grid;
+            grid-template-columns: 1.5fr 1fr;
+            gap: 0.75rem;
+            margin-top: 0.25rem;
+        }
+        .btn-copy-auth {
+            background: #2563EB;
+            color: #FFFFFF;
+            border: none;
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            font-family: var(--font-sans);
+            font-size: 0.875rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .btn-copy-auth:hover {
+            background: #1D4ED8;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+        }
+        .btn-rotate-auth {
+            background: rgba(255, 255, 255, 0.08);
+            color: #CBD5E1;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 8px;
+            padding: 0.75rem 0.85rem;
+            font-family: var(--font-sans);
+            font-size: 0.8125rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .btn-rotate-auth:hover {
+            background: rgba(255, 255, 255, 0.14);
+            color: #FFFFFF;
+        }
+
+        /* ─── Platform Compatibility Ribbon ─── */
+        .platforms-section {
+            padding: 2.5rem 0;
+            border-top: 1px solid var(--border-light);
+            border-bottom: 1px solid var(--border-light);
+            background: #FFFFFF;
+        }
+        .platforms-title {
+            text-align: center;
+            font-size: 0.8125rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            margin-bottom: 1.25rem;
+        }
+        .platforms-row {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 0.875rem 1.5rem;
+            align-items: center;
+        }
+        .platform-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: #F8FAFC;
+            border: 1px solid var(--border-light);
+            border-radius: 9999px;
+            padding: 0.4rem 0.875rem;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            transition: all 0.15s ease;
+        }
+        .platform-pill:hover {
+            border-color: #94A3B8;
+            color: var(--text-primary);
+            transform: translateY(-1px);
+        }
+
+        /* ─── SECTION 02: THE GRAPHICAL TELEMETRY CONDUIT ─── */
+        .conduit-section {
+            padding: 5.5rem 0;
+            background: #FAF9F6;
+        }
+        .section-header-center {
+            text-align: center;
+            max-width: 860px;
+            margin: 0 auto 3rem auto;
+        }
+        .section-tag {
+            font-size: 0.8125rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--brand-primary);
+            margin-bottom: 0.75rem;
+        }
+        .section-h2 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            letter-spacing: -0.025em;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+            line-height: 1.25;
+        }
+        .section-sub {
+            font-size: 1.125rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        /* ─── Production Funnel Analytics Visualizer (Refined Architectural Theme) ─── */
+        .funnel-visualizer-card {
+            background: #FFFFFF;
+            border: 1px solid var(--border-light, #E2E8F0);
+            border-radius: 14px;
+            padding: 1.75rem 2rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04), 0 2px 4px -2px rgba(0, 0, 0, 0.03);
+            position: relative;
+        }
+        .funnel-top-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 1.25rem;
+            border-bottom: 1px solid #F1F5F9;
+            margin-bottom: 1.75rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+        .funnel-title-group {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        .funnel-icon-box {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            background: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            color: #0F172A;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .funnel-headline {
+            font-size: 0.9375rem;
+            font-weight: 700;
+            color: #0F172A;
+            letter-spacing: -0.01em;
+        }
+        .funnel-subheadline {
+            font-size: 0.75rem;
+            color: #64748B;
+        }
+        .funnel-kpi-pills {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .kpi-pill {
+            font-family: var(--font-mono);
+            font-size: 0.71875rem;
+            font-weight: 500;
+            padding: 0.25rem 0.55rem;
+            border-radius: 6px;
+            background: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            color: #475569;
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+        .kpi-pill strong {
+            color: #0F172A;
+            font-weight: 600;
+        }
+        .kpi-pill-alert {
+            background: #FEF2F2;
+            border-color: #FEE2E2;
+            color: #991B1B;
+        }
+        .kpi-pill-alert strong {
+            color: #DC2626;
+        }
+
+        .funnel-flow-diagram {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            position: relative;
+        }
+        @media (min-width: 900px) {
+            .funnel-flow-diagram {
+                grid-template-columns: 1fr 48px 1fr 48px 1fr 48px 1fr;
+                align-items: center;
+            }
+        }
+        .funnel-step-col {
+            background: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 10px;
+            padding: 1.125rem 1rem;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: flex;
+            flex-direction: column;
+            gap: 0.65rem;
+        }
+        .funnel-step-col:hover {
+            background: #F1F5F9;
+            border-color: #CBD5E1;
+        }
+        .funnel-step-col.active {
+            background: #FFFFFF;
+            border: 2px solid #0F172A;
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+            padding: calc(1.125rem - 1px) calc(1rem - 1px);
+        }
+        .step-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .step-badge {
+            font-size: 0.6875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #64748B;
+        }
+        .step-conv-rate {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #0F172A;
+        }
+        .step-name {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #0F172A;
+        }
+        .step-path {
+            font-family: var(--font-mono);
+            font-size: 0.6875rem;
+            color: #475569;
+            background: #F1F5F9;
+            border: 1px solid #E2E8F0;
+            padding: 0.15rem 0.45rem;
+            border-radius: 4px;
+            width: fit-content;
+        }
+        .step-volume-gauge {
+            height: 100px;
+            background: #F1F5F9;
+            border-radius: 6px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: flex-end;
+            border: 1px solid #E2E8F0;
+        }
+        .gauge-fill {
+            width: 100%;
+            transition: height 0.4s ease;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 3px 3px 0 0;
+            min-height: 28px;
+        }
+        .gauge-fill-s1 {
+            height: 100%;
+            background: linear-gradient(180deg, #2563EB 0%, #1D4ED8 100%);
+        }
+        .gauge-fill-s2 {
+            height: 64%;
+            background: linear-gradient(180deg, #3B82F6 0%, #2563EB 100%);
+        }
+        .gauge-fill-s3 {
+            height: 28%;
+            background: linear-gradient(180deg, #D97706 0%, #B45309 100%);
+        }
+        .gauge-fill-s4 {
+            height: 14%;
+            background: linear-gradient(180deg, #10B981 0%, #059669 100%);
+        }
+        .gauge-label {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #FFFFFF;
+            letter-spacing: 0.02em;
+            line-height: 1;
+        }
+        .step-footer-stats {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.6875rem;
+            color: #64748B;
+            border-top: 1px solid #E2E8F0;
+            padding-top: 0.4rem;
+        }
+        .dropoff-bridge {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            height: 100%;
+        }
+        .bridge-arrow-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.2rem;
+        }
+        .bridge-arrow-wrap i, .bridge-arrow-wrap svg {
+            width: 14px;
+            height: 14px;
+            color: #94A3B8;
+        }
+        .dropoff-metric {
+            font-size: 0.625rem;
+            color: #64748B;
+            font-family: var(--font-mono);
+            white-space: nowrap;
+        }
+        .dropoff-tag {
+            font-family: var(--font-mono);
+            font-size: 0.625rem;
+            font-weight: 600;
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            white-space: nowrap;
+            position: absolute;
+            top: 25%;
+            transform: translateY(-50%);
+        }
+        .drop-neutral {
+            background: #F1F5F9;
+            color: #64748B;
+            border: 1px solid #E2E8F0;
+        }
+        .drop-leak {
+            background: #FEF2F2;
+            color: #DC2626;
+            border: 1px solid #FEE2E2;
+        }
+        .funnel-inspector-drawer {
+            background: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 10px;
+            padding: 1rem 1.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1.25rem;
+            flex-wrap: wrap;
+        }
+        .inspector-left {
+            display: flex;
+            align-items: center;
+            gap: 0.85rem;
+            flex: 1;
+        }
+        .inspector-badge {
+            font-size: 0.6875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            background: #F1F5F9;
+            color: #334155;
+            border: 1px solid #E2E8F0;
+            white-space: nowrap;
+        }
+        .inspector-badge.badge-leak {
+            background: #FEF2F2;
+            color: #991B1B;
+            border-color: #FEE2E2;
+        }
+        .inspector-text-block {
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+        }
+        .inspector-headline {
+            font-size: 0.8125rem;
+            font-weight: 600;
+            color: #0F172A;
+        }
+        .inspector-subheadline {
+            font-size: 0.75rem;
+            color: #64748B;
+            line-height: 1.4;
+        }
+        .btn-dashboard-link {
+            background: #0F172A;
+            color: #FFFFFF;
+            font-size: 0.75rem;
+            font-weight: 500;
+            padding: 0.45rem 0.9rem;
+            border-radius: 6px;
+            border: 1px solid #0F172A;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            text-decoration: none;
+            transition: background 0.15s ease;
+            white-space: nowrap;
+        }
+        .btn-dashboard-link:hover {
+            background: #1E293B;
+            color: #FFFFFF;
+        }
+        .btn-copy-fix {
+            background: #2563EB;
+            color: #FFFFFF;
+            border: none;
+            border-radius: 6px;
+            padding: 0.6rem 1rem;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.15s ease;
+        }
+        .btn-copy-fix:hover {
+            background: #1D4ED8;
+        }
+
+        /* ─── SECTION 03: HYDRATION & AI SEARCH RADAR ─── */
+        .hydration-section {
+            padding: 5.5rem 0;
+            background: #FFFFFF;
+            border-top: 1px solid var(--border-light);
+            border-bottom: 1px solid var(--border-light);
+        }
+        .hydration-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+        }
+        @media (min-width: 1024px) {
+            .hydration-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+        .hydration-card {
+            background: #F8FAFC;
+            border: 1px solid var(--border-light);
+            border-radius: 16px;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .hydration-card-top {
+            margin-bottom: 1.5rem;
+        }
+        .hydration-pill-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--brand-primary);
+            background: rgba(37, 99, 235, 0.08);
+            padding: 0.25rem 0.65rem;
+            border-radius: 9999px;
+            margin-bottom: 1rem;
+        }
+        .hydration-card-title {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            margin-bottom: 0.75rem;
+            line-height: 1.25;
+        }
+        .hydration-card-desc {
+            font-size: 0.9375rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        /* Interactive Hydration Split Box */
+        .dom-compare-box {
+            background: #0B0F17;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 1.25rem;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: #CBD5E1;
+            line-height: 1.6;
+        }
+        .compare-side-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            font-size: 0.6875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        /* ─── SECTION 04: THE SIGNAL COLLIDER ─── */
+        .collider-section {
+            padding: 5.5rem 0;
+            background: #FAF9F6;
+        }
+        .collider-chassis {
+            background: #0B0F17;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 18px;
+            padding: 2.25rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+        }
+        .collider-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+            align-items: center;
+        }
+        @media (min-width: 1024px) {
+            .collider-grid {
+                grid-template-columns: 1fr 0.9fr;
+            }
+        }
+        .wire-stream-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.875rem;
+        }
+        .wire-item {
+            background: #111827;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 1rem 1.25rem;
+            position: relative;
+            overflow: hidden;
+        }
+        .wire-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+        }
+        .wire-blue::before { background: #38BDF8; }
+        .wire-amber::before { background: #F59E0B; }
+        .wire-violet::before { background: #A855F7; }
+
+        .wire-label {
+            font-family: var(--font-mono);
+            font-size: 0.6875rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 0.25rem;
+        }
+        .wire-blue .wire-label { color: #38BDF8; }
+        .wire-amber .wire-label { color: #F59E0B; }
+        .wire-violet .wire-label { color: #A855F7; }
+
+        .wire-content {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #FFFFFF;
+        }
+        .wire-detail {
+            font-size: 0.75rem;
+            color: #94A3B8;
+            margin-top: 0.2rem;
+        }
+
+        /* Resulting Fix Card */
+        .collider-fix-card {
+            background: #06090F;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            box-shadow: 0 0 30px rgba(16, 185, 129, 0.15);
+            border-radius: 14px;
+            padding: 1.75rem;
+        }
+        .fix-card-tag {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #34D399;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .fix-cause-text {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #FFFFFF;
+            line-height: 1.45;
+            margin-bottom: 1rem;
+        }
+        .fix-code-block {
+            background: #111827;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 0.875rem;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: #60A5FA;
+            line-height: 1.5;
+            margin-bottom: 1.25rem;
+        }
+        .btn-prompt-export {
+            width: 100%;
+            background: #10B981;
+            color: #064E3B;
+            font-weight: 700;
+            border: none;
+            border-radius: 8px;
+            padding: 0.75rem 1.25rem;
+            font-size: 0.875rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            transition: all 0.2s ease;
+        }
+        .btn-prompt-export:hover {
+            background: #34D399;
+            transform: translateY(-1px);
+        }
+
+        /* ─── SECTION 05: WHAT 1 LINE DOES ─── */
+        .single-script-section {
+            padding: 5.5rem 0;
+            background: #FFFFFF;
+            border-top: 1px solid var(--border-light);
+            border-bottom: 1px solid var(--border-light);
+        }
+        .specs-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+        }
+        @media (min-width: 768px) {
+            .specs-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        @media (min-width: 1024px) {
+            .specs-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+        .spec-card {
+            background: #F8FAFC;
+            border: 1px solid var(--border-light);
+            border-radius: 12px;
+            padding: 1.75rem;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.2s ease;
+        }
+        .spec-card:hover {
+            border-color: #94A3B8;
+            box-shadow: var(--shadow-md);
+            transform: translateY(-2px);
+        }
+        .spec-card-badge {
+            display: inline-block;
+            font-family: var(--font-mono);
+            font-size: 0.6875rem;
+            font-weight: 700;
+            color: var(--brand-primary);
+            background: rgba(37, 99, 235, 0.08);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            width: fit-content;
+        }
+        .spec-card-title {
+            font-size: 1.15rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+            line-height: 1.3;
+        }
+        .spec-card-desc {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        /* ─── SECTION 06: COMPARISON MATRIX ─── */
+        .comparison-section {
+            padding: 5.5rem 0;
+            background: #FAF9F6;
+        }
+        .comp-table-wrap {
+            background: #FFFFFF;
+            border: 1px solid var(--border-light);
+            border-radius: 16px;
+            box-shadow: var(--shadow-sm);
+            overflow-x: auto;
+        }
+        .comp-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 0.875rem;
+        }
+        .comp-table th, .comp-table td {
+            padding: 1.125rem 1.5rem;
+            border-bottom: 1px solid var(--border-light);
+        }
+        .comp-table th {
+            font-weight: 700;
+            color: var(--text-primary);
+            background: #F8FAFC;
+        }
+        .col-hotspot {
+            background: rgba(37, 99, 235, 0.04);
+            border-left: 2px solid var(--brand-primary);
+            border-right: 2px solid var(--brand-primary);
+        }
+        .comp-table th.col-hotspot {
+            background: rgba(37, 99, 235, 0.08);
+            color: var(--brand-primary);
+            font-weight: 800;
+        }
+
+        /* ─── SECTION 07: PRICING ─── */
+        .pricing-section {
+            padding: 5.5rem 0;
+            background: #FFFFFF;
+            border-top: 1px solid var(--border-light);
+            border-bottom: 1px solid var(--border-light);
+        }
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        @media (min-width: 768px) {
+            .pricing-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+        .pricing-card {
+            background: #FFFFFF;
+            border: 1px solid var(--border-light);
+            border-radius: 16px;
+            padding: 2.25rem;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            transition: all 0.2s ease;
+        }
+        .pricing-card:hover {
+            box-shadow: var(--shadow-lg);
+            border-color: #94A3B8;
+        }
+        .pricing-card.popular {
+            border: 2px solid var(--brand-primary);
+            box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.15);
+        }
+        .popular-badge {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--brand-primary);
+            color: #FFFFFF;
+            font-size: 0.6875rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+        }
+        .price-val {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            line-height: 1;
+        }
+        .price-period {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+        .pricing-features-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-top: 1.5rem;
+        }
+        .pricing-feature-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .pricing-feature-item i {
+            color: var(--success);
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+        }
+
+        /* ─── SECTION 08: FAQ ─── */
+        .faq-section {
+            padding: 5.5rem 0;
+            background: #FAF9F6;
+        }
+        .faq-accordion {
+            max-width: 800px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .faq-card {
+            background: #FFFFFF;
+            border: 1px solid var(--border-light);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.2s ease;
+        }
+        .faq-question {
+            padding: 1.25rem 1.5rem;
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .faq-answer {
+            padding: 0 1.5rem 1.25rem 1.5rem;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            display: none;
+        }
+        .faq-card.open .faq-answer {
+            display: block;
+        }
+        .faq-card.open .faq-question i {
+            transform: rotate(180deg);
+        }
+
+        /* ─── SECTION 09: PRE-FOOTER CTA ─── */
+        .pre-footer-cta {
+            padding: 5.5rem 0;
+            background: #0B0F17;
+            color: #FFFFFF;
+            text-align: center;
+        }
+        .cta-banner {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .cta-banner h2 {
+            font-size: 2.75rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+            letter-spacing: -0.03em;
+        }
+
+        /* ─── Minimal Hardware Footer ─── */
+        .footer {
+            background: #06090F;
+            color: #94A3B8;
+            padding: 4.5rem 0 2rem 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            font-size: 0.875rem;
+        }
+        .footer-grid {
+            display: grid;
+            grid-template-columns: 2fr repeat(3, 1fr);
+            gap: 3rem;
+            margin-bottom: 3.5rem;
+        }
+        @media (max-width: 768px) {
+            .footer-grid {
+                grid-template-columns: 1fr;
+                gap: 2rem;
+            }
+        }
+        .footer-links-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 0.65rem;
+        }
+        .footer-link-a {
+            color: #94A3B8;
+            text-decoration: none;
+            transition: color 0.15s ease;
+        }
+        .footer-link-a:hover {
+            color: #FFFFFF;
+        }
+        .footer-bottom-bar {
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            padding-top: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8125rem;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Top Announcement Bar -->
+    <div class="top-banner">
+        <span class="badge-pill">v2.4</span>
+        <span>3.8KB Zero-Config Runtime • Passkey Authentication • 100% Free Core Telemetry</span>
+    </div>
+
+    <!-- Navigation Header -->
+    <header class="header">
+        <div class="header-inner">
+            <!-- Cursive Logo with Seamless "O" Mark -->
+            <a href="/" class="logo-brand">
+                <span class="logo-cursive-h">H</span><span class="logo-icon-o" title="Hotspot">
+                    <svg viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <linearGradient id="logoOGrad" x1="2" y1="2" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+                                <stop stop-color="#2563EB"/>
+                                <stop offset="1" stop-color="#1D4ED8"/>
+                            </linearGradient>
+                        </defs>
+                        <circle cx="13" cy="13" r="11" stroke="url(#logoOGrad)" stroke-width="2.75"/>
+                        <circle cx="13" cy="13" r="6.25" stroke="#3B82F6" stroke-width="1.5" stroke-dasharray="2.5 1.5"/>
+                        <circle cx="13" cy="13" r="3.75" fill="#10B981"/>
+                        <circle cx="13" cy="13" r="1.5" fill="#FFFFFF"/>
+                    </svg>
+                </span><span class="logo-cursive-tail">tspot</span>
+            </a>
+
+            <ul class="nav-links">
+                <li><a href="#telemetry-funnel" class="nav-link">The Funnel Flow</a></li>
+                <li><a href="#single-script" class="nav-link">What 1 Line Does</a></li>
+                <li><a href="/dashboard/" class="nav-link">Session Replay</a></li>
+                <li><a href="#hydration-audit" class="nav-link">GEO & Hydration</a></li>
+                <li><a href="#comparison" class="nav-link">Comparison</a></li>
+                <li><a href="#pricing" class="nav-link">Pricing</a></li>
+            </ul>
+
+            <div class="header-cta-group">
+                <button type="button" class="btn btn-outline" onclick="openPasskeyLoginModal()">
+                    <i data-lucide="fingerprint" style="width: 15px; height: 15px; color: var(--brand-primary);"></i>
+                    <span>Sign In</span>
+                </button>
+                <a href="/dashboard/" class="btn btn-primary" id="header-dashboard-link">
+                    <i data-lucide="layout-dashboard" style="width: 15px; height: 15px;"></i>
+                    <span>Open Dashboard</span>
+                    <i data-lucide="arrow-right" style="width: 13px; height: 13px;"></i>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 01: DUAL-COLUMN PASSKEY AUTH HERO                                -->
+    <!-- ========================================================================= -->
+    <section class="hero-section" id="audit-hero">
+        <div class="container">
+            <div class="hero-dual-grid">
+                
+                <!-- Left Column: The Pitch & Key Telemetry Counters -->
+                <div class="hero-pitch">
+                    <div class="hero-engine-tag">
+                        <span class="tag-dot"></span>
+                        <span>Passkey Authentication & Instant Provisioning</span>
+                    </div>
+
+                    <h1 class="hero-title">
+                        One script tag. Every user movement. <span class="text-highlight">Plain-English fixes.</span>
+                    </h1>
+
+                    <p class="hero-subtitle">
+                        Drop <code class="hero-code-inline">hotspot.js</code> into your head tag once. Get zero-config autocapture for every rage click, dead tap, and client-side hydration issue across your web app—then let AI tell you exactly what code to fix.
+                    </p>
+
+                    <!-- Hardware Telemetry Specs Counters -->
+                    <div class="hero-specs-row">
+                        <div class="spec-item">
+                            <span class="spec-label">Bundle Footprint</span>
+                            <span class="spec-value">3.8 KB</span>
+                            <span class="spec-sub">gzip payload</span>
+                        </div>
+                        <div class="spec-item">
+                            <span class="spec-label">Manual Events</span>
+                            <span class="spec-value">0</span>
+                            <span class="spec-sub">zero code tags</span>
+                        </div>
+                        <div class="spec-item">
+                            <span class="spec-label">Core Telemetry</span>
+                            <span class="spec-value" style="color: #10B981;">$0</span>
+                            <span class="spec-sub">free forever</span>
+                        </div>
+                        <div class="spec-item">
+                            <span class="spec-label">AI Intelligence</span>
+                            <span class="spec-value" style="color: #2563EB;">$9</span>
+                            <span class="spec-sub">/ month</span>
+                        </div>
+                    </div>
+
+                    <!-- Clean Checkmarks -->
+                    <div class="hero-checkmarks-row">
+                        <span><i data-lucide="check-circle-2"></i> Zero manual event tagging</span>
+                        <span><i data-lucide="check-circle-2"></i> 0ms main thread blocking</span>
+                        <span><i data-lucide="check-circle-2"></i> Cookie-free & GDPR clean</span>
+                        <span><i data-lucide="check-circle-2"></i> Real passkey-backed API key</span>
+                    </div>
+                </div>
+
+                <!-- Right Column: Passkey Auth & Key Provisioner -->
+                <div class="passkey-provisioner-chassis" id="passkey-auth-module">
+                    <div class="provisioner-header">
+                        <span class="provisioner-title-tag">DEVELOPER PASSKEY PROVISIONER</span>
+                        <span class="provisioner-status-badge">
+                            <span class="status-dot-pulse"></span>
+                            <span id="badge-status-text">WEBAUTHN READY</span>
+                        </span>
+                    </div>
+
+                    <!-- STATE 1: Unauthenticated Passkey Trigger -->
+                    <div id="auth-unauthenticated-state">
+                        <div class="provisioner-step-label">
+                            <span>01. Developer Identity (Email or Domain)</span>
+                        </div>
+                        <div class="provisioner-input-group">
+                            <input 
+                                type="text" 
+                                id="passkey-identity-input"
+                                class="provisioner-input" 
+                                value="alex@acme.dev"
+                                placeholder="you@company.dev or myapp.com"
+                            >
+                        </div>
+
+                        <div class="provisioner-step-label">
+                            <span>02. Runtime Framework</span>
+                        </div>
+                        <div class="provisioner-tabs">
+                            <button type="button" class="provisioner-tab active" onclick="switchSnippetFw('nextjs', this)">Next.js Router</button>
+                            <button type="button" class="provisioner-tab" onclick="switchSnippetFw('vite', this)">React / Vite</button>
+                            <button type="button" class="provisioner-tab" onclick="switchSnippetFw('html', this)">HTML / Vanilla</button>
+                            <button type="button" class="provisioner-tab" onclick="switchSnippetFw('shopify', this)">Shopify Liquid</button>
+                        </div>
+
+                        <!-- Big Biometric Passkey CTA -->
+                        <button type="button" class="btn-passkey-cta" id="btn-passkey-trigger" onclick="authenticateWithPasskey()">
+                            <i data-lucide="fingerprint" style="width: 20px; height: 20px;"></i>
+                            <span id="passkey-btn-label">Authenticate with Passkey & Mint Key</span>
+                        </button>
+
+                        <div id="passkey-error-alert" style="display: none; background: #FEF2F2; border: 1px solid #FCA5A5; color: #991B1B; padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.8125rem; margin-top: 0.75rem; text-align: left; align-items: center; gap: 0.5rem;">
+                            <i data-lucide="alert-circle" style="width: 16px; height: 16px; flex-shrink: 0; color: #DC2626;"></i>
+                            <span id="passkey-error-message">Passkey authentication was cancelled or not allowed.</span>
+                        </div>
+
+                        <p class="passkey-microcopy">
+                            Uses WebAuthn (Touch ID, Face ID, Windows Hello, or YubiKey). Secure, cryptographic login with zero passwords.
+                        </p>
+                    </div>
+
+                    <!-- STATE 2: Authenticated State (Revealed after Passkey verification) -->
+                    <div class="auth-active-card" id="auth-authenticated-state">
+                        <div class="auth-verified-banner">
+                            <span class="verified-label">
+                                <i data-lucide="check-circle" style="width: 14px; height: 14px;"></i>
+                                PASSKEY VERIFIED
+                            </span>
+                            <span class="verified-email" id="auth-email-display">alex@acme.dev</span>
+                        </div>
+
+                        <div class="auth-key-box">
+                            <div>
+                                <div class="key-label">Active Provisioned Key</div>
+                                <code class="key-val" id="active-key-string">hs_live_9f81a4b2c0</code>
+                            </div>
+                            <span style="font-size: 0.6875rem; background: rgba(16, 185, 129, 0.2); color: #34D399; padding: 2px 6px; border-radius: 4px; font-weight: 700;">LIVE</span>
+                        </div>
+
+                        <div class="provisioner-code-container">
+                            <div class="provisioner-file-badge" id="auth-file-target">Paste inside &lt;head&gt; in src/app/layout.tsx</div>
+                            <pre style="margin: 0; white-space: pre-wrap;" id="auth-code-view">&lt;Script
+  src="https://cdn.hotspot.so/v2/hotspot.js"
+  data-key="hs_live_9f81a4b2c0"
+  data-domain="acme.dev"
+  strategy="afterInteractive"
+/&gt;</pre>
+                        </div>
+
+                        <div class="auth-actions-row" style="grid-template-columns: 1fr 1fr; margin-bottom: 0.5rem;">
+                            <a href="/dashboard/" class="btn-copy-auth" id="btn-enter-dashboard" style="background: #10B981; text-decoration: none;">
+                                <i data-lucide="layout-dashboard" style="width: 15px; height: 15px;"></i>
+                                <span>Enter Live Dashboard &rarr;</span>
+                            </a>
+                            <button type="button" class="btn-copy-auth" id="btn-copy-auth-code" onclick="copyAuthenticatedSnippet()">
+                                <i data-lucide="copy" style="width: 15px; height: 15px;"></i>
+                                <span>Copy 1-Line Snippet</span>
+                            </button>
+                        </div>
+                        <div style="display: flex; justify-content: flex-end;">
+                            <button type="button" class="btn-rotate-auth" onclick="rotateKey()" style="padding: 0.45rem 0.75rem; font-size: 0.75rem;">
+                                <i data-lucide="refresh-cw" style="width: 13px; height: 13px;"></i>
+                                <span>Rotate Key</span>
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- PLATFORM COMPATIBILITY RIBBON                                             -->
+    <!-- ========================================================================= -->
+    <section class="platforms-section scroll-section" id="platforms">
+        <div class="container">
+            <div class="platforms-title">Runs seamlessly across every modern framework & digital platform</div>
+            <div class="platforms-row">
+                <span class="platform-pill">
+                    <i data-lucide="code-2" style="color: #2563EB;"></i>
+                    <span>Next.js App Router</span>
+                </span>
+                <span class="platform-pill">
+                    <i data-lucide="atom" style="color: #2563EB;"></i>
+                    <span>React & Vite</span>
+                </span>
+                <span class="platform-pill">
+                    <i data-lucide="layers" style="color: #2563EB;"></i>
+                    <span>Remix & Astro</span>
+                </span>
+                <span class="platform-pill">
+                    <i data-lucide="palette" style="color: #2563EB;"></i>
+                    <span>Webflow & Framer</span>
+                </span>
+                <span class="platform-pill">
+                    <i data-lucide="shopping-cart" style="color: #2563EB;"></i>
+                    <span>Shopify & Headless</span>
+                </span>
+                <span class="platform-pill">
+                    <i data-lucide="smartphone" style="color: #2563EB;"></i>
+                    <span>iOS & Mobile Safari</span>
+                </span>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 02: PRODUCTION COHORT CONVERSION FUNNEL                           -->
+    <!-- ========================================================================= -->
+    <section class="conduit-section scroll-section" id="telemetry-funnel">
+        <div class="container">
+            <div class="section-header-center">
+                <div class="section-tag">Visual Funnel Intelligence</div>
+                <h2 class="section-h2">See exactly where visitors drop off, step by step</h2>
+                <p class="section-sub">
+                    Traditional analytics show arbitrary graphs. Hotspot clusters real user telemetry into clear stepped progression corridors and reveals the exact friction barriers killing your conversion rate.
+                </p>
+            </div>
+
+            <!-- Stepped Funnel Card -->
+            <div class="funnel-visualizer-card">
+                
+                <!-- Toolbar -->
+                <div class="funnel-top-toolbar">
+                    <div class="funnel-title-group">
+                        <div class="funnel-icon-box">
+                            <i data-lucide="filter" style="width: 16px; height: 16px;"></i>
+                        </div>
+                        <div>
+                            <div class="funnel-headline">Conversion Funnel Drop-off</div>
+                            <div class="funnel-subheadline">Sequential cohort progression across core conversion steps</div>
+                        </div>
+                    </div>
+                    <div class="funnel-kpi-pills">
+                        <div class="kpi-pill">Cohort: <strong>10,000 Visitors</strong></div>
+                        <div class="kpi-pill">Conversion: <strong style="color: #059669;">14.0%</strong></div>
+                        <div class="kpi-pill kpi-pill-alert">Leaked ARR: <strong>-$2,400 / mo</strong></div>
+                    </div>
+                </div>
+
+                <!-- Stepped Funnel Diagram Grid -->
+                <div class="funnel-flow-diagram">
+                    
+                    <!-- STEP 1 -->
+                    <div class="funnel-step-col active" onclick="selectFunnelStep(0, this)">
+                        <div class="step-header">
+                            <span class="step-badge">Stage 1</span>
+                            <span class="step-conv-rate" style="color: #2563EB;">100% Entry</span>
+                        </div>
+                        <div class="step-name">Inbound Arrival</div>
+                        <div class="step-path">/</div>
+                        <div class="step-volume-gauge">
+                            <div class="gauge-fill gauge-fill-s1">
+                                <span class="gauge-label">10,000</span>
+                            </div>
+                        </div>
+                        <div class="step-footer-stats">
+                            <span>Google (58%) • Direct (42%)</span>
+                            <span>0% drop</span>
+                        </div>
+                    </div>
+
+                    <!-- DROPOFF BRIDGE 1 -->
+                    <div class="dropoff-bridge">
+                        <span class="dropoff-tag drop-neutral">-36% Drop</span>
+                        <div class="bridge-arrow-wrap">
+                            <i data-lucide="arrow-right"></i>
+                            <span class="dropoff-metric">3,600 lost</span>
+                        </div>
+                    </div>
+
+                    <!-- STEP 2 -->
+                    <div class="funnel-step-col" onclick="selectFunnelStep(1, this)">
+                        <div class="step-header">
+                            <span class="step-badge">Stage 2</span>
+                            <span class="step-conv-rate" style="color: #2563EB;">64% Retained</span>
+                        </div>
+                        <div class="step-name">Explore Pricing</div>
+                        <div class="step-path">/pricing</div>
+                        <div class="step-volume-gauge">
+                            <div class="gauge-fill gauge-fill-s2">
+                                <span class="gauge-label">6,400</span>
+                            </div>
+                        </div>
+                        <div class="step-footer-stats">
+                            <span>64% Scroll Arrest Depth</span>
+                            <span>36% drop</span>
+                        </div>
+                    </div>
+
+                    <!-- DROPOFF BRIDGE 2 (CRITICAL) -->
+                    <div class="dropoff-bridge">
+                        <span class="dropoff-tag drop-leak">-56% Leak</span>
+                        <div class="bridge-arrow-wrap">
+                            <i data-lucide="arrow-right" style="color: #DC2626;"></i>
+                            <span class="dropoff-metric" style="color: #DC2626;">3,600 lost</span>
+                        </div>
+                    </div>
+
+                    <!-- STEP 3 -->
+                    <div class="funnel-step-col" onclick="selectFunnelStep(2, this)">
+                        <div class="step-header">
+                            <span class="step-badge">Stage 3</span>
+                            <span class="step-conv-rate" style="color: #D97706;">28% Retained</span>
+                        </div>
+                        <div class="step-name">Trigger Passkey</div>
+                        <div class="step-path">#btn-passkey-trigger</div>
+                        <div class="step-volume-gauge">
+                            <div class="gauge-fill gauge-fill-s3">
+                                <span class="gauge-label">2,800</span>
+                            </div>
+                        </div>
+                        <div class="step-footer-stats">
+                            <span>Registration Modal</span>
+                            <span style="color: #DC2626; font-weight: 600;">56% drop</span>
+                        </div>
+                    </div>
+
+                    <!-- DROPOFF BRIDGE 3 -->
+                    <div class="dropoff-bridge">
+                        <span class="dropoff-tag drop-neutral">-50% Drop</span>
+                        <div class="bridge-arrow-wrap">
+                            <i data-lucide="arrow-right"></i>
+                            <span class="dropoff-metric">1,400 lost</span>
+                        </div>
+                    </div>
+
+                    <!-- STEP 4 -->
+                    <div class="funnel-step-col" onclick="selectFunnelStep(3, this)">
+                        <div class="step-header">
+                            <span class="step-badge">Stage 4</span>
+                            <span class="step-conv-rate" style="color: #059669;">14% Converted</span>
+                        </div>
+                        <div class="step-name">Passkey Verified</div>
+                        <div class="step-path" style="background: #ECFDF5; color: #059669; border-color: #A7F3D0;">passkey_verified</div>
+                        <div class="step-volume-gauge">
+                            <div class="gauge-fill gauge-fill-s4">
+                                <span class="gauge-label">1,400</span>
+                            </div>
+                        </div>
+                        <div class="step-footer-stats">
+                            <span style="color: #059669; font-weight: 600;">Completed</span>
+                            <span style="color: #059669; font-weight: 600;">14% Final</span>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Inspector Drawer -->
+                <div class="funnel-inspector-drawer">
+                    <div class="inspector-left">
+                        <span class="inspector-badge" id="insp-stage-badge">Stage 1: Arrival</span>
+                        <div class="inspector-text-block">
+                            <div class="inspector-headline" id="insp-headline">10,000 visitors entered via Google Search (58%) & Direct Navigation (42%)</div>
+                            <div class="inspector-subheadline" id="insp-desc">Zero-config telemetry active • 0ms DOM blocking • Average landing page dwell time: 14.8 seconds</div>
+                        </div>
+                    </div>
+                    <a href="/dashboard/" class="btn-dashboard-link">
+                        <i data-lucide="layout-dashboard" style="width: 14px; height: 14px;"></i>
+                        <span>Open Funnel in Dashboard &rarr;</span>
+                    </a>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 03: HYDRATION & AI SEARCH RADAR (Why In-Browser Beats Crawlers)  -->
+    <!-- ========================================================================= -->
+    <section class="hydration-section scroll-section" id="hydration-audit">
+        <div class="container">
+            <div class="section-header-center">
+                <div class="section-tag">Client Hydration & AI Search Radar</div>
+                <h2 class="section-h2">Why in-browser telemetry beats external crawlers</h2>
+                <p class="section-sub">
+                    Vibe-coded apps (Next.js, Vite, Remix) break traditional SEO tools because content hydrates client-side. Because hotspot.js lives inside the browser DOM on real devices, it catches what external crawlers miss.
+                </p>
+            </div>
+
+            <div class="hydration-grid">
+                <!-- Card 1: Client DOM Hydration Gap -->
+                <div class="hydration-card">
+                    <div class="hydration-card-top">
+                        <span class="hydration-pill-tag">
+                            <i data-lucide="layers" style="width: 14px; height: 14px;"></i>
+                            <span>Client Hydration Gap</span>
+                        </span>
+                        <h3 class="hydration-card-title">What users see vs. what Google & ChatGPT see</h3>
+                        <p class="hydration-card-desc">
+                            External audit tools ping your URL once from a remote server, completely missing how React hydrates your metadata, schema tags, and pricing table on mobile devices.
+                        </p>
+                    </div>
+
+                    <div class="dom-compare-box">
+                        <div class="compare-side-header">
+                            <span style="color: #34D399;">✓ In-Browser DOM (Real Visitor)</span>
+                            <span style="color: #EF4444;">⚠ External Curl Crawler</span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                            <div>
+                                <div style="color: #38BDF8;">&lt;title&gt;Enterprise Kanban&lt;/title&gt;</div>
+                                <div style="color: #34D399;">&lt;script type="application/ld+json"&gt;</div>
+                                <div style="color: #94A3B8;">  SoftwareApplication hydrated</div>
+                                <div style="color: #34D399;">&lt;/script&gt;</div>
+                                <div style="color: #E2E8F0; margin-top: 0.5rem;">&lt;div class="pricing-matrix"&gt;</div>
+                                <div style="color: #94A3B8;">  Rendered 3 Plans ($9/$29)</div>
+                            </div>
+                            <div style="border-left: 1px solid rgba(255, 255, 255, 0.08); padding-left: 1rem; color: #64748B;">
+                                <div>&lt;title&gt;React App&lt;/title&gt;</div>
+                                <div style="color: #EF4444;">&lt;!-- Schema Missing --&gt;</div>
+                                <div style="color: #EF4444;">&lt;div id="root"&gt;&lt;/div&gt;</div>
+                                <div style="margin-top: 0.5rem; color: #EF4444;">[Empty Container]</div>
+                                <div style="font-size: 0.6875rem; color: #F59E0B;">AI Bots see 0 pricing data</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card 2: Search Console Intent Join + AI Bot Radar -->
+                <div class="hydration-card">
+                    <div class="hydration-card-top">
+                        <span class="hydration-pill-tag">
+                            <i data-lucide="bot" style="width: 14px; height: 14px;"></i>
+                            <span>Search Console Join + AI Bot Radar</span>
+                        </span>
+                        <h3 class="hydration-card-title">Join GSC queries directly with on-page drop-offs</h3>
+                        <p class="hydration-card-desc">
+                            Search Console knows what people searched, but goes blind the millisecond they land. Hotspot correlates inbound query intent with real cursor stalls and mobile frustration.
+                        </p>
+                    </div>
+
+                    <div class="dom-compare-box">
+                        <div class="compare-side-header">
+                            <span style="color: #60A5FA;">GSC Query: "team kanban with sso"</span>
+                            <span style="color: #A855F7;">LLM Bot: GPTBot & ClaudeBot</span>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="color: #94A3B8;">Inbound Position:</span>
+                                <span style="color: #FFFFFF; font-weight: 700;">Rank #2 on Google • 11.4% CTR</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="color: #94A3B8;">On-Page Scroll Arrest:</span>
+                                <span style="color: #F59E0B; font-weight: 700;">84% bounce within 4s at Hero</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span style="color: #94A3B8;">Root Cause Flagged:</span>
+                                <span style="color: #EF4444; font-weight: 700;">Hero H1 omits SSO verification</span>
+                            </div>
+                            <div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid rgba(255, 255, 255, 0.08); display: flex; justify-content: space-between; align-items: center;">
+                                <span style="color: #34D399;">/llms.txt Specification:</span>
+                                <span style="background: rgba(16, 185, 129, 0.2); color: #34D399; padding: 2px 6px; border-radius: 4px;">PASS • 100% Crawlable</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 04: THE SIGNAL COLLIDER (Synthesis Engine)                       -->
+    <!-- ========================================================================= -->
+    <section class="collider-section scroll-section" id="signal-collider">
+        <div class="container">
+            <div class="section-header-center">
+                <div class="section-tag">The Synthesis Engine</div>
+                <h2 class="section-h2">From raw telemetry to plain-English code fix</h2>
+                <p class="section-sub">
+                    Dashboards give you homework. Hotspot correlates inbound intent, DOM friction, and runtime errors to generate the exact code fix for Cursor or Claude.
+                </p>
+            </div>
+
+            <div class="collider-chassis">
+                <div class="collider-grid">
+                    
+                    <!-- Left: 3 Telemetry Wires Entering Collider -->
+                    <div class="wire-stream-list">
+                        <div class="wire-item wire-blue">
+                            <div class="wire-label">Signal 1: Inbound Search Intent</div>
+                            <div class="wire-content">Query: "stripe alternative india" &rarr; Landed on /pricing</div>
+                            <div class="wire-detail">Visitor arriving with high purchase intent looking for domestic card processing.</div>
+                        </div>
+
+                        <div class="wire-item wire-amber">
+                            <div class="wire-label">Signal 2: In-Browser Behavioral Telemetry</div>
+                            <div class="wire-content">Scrolled to FAQ &rarr; 4x Rapid Clicks on #intl-badge (Dead Click)</div>
+                            <div class="wire-detail">User clicked static non-interactive text badge 4 times on Safari expecting a modal.</div>
+                        </div>
+
+                        <div class="wire-item wire-violet">
+                            <div class="wire-label">Signal 3: Client Hydration & Metadata</div>
+                            <div class="wire-content">Missing FAQPage JSON-LD schema for international cards</div>
+                            <div class="wire-detail">Search crawlers and ChatGPT citation engines cannot see pricing answers.</div>
+                        </div>
+                    </div>
+
+                    <!-- Right: The Synthesized Fix Card -->
+                    <div class="collider-fix-card">
+                        <div class="fix-card-tag">
+                            <i data-lucide="check-circle" style="width: 16px; height: 16px;"></i>
+                            <span>SYNTHESIZED FIX GENERATED</span>
+                        </div>
+
+                        <div class="fix-cause-text">
+                            "Visitors searching for Indian cards expect immediate payment confirmation, but tap a static comparison badge 4 times before bouncing."
+                        </div>
+
+                        <div class="fix-code-block">
+                            <span style="color: #94A3B8;">src/components/Pricing.tsx:42</span><br>
+                            - &lt;span className="badge"&gt;International Cards&lt;/span&gt;<br>
+                            + &lt;button onClick={() =&gt; setPaymentModal(true)} className="badge min-h-[44px]"&gt;<br>
+                            +   International Cards &bull; Instant Details &rarr;<br>
+                            + &lt;/button&gt;
+                        </div>
+
+                        <button type="button" class="btn-prompt-export" onclick="copyColliderPrompt(this)">
+                            <i data-lucide="terminal" style="width: 16px; height: 16px;"></i>
+                            <span>Copy Prompt for Cursor / Claude &rarr;</span>
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 05: WHAT 1 LINE DOES (Zero-Config Architecture & Hardware Specs) -->
+    <!-- ========================================================================= -->
+    <section class="single-script-section scroll-section" id="single-script">
+        <div class="container">
+            <div class="section-header-center">
+                <div class="section-tag">Zero-Config Architecture</div>
+                <h2 class="section-h2">What a single line of JavaScript actually does for you</h2>
+                <p class="section-sub">
+                    Drop 3.8KB into your &lt;head&gt; once. Replace an entire fragmented $400/month stack of GA4, Hotjar, Sentry, and manual SEO crawlers with zero maintenance.
+                </p>
+            </div>
+
+            <div class="specs-grid">
+                <!-- Card 1 -->
+                <div class="spec-card">
+                    <span class="spec-card-badge">Zero Tagging</span>
+                    <h3 class="spec-card-title">Zero Manual Event Tagging</h3>
+                    <p class="spec-card-desc">
+                        Never write <code style="font-family: var(--font-mono); font-size: 0.85em; background: #E2E8F0; padding: 2px 4px; border-radius: 4px;">analytics.track()</code> or wrestle with Google Tag Manager triggers. Every button, form field, route transition, tab switch, and modal open is indexed automatically.
+                    </p>
+                </div>
+
+                <!-- Card 2 -->
+                <div class="spec-card">
+                    <span class="spec-card-badge">Rage Radar</span>
+                    <h3 class="spec-card-title">Physics-Based Rage Radar</h3>
+                    <p class="spec-card-desc">
+                        Distinguishes genuine intention from frustration. Analyzes vector velocity, coordinate clustering, rapid repeat clicks in &lt;800ms, and dead taps on non-interactive text elements.
+                    </p>
+                </div>
+
+                <!-- Card 3 -->
+                <div class="spec-card">
+                    <span class="spec-card-badge">Hydration Audit</span>
+                    <h3 class="spec-card-title">Client-Side Hydration Auditing</h3>
+                    <p class="spec-card-desc">
+                        External crawlers ping a server URL once, missing client-side React hydration bugs. Hotspot runs inside the real DOM, verifying what visitors and AI bots (ChatGPT, Claude, Perplexity) actually see.
+                    </p>
+                </div>
+
+                <!-- Card 4 -->
+                <div class="spec-card">
+                    <span class="spec-card-badge">Zero Bloat</span>
+                    <h3 class="spec-card-title">0ms DOM Blocking & 3.8KB</h3>
+                    <p class="spec-card-desc">
+                        Traditional session replay tools stream 50MB of heavy canvas video that slows visitor phones and drains batteries. Hotspot records lightweight vector coordinate physics with zero main-thread lag.
+                    </p>
+                </div>
+
+                <!-- Card 5 -->
+                <div class="spec-card">
+                    <span class="spec-card-badge">Privacy First</span>
+                    <h3 class="spec-card-title">Cookie-Free & GDPR-Clean</h3>
+                    <p class="spec-card-desc">
+                        No creepy cross-site tracking cookies. 100% compliant with GDPR, CCPA, and PECR out of the box with zero annoying cookie consent banners required on your site.
+                    </p>
+                </div>
+
+                <!-- Card 6 -->
+                <div class="spec-card">
+                    <span class="spec-card-badge">Transparent Pricing</span>
+                    <h3 class="spec-card-title">Core Telemetry Free Forever</h3>
+                    <p class="spec-card-desc">
+                        Telemetry is a commodity—so collecting events is 100% free with no monthly caps. We only charge $9/mo when you want automated AI synthesis and 1-click code fixes.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 06: COMPARISON MATRIX                                             -->
+    <!-- ========================================================================= -->
+    <section class="comparison-section scroll-section" id="comparison">
+        <div class="container">
+            <div class="section-header-center">
+                <div class="section-tag">The Builder Advantage</div>
+                <h2 class="section-h2">Why builders choose Hotspot over complex developer tools</h2>
+                <p class="section-sub">
+                    Most analytics tools were built for data engineers writing SQL queries. Hotspot was built for founders, builders, and growth teams who just want results.
+                </p>
+            </div>
+
+            <div class="comp-table-wrap">
+                <table class="comp-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 28%;">Capability</th>
+                            <th style="width: 24%;">Google Analytics 4</th>
+                            <th style="width: 24%;">Hotjar / Clarity</th>
+                            <th class="col-hotspot" style="width: 24%;">Hotspot</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Tells You Why Users Left</strong></td>
+                            <td style="color: #64748B;">Only shows bounce percentage</td>
+                            <td style="color: #64748B;">Requires watching 100s of hours of video</td>
+                            <td class="col-hotspot" style="color: #2563EB; font-weight: 700;">Plain-English root cause in 30 seconds</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Prioritized Action Plan</strong></td>
+                            <td style="color: #64748B;">No action plan (raw charts)</td>
+                            <td style="color: #64748B;">No prioritized fixes</td>
+                            <td class="col-hotspot" style="color: #2563EB; font-weight: 700;">Ranked by conversion impact</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Mobile Tap Frustration Radar</strong></td>
+                            <td style="color: #64748B;">Not supported</td>
+                            <td style="color: #64748B;">Generic heatmaps without context</td>
+                            <td class="col-hotspot" style="color: #2563EB; font-weight: 700;">Instant tap & rage-click coordinate radar</td>
+                        </tr>
+                        <tr>
+                            <td><strong>AI Search & GEO Hydration Audit</strong></td>
+                            <td style="color: #64748B;">Blind to AI crawler indexing</td>
+                            <td style="color: #64748B;">No AI search indexing checks</td>
+                            <td class="col-hotspot" style="color: #2563EB; font-weight: 700;">Checks ChatGPT, Claude & Perplexity Bots</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Technical Knowledge Needed</strong></td>
+                            <td style="color: #64748B;">Complex Tag Manager & custom events</td>
+                            <td style="color: #64748B;">Manual recording tagging required</td>
+                            <td class="col-hotspot" style="color: #2563EB; font-weight: 700;">Zero coding. 100% zero-config runtime</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 07: TRANSPARENT PRICING                                          -->
+    <!-- ========================================================================= -->
+    <section class="pricing-section scroll-section" id="pricing">
+        <div class="container">
+            <div class="section-header-center">
+                <div class="section-tag">Transparent Pricing</div>
+                <h2 class="section-h2">Core telemetry is free. Fixes are $9.</h2>
+                <p class="section-sub">
+                    Tracking should never be a luxury tax on your traffic. Collect events without caps—pay only when you want automated root-cause intelligence.
+                </p>
+            </div>
+
+            <div class="pricing-grid">
+                <!-- Free Tier -->
+                <div class="pricing-card">
+                    <h3 style="font-size: 1.25rem; font-weight: 800; color: #0F172A; margin-bottom: 0.5rem;">Core Telemetry</h3>
+                    <p style="font-size: 0.875rem; color: #64748B; margin-bottom: 1.5rem;">For solo builders and pre-launch products.</p>
+                    <div style="display: flex; align-items: baseline; gap: 0.35rem; margin-bottom: 1.5rem;">
+                        <span class="price-val">$0</span>
+                        <span class="price-period">/ forever</span>
+                    </div>
+
+                    <a href="#passkey-auth-module" class="btn btn-outline" style="width: 100%; margin-bottom: 1.5rem;" onclick="focusPasskeyAuth()">
+                        <span>Provision Free Key</span>
+                    </a>
+
+                    <ul class="pricing-features-list">
+                        <li class="pricing-feature-item"><i data-lucide="check"></i> Unlimited event autocapture</li>
+                        <li class="pricing-feature-item"><i data-lucide="check"></i> 0ms DOM blocking script (3.8KB)</li>
+                        <li class="pricing-feature-item"><i data-lucide="check"></i> Real-time rage click alerts</li>
+                        <li class="pricing-feature-item"><i data-lucide="check"></i> 1 site or domain</li>
+                        <li class="pricing-feature-item"><i data-lucide="check"></i> Passkey authentication</li>
+                    </ul>
+                </div>
+
+                <!-- Pro Tier (Popular) -->
+                <div class="pricing-card popular">
+                    <span class="popular-badge">Most Popular</span>
+                    <h3 style="font-size: 1.25rem; font-weight: 800; color: #0F172A; margin-bottom: 0.5rem;">Pro Intelligence</h3>
+                    <p style="font-size: 0.875rem; color: #64748B; margin-bottom: 1.5rem;">For growing SaaS, apps, and digital platforms.</p>
+                    <div style="display: flex; align-items: baseline; gap: 0.35rem; margin-bottom: 1.5rem;">
+                        <span class="price-val">$9</span>
+                        <span class="price-period">/ month</span>
+                    </div>
+
+                    <a href="#passkey-auth-module" class="btn btn-primary" style="width: 100%; margin-bottom: 1.5rem;" onclick="focusPasskeyAuth()">
+                        <span>Start 14-Day Free Trial</span>
+                    </a>
+
+                    <ul class="pricing-features-list">
+                        <li class="pricing-feature-item"><i data-lucide="check"></i> <strong>Everything in Core, plus:</strong></li>
+                        <li class="pricing-feature-item"><i data-lucide="check"></i> Automated root-cause synthesis</li>
+                        <li class="pricing-feature-item"><i data-lucide="check"></i> 1-click Cursor & Claude prompt exports</li>
+                        <li class="pricing-feature-item"><i data-lucide="check"></i> AI search & GEO crawler radar</li>
+                        <li class="pricing-feature-item"><i data-lucide="check"></i> Mobile tap frustration heatmaps</li>
+                        <li class="pricing-feature-item"><i data-lucide="check"></i> Up to 3 active domains</li>
+                    </ul>
+                </div>
+
+                <!-- Team Tier -->
+                <div class="pricing-card">
+                    <h3 style="font-size: 1.25rem; font-weight: 800; color: #0F172A; margin-bottom: 0.5rem;">Team Studio</h3>
+                    <p style="font-size: 0.875rem; color: #64748B; margin-bottom: 1.5rem;">For agencies and multi-product teams.</p>
+                    <div style="display: flex; align-items: baseline; gap: 0.35rem; margin-bottom: 1.5rem;">
+                        <span class="price-val">$29</span>
+                        <span class="price-period">/ month</span>
+                    </div>
+
+                    <a href="#passkey-auth-module" class="btn btn-outline" style="width: 100%; margin-bottom: 1.5rem;" onclick="focusPasskeyAuth()">
+                        <span>Start Team Trial</span>
+                    </a>
+
+                    <ul class="pricing-features-list">
+                        <li class="pricing-feature-item"><i data-lucide="check"></i> <strong>Everything in Pro, plus:</strong></li>
+                        <li class="pricing-feature-item"><i data-lucide="check"></i> Unlimited team seats & workspaces</li>
+                        <li class="pricing-feature-item"><i data-lucide="check"></i> Up to 15 domains included</li>
+                        <li class="pricing-feature-item"><i data-lucide="check"></i> Custom webhook dispatch & Slack bot</li>
+                        <li class="pricing-feature-item"><i data-lucide="check"></i> Dedicated priority Slack channel</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- SECTION 08: FREQUENTLY ASKED QUESTIONS                                   -->
+    <!-- ========================================================================= -->
+    <section class="faq-section scroll-section" id="faq">
+        <div class="container">
+            <div class="section-header-center">
+                <div class="section-tag">FAQ</div>
+                <h2 class="section-h2">Frequently Asked Questions</h2>
+            </div>
+
+            <div class="faq-accordion">
+                <div class="faq-card open">
+                    <div class="faq-question" onclick="toggleFaq(this)">
+                        <span>How does Passkey authentication work for Hotspot?</span>
+                        <i data-lucide="chevron-down" style="width: 18px; height: 18px;"></i>
+                    </div>
+                    <div class="faq-answer">
+                        Hotspot uses the modern WebAuthn standard. You authenticate directly with your device's biometric sensor (Touch ID, Face ID, Windows Hello, or hardware YubiKey). There are no passwords to leak, no SMS verification codes, and your live script key is cryptographically tied to your developer credential.
+                    </div>
+                </div>
+
+                <div class="faq-card">
+                    <div class="faq-question" onclick="toggleFaq(this)">
+                        <span>Does Hotspot slow down my website or web app?</span>
+                        <i data-lucide="chevron-down" style="width: 18px; height: 18px;"></i>
+                    </div>
+                    <div class="faq-answer">
+                        No. The <code style="font-family: var(--font-mono); font-size: 0.85em; background: #F1F5F9; padding: 2px 4px; border-radius: 4px;">hotspot.js</code> runtime weighs just 3.8KB (under 1/100th the weight of Hotjar or GA4) and executes completely asynchronously with 0ms DOM blocking time. It records vector delta physics rather than streaming heavy canvas videos.
+                    </div>
+                </div>
+
+                <div class="faq-card">
+                    <div class="faq-question" onclick="toggleFaq(this)">
+                        <span>Do I need technical or data engineering skills to use Hotspot?</span>
+                        <i data-lucide="chevron-down" style="width: 18px; height: 18px;"></i>
+                    </div>
+                    <div class="faq-answer">
+                        Not at all. You paste one line of script into your site's &lt;head&gt; tag once. From that moment forward, Hotspot autocaptures all routes, clicks, and rage taps, then provides plain-English instructions and 1-click prompts for Cursor or Claude.
+                    </div>
+                </div>
+
+                <div class="faq-card">
+                    <div class="faq-question" onclick="toggleFaq(this)">
+                        <span>How is Hotspot different from Google Analytics 4?</span>
+                        <i data-lucide="chevron-down" style="width: 18px; height: 18px;"></i>
+                    </div>
+                    <div class="faq-answer">
+                        GA4 tells you that 70% of your visitors left, but gives you zero clues as to why. Hotspot identifies the exact broken button, rage tap cluster, mobile overlap, or hydration failure causing users to drop off, and gives you the exact code to fix it.
+                    </div>
+                </div>
+
+                <div class="faq-card">
+                    <div class="faq-question" onclick="toggleFaq(this)">
+                        <span>Does it work on custom Next.js, Vite, and mobile web apps?</span>
+                        <i data-lucide="chevron-down" style="width: 18px; height: 18px;"></i>
+                    </div>
+                    <div class="faq-answer">
+                        Yes. Hotspot is framework-agnostic and runs on Next.js App Router, React/Vite, Remix, Astro, Webflow, Shopify, WordPress, and custom SPAs.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- PRE-FOOTER CTA                                                            -->
+    <!-- ========================================================================= -->
+    <section class="pre-footer-cta scroll-section">
+        <div class="container">
+            <div class="cta-banner">
+                <h2>Stop losing users to broken buttons and hidden friction.</h2>
+                <p style="font-size: 1.15rem; color: #DBEAFE; max-width: 600px; margin: 0 auto 2.5rem auto;">
+                    Authenticate with your Passkey right now. Takes 3 seconds. Core telemetry is free forever.
+                </p>
+                <a href="#passkey-auth-module" class="btn btn-primary btn-lg" onclick="focusPasskeyAuth()">
+                    <i data-lucide="key" style="width: 18px; height: 18px;"></i>
+                    <span>Authenticate & Get 1-Line Key</span>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- MINIMAL HARDWARE FOOTER                                                   -->
+    <!-- ========================================================================= -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-grid">
+                <div>
+                    <a href="/" class="logo-brand" style="margin-bottom: 0.75rem; display: inline-flex;">
+                        <span class="logo-cursive-h" style="color: #FFFFFF;">H</span><span class="logo-icon-o" title="Hotspot">
+                            <svg viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="13" cy="13" r="11" stroke="url(#logoOGrad)" stroke-width="2.75"/>
+                                <circle cx="13" cy="13" r="6.25" stroke="#3B82F6" stroke-width="1.5" stroke-dasharray="2.5 1.5"/>
+                                <circle cx="13" cy="13" r="3.75" fill="#10B981"/>
+                                <circle cx="13" cy="13" r="1.5" fill="#FFFFFF"/>
+                            </svg>
+                        </span><span class="logo-cursive-tail" style="color: #FFFFFF;">tspot</span>
+                    </a>
+                    <p style="line-height: 1.6; max-width: 320px; margin-bottom: 1.5rem; margin-top: 0.5rem; color: #64748B;">
+                        Autonomous in-browser telemetry, behavioral physics and conversion intelligence. Find out why users drop off without guessing.
+                    </p>
+                    <p style="font-size: 0.8125rem; color: #475569;">
+                        &copy; 2026 Hotspot Inc. All rights reserved.
+                    </p>
+                </div>
+
+                <div>
+                    <div style="font-weight: 700; color: #F8FAFC; margin-bottom: 1.25rem;">Product</div>
+                    <ul class="footer-links-list">
+                        <li><a href="#telemetry-funnel" class="footer-link-a">Funnel Flow</a></li>
+                        <li><a href="#single-script" class="footer-link-a">1-Line Architecture</a></li>
+                        <li><a href="#hydration-audit" class="footer-link-a">Hydration & GEO Radar</a></li>
+                        <li><a href="#signal-collider" class="footer-link-a">Signal Collider</a></li>
+                        <li><a href="#comparison" class="footer-link-a">Comparison vs GA4</a></li>
+                        <li><a href="#pricing" class="footer-link-a">Pricing Plans</a></li>
+                    </ul>
+                </div>
+
+                <div>
+                    <div style="font-weight: 700; color: #F8FAFC; margin-bottom: 1.25rem;">Platforms</div>
+                    <ul class="footer-links-list">
+                        <li><a href="#passkey-auth-module" class="footer-link-a" onclick="focusPasskeyAuth()">Next.js App Router</a></li>
+                        <li><a href="#passkey-auth-module" class="footer-link-a" onclick="focusPasskeyAuth()">React & Vite</a></li>
+                        <li><a href="#passkey-auth-module" class="footer-link-a" onclick="focusPasskeyAuth()">Remix & Astro</a></li>
+                        <li><a href="#passkey-auth-module" class="footer-link-a" onclick="focusPasskeyAuth()">Webflow Custom Code</a></li>
+                        <li><a href="#passkey-auth-module" class="footer-link-a" onclick="focusPasskeyAuth()">Shopify Liquid</a></li>
+                    </ul>
+                </div>
+
+                <div>
+                    <div style="font-weight: 700; color: #F8FAFC; margin-bottom: 1.25rem;">Security & Contact</div>
+                    <ul class="footer-links-list">
+                        <li><a href="#passkey-auth-module" class="footer-link-a" onclick="focusPasskeyAuth()">Passkey WebAuthn Spec</a></li>
+                        <li><a href="#faq" class="footer-link-a">Privacy & GDPR Compliance</a></li>
+                        <li><a href="#faq" class="footer-link-a">FAQ & Help</a></li>
+                        <li><a href="mailto:security@hotspot.so" class="footer-link-a">Security Team</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="footer-bottom-bar">
+                <div>Autonomous telemetry for modern web builders worldwide.</div>
+                <div style="display: flex; gap: 1.5rem;">
+                    <a href="#" class="footer-link-a">Privacy Policy</a>
+                    <a href="#" class="footer-link-a">Terms of Service</a>
+                    <a href="#" class="footer-link-a">Cookie Preferences</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Passkey Login Modal -->
+    <div class="modal-backdrop" id="passkey-login-modal" onclick="if(event.target === this) closePasskeyLoginModal()" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(6px); z-index: 200; display: none; align-items: center; justify-content: center; padding: 1.5rem;">
+        <div style="background: #FFFFFF; border-radius: 16px; max-width: 480px; width: 100%; padding: 2rem; box-shadow: var(--shadow-xl); border: 1px solid var(--border-light); position: relative;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                <div style="display: flex; align-items: center; gap: 0.6rem;">
+                    <div style="width: 36px; height: 36px; border-radius: 8px; background: rgba(37, 99, 235, 0.1); display: flex; align-items: center; justify-content: center; color: var(--brand-primary);">
+                        <i data-lucide="fingerprint" style="width: 20px; height: 20px;"></i>
+                    </div>
+                    <div>
+                        <h3 style="font-size: 1.15rem; font-weight: 800; color: var(--text-primary); line-height: 1.2;">Sign In with Passkey</h3>
+                        <span style="font-size: 0.75rem; color: var(--text-muted);">WebAuthn • FIDO2 Passwordless</span>
+                    </div>
+                </div>
+                <button type="button" style="background: none; border: none; cursor: pointer; color: var(--text-muted);" onclick="closePasskeyLoginModal()">
+                    <i data-lucide="x" style="width: 20px; height: 20px;"></i>
+                </button>
+            </div>
+
+            <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1.25rem; line-height: 1.5;">
+                Authenticate with Touch ID, Face ID, or Windows Hello. Zero passwords or OTP codes required.
+            </p>
+
+            <div style="margin-bottom: 1.25rem;">
+                <label style="display: block; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.4rem; font-family: var(--font-mono);">
+                    Work Domain or Email
+                </label>
+                <input type="text" id="modal-passkey-email" value="alex@acme.dev" placeholder="founder@yourdomain.com" style="width: 100%; padding: 0.75rem 1rem; border: 1px solid var(--border-medium); border-radius: 8px; font-family: var(--font-mono); font-size: 0.875rem; color: var(--text-primary); outline: none;">
+            </div>
+
+            <div id="modal-passkey-error" style="display: none; background: #FEF2F2; border: 1px solid #FCA5A5; color: #991B1B; padding: 0.65rem 0.85rem; border-radius: 8px; font-size: 0.8125rem; margin-bottom: 1rem; text-align: left; align-items: center; gap: 0.5rem;">
+                <i data-lucide="alert-circle" style="width: 16px; height: 16px; flex-shrink: 0; color: #DC2626;"></i>
+                <span id="modal-passkey-error-msg">Passkey verification was cancelled.</span>
+            </div>
+
+            <button type="button" id="btn-modal-passkey-submit" onclick="executePasskeyLogin()" style="width: 100%; background: var(--brand-primary); color: #FFFFFF; border: none; border-radius: 8px; padding: 0.85rem; font-size: 0.9375rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; transition: background 0.15s ease;">
+                <i data-lucide="fingerprint" style="width: 18px; height: 18px;"></i>
+                <span id="modal-passkey-btn-text">Verify Touch ID & Enter Dashboard</span>
+            </button>
+
+            <div style="margin-top: 1rem; text-align: center; font-size: 0.75rem; color: var(--text-muted);">
+                Don't have a project yet? <a href="#passkey-auth-module" onclick="closePasskeyLoginModal(); focusPasskeyAuth();" style="color: var(--brand-primary); font-weight: 600;">Mint your key in 3 seconds &rarr;</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- SCRIPT LOGIC: PASSKEY AUTH & CONDUIT (Zero Video Game Arcade Logic)      -->
+    <!-- ========================================================================= -->
+    <script>
+        // Initialize Lucide Icons
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+
+        // Clean up any lingering localStorage HUD artifacts
+        try {
+            localStorage.removeItem('__hotspot_clicks');
+            localStorage.removeItem('__hotspot_hud_state');
+            var badHud = document.getElementById('__hotspot_hud_root');
+            if (badHud) badHud.remove();
+        } catch(e) {}
+
+        // ==========================================
+        // 1. PASSKEY WEBAUTHN AUTHENTICATION & KEY MINTING
+        // ==========================================
+        var currentFw = 'nextjs';
+        var currentIdentity = 'alex@acme.dev';
+        var activeProvisionedKey = 'hs_live_9f81a4b2c0';
+
+        function sanitizeDomainFromIdentity(val) {
+            val = val.trim();
+            if (val.includes('@')) {
+                return val.split('@')[1];
+            }
+            return val.replace(/^https?:\/\//i, '').replace(/[\/\?#].*$/, '') || 'acme.dev';
+        }
+
+        function switchSnippetFw(fw, btn) {
+            currentFw = fw;
+            document.querySelectorAll('.provisioner-tab').forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            updateProvisionedCode();
+        }
+
+        function focusPasskeyAuth() {
+            var el = document.getElementById('passkey-auth-module');
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth' });
+                var input = document.getElementById('passkey-identity-input');
+                if (input) input.focus();
+            }
+        }
+
+        async function authenticateWithPasskey() {
+            var input = document.getElementById('passkey-identity-input');
+            var rawIdentity = (input ? input.value.trim() : '') || 'alex@acme.dev';
+            currentIdentity = rawIdentity;
+            
+            var btn = document.getElementById('btn-passkey-trigger');
+            var btnLabel = document.getElementById('passkey-btn-label');
+            var badgeText = document.getElementById('badge-status-text');
+            var errorAlert = document.getElementById('passkey-error-alert');
+            var errorMsg = document.getElementById('passkey-error-message');
+
+            if (errorAlert) errorAlert.style.display = 'none';
+
+            if (!window.PublicKeyCredential || !navigator.credentials || !navigator.credentials.create) {
+                if (errorAlert && errorMsg) {
+                    errorMsg.textContent = 'WebAuthn passkeys are not supported in this browser. Please use Chrome, Safari, Edge, or Firefox.';
+                    errorAlert.style.display = 'flex';
+                }
+                return;
+            }
+
+            btn.disabled = true;
+            btnLabel.textContent = 'Touch Your Biometric Sensor (Passkey)...';
+            badgeText.textContent = 'PROMPTING SENSOR';
+
+            var credential = null;
+            try {
+                var challenge = new Uint8Array(32);
+                window.crypto.getRandomValues(challenge);
+                var userId = new Uint8Array(16);
+                window.crypto.getRandomValues(userId);
+
+                var options = {
+                    challenge: challenge,
+                    rp: { 
+                        name: "Hotspot Telemetry", 
+                        id: window.location.hostname || "localhost" 
+                    },
+                    user: { 
+                        id: userId, 
+                        name: currentIdentity, 
+                        displayName: currentIdentity.split('@')[0] 
+                    },
+                    pubKeyCredParams: [
+                        { alg: -7, type: "public-key" },   // ES256
+                        { alg: -257, type: "public-key" }  // RS256
+                    ],
+                    authenticatorSelection: { 
+                        authenticatorAttachment: "platform", 
+                        userVerification: "required",
+                        residentKey: "preferred"
+                    },
+                    timeout: 60000
+                };
+
+                // Real WebAuthn call - user must touch sensor or click cancel
+                credential = await navigator.credentials.create({ publicKey: options });
+
+            } catch(err) {
+                console.warn("Passkey authentication aborted or cancelled:", err);
+                btn.disabled = false;
+                btnLabel.textContent = 'Authenticate with Passkey & Mint Key';
+                badgeText.textContent = 'NOT AUTHENTICATED';
+
+                var message = 'Passkey authentication was cancelled. Biometric touch was not verified.';
+                if (err.name === 'NotAllowedError') {
+                    message = 'Passkey prompt was cancelled. Biometric verification is required to mint your API key.';
+                } else if (err.name === 'SecurityError') {
+                    message = 'Security error: Passkeys require HTTPS or localhost.';
+                } else if (err.name === 'NotSupportedError') {
+                    message = 'The platform authenticator (Touch ID / Windows Hello) is unavailable on this device.';
+                } else if (err.message) {
+                    message = err.message;
+                }
+
+                if (errorAlert && errorMsg) {
+                    errorMsg.textContent = message;
+                    errorAlert.style.display = 'flex';
+                }
+                if (typeof lucide !== 'undefined') lucide.createIcons();
+                // STOP: Do NOT mint key or transition to authenticated state!
+                return;
+            }
+
+            if (!credential || !credential.id) {
+                btn.disabled = false;
+                btnLabel.textContent = 'Authenticate with Passkey & Mint Key';
+                badgeText.textContent = 'NOT AUTHENTICATED';
+                if (errorAlert && errorMsg) {
+                    errorMsg.textContent = 'No passkey credential received. Authentication failed.';
+                    errorAlert.style.display = 'flex';
+                }
+                if (typeof lucide !== 'undefined') lucide.createIcons();
+                return;
+            }
+
+            // SUCCESS ONLY: Valid hardware biometric passkey authenticated
+            btnLabel.textContent = 'Passkey Verified! Provisioning Key...';
+            badgeText.textContent = 'KEY PROVISIONED';
+
+            var randHex = Array.from(window.crypto.getRandomValues(new Uint8Array(6)))
+                .map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
+            activeProvisionedKey = 'hs_live_' + randHex;
+
+            // Transition UI into Authenticated State
+            document.getElementById('auth-unauthenticated-state').style.display = 'none';
+            document.getElementById('auth-authenticated-state').style.display = 'flex';
+            document.getElementById('auth-email-display').textContent = currentIdentity;
+            document.getElementById('active-key-string').textContent = activeProvisionedKey;
+
+            try {
+                localStorage.setItem('hotspot_auth_user', currentIdentity);
+                localStorage.setItem('hotspot_auth_key', activeProvisionedKey);
+                localStorage.setItem('hotspot_passkey_id', credential.id);
+            } catch(e) {}
+
+            updateProvisionedCode();
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+
+        function openPasskeyLoginModal() {
+            var modal = document.getElementById('passkey-login-modal');
+            if (modal) {
+                var errBox = document.getElementById('modal-passkey-error');
+                if (errBox) errBox.style.display = 'none';
+                modal.style.display = 'flex';
+                if (typeof lucide !== 'undefined') lucide.createIcons();
+            }
+        }
+
+        function closePasskeyLoginModal() {
+            var modal = document.getElementById('passkey-login-modal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        async function executePasskeyLogin() {
+            var emailInput = document.getElementById('modal-passkey-email');
+            var email = (emailInput ? emailInput.value.trim() : '') || 'alex@acme.dev';
+            var btnText = document.getElementById('modal-passkey-btn-text');
+            var btn = document.getElementById('btn-modal-passkey-submit');
+            var errorBox = document.getElementById('modal-passkey-error');
+            var errorMsg = document.getElementById('modal-passkey-error-msg');
+
+            if (errorBox) errorBox.style.display = 'none';
+
+            if (!window.PublicKeyCredential || !navigator.credentials || !navigator.credentials.get) {
+                if (errorBox && errorMsg) {
+                    errorMsg.textContent = 'WebAuthn is not supported in this browser. Please use Chrome, Safari, or Edge.';
+                    errorBox.style.display = 'flex';
+                }
+                return;
+            }
+
+            if (btn) btn.disabled = true;
+            if (btnText) btnText.textContent = 'Touch Your Biometric Sensor...';
+
+            var credential = null;
+            try {
+                var challenge = new Uint8Array(32);
+                window.crypto.getRandomValues(challenge);
+
+                var options = {
+                    challenge: challenge,
+                    rpId: window.location.hostname || "localhost",
+                    userVerification: "required",
+                    timeout: 60000
+                };
+
+                credential = await navigator.credentials.get({ publicKey: options });
+
+            } catch(err) {
+                console.warn("Passkey assertion failed or cancelled:", err);
+                if (btn) btn.disabled = false;
+                if (btnText) btnText.textContent = 'Verify Touch ID & Enter Dashboard';
+
+                var message = 'Passkey verification cancelled. Sensor touch was not provided.';
+                if (err.name === 'NotAllowedError') {
+                    message = 'Sign-in cancelled. Biometric verification is required to access your dashboard.';
+                } else if (err.message) {
+                    message = err.message;
+                }
+
+                if (errorBox && errorMsg) {
+                    errorMsg.textContent = message;
+                    errorBox.style.display = 'flex';
+                }
+                if (typeof lucide !== 'undefined') lucide.createIcons();
+                // STOP: Do NOT authenticate, do NOT navigate!
+                return;
+            }
+
+            if (!credential || !credential.id) {
+                if (btn) btn.disabled = false;
+                if (btnText) btnText.textContent = 'Verify Touch ID & Enter Dashboard';
+                if (errorBox && errorMsg) {
+                    errorMsg.textContent = 'Passkey assertion failed. Please try again.';
+                    errorBox.style.display = 'flex';
+                }
+                if (typeof lucide !== 'undefined') lucide.createIcons();
+                return;
+            }
+
+            // SUCCESS ONLY
+            try {
+                localStorage.setItem('hotspot_auth_user', email);
+                localStorage.setItem('hotspot_auth_key', 'hs_live_740bf8263397');
+                localStorage.setItem('hotspot_passkey_id', credential.id);
+            } catch(e) {}
+
+            if (btnText) btnText.textContent = 'Verified! Entering Dashboard...';
+            setTimeout(function() {
+                window.location.href = '/dashboard/';
+            }, 300);
+        }
+
+        function rotateKey() {
+            var randHex = Array.from(window.crypto.getRandomValues(new Uint8Array(6)))
+                .map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
+            activeProvisionedKey = 'hs_live_' + randHex;
+            document.getElementById('active-key-string').textContent = activeProvisionedKey;
+            updateProvisionedCode();
+        }
+
+        function updateProvisionedCode() {
+            var domain = sanitizeDomainFromIdentity(currentIdentity);
+            var fileTarget = document.getElementById('auth-file-target');
+            var codeView = document.getElementById('auth-code-view');
+            var closeTag = '<' + '/script>';
+
+            if (currentFw === 'nextjs') {
+                if (fileTarget) fileTarget.textContent = 'Paste inside <head> in src/app/layout.tsx';
+                if (codeView) {
+                    codeView.textContent = '<Script\n  src="https://cdn.hotspot.so/v2/hotspot.js"\n  data-key="' + activeProvisionedKey + '"\n  data-domain="' + domain + '"\n  strategy="afterInteractive"\n/>';
+                }
+            } else if (currentFw === 'vite') {
+                if (fileTarget) fileTarget.textContent = 'Paste inside <head> in index.html';
+                if (codeView) {
+                    codeView.textContent = '<script async\n  src="https://cdn.hotspot.so/v2/hotspot.js"\n  data-key="' + activeProvisionedKey + '"\n  data-domain="' + domain + '"\n>' + closeTag;
+                }
+            } else if (currentFw === 'html') {
+                if (fileTarget) fileTarget.textContent = 'Paste before </head> in your main HTML template';
+                if (codeView) {
+                    codeView.textContent = '<script async\n  src="https://cdn.hotspot.so/v2/hotspot.js"\n  data-key="' + activeProvisionedKey + '"\n  data-domain="' + domain + '"\n>' + closeTag;
+                }
+            } else if (currentFw === 'shopify') {
+                if (fileTarget) fileTarget.textContent = 'Edit theme.liquid right before </head>';
+                if (codeView) {
+                    codeView.textContent = '<script async\n  src="https://cdn.hotspot.so/v2/hotspot.js"\n  data-key="' + activeProvisionedKey + '"\n  data-domain="' + domain + '"\n>' + closeTag;
+                }
+            }
+        }
+
+        function copyAuthenticatedSnippet() {
+            var code = document.getElementById('auth-code-view').textContent;
+            var btn = document.getElementById('btn-copy-auth-code');
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(code).then(function() {
+                    btn.innerHTML = '<span>✓ Copied to Clipboard!</span>';
+                    setTimeout(function() {
+                        btn.innerHTML = '<i data-lucide="copy" style="width: 15px; height: 15px;"></i><span>Copy 1-Line Snippet</span>';
+                        if (typeof lucide !== 'undefined') lucide.createIcons();
+                    }, 2200);
+                });
+            }
+        }
+
+        // ==========================================
+        // 2. PRODUCTION CONVERSION FUNNEL INTELLIGENCE
+        // ==========================================
+        function selectFunnelStep(idx, card) {
+            document.querySelectorAll('.funnel-step-col').forEach(function(c) { c.classList.remove('active'); });
+            if (card) card.classList.add('active');
+
+            var badge = document.getElementById('insp-stage-badge');
+            var head = document.getElementById('insp-headline');
+            var desc = document.getElementById('insp-desc');
+
+            if (idx === 0) {
+                if (badge) { badge.textContent = 'Stage 1: Arrival'; badge.className = 'inspector-badge'; }
+                if (head) head.textContent = '10,000 visitors entered via Google Search (58%) & Direct Navigation (42%)';
+                if (desc) desc.textContent = 'Zero-config telemetry active • 0ms DOM blocking • Average initial page dwell time: 14.8 seconds';
+            } else if (idx === 1) {
+                if (badge) { badge.textContent = 'Stage 2: Pricing Table'; badge.className = 'inspector-badge'; }
+                if (head) head.textContent = '6,400 visitors reached the pricing table (64% scroll depth)';
+                if (desc) desc.textContent = '3,600 visitors bounced before scrolling down to compare pricing tiers.';
+            } else if (idx === 2) {
+                if (badge) { badge.textContent = 'Stage 3: Friction Choke'; badge.className = 'inspector-badge badge-leak'; }
+                if (head) head.textContent = 'Primary drop-off: 1,420 visitors rage-clicked on #pricing-tier-enterprise';
+                if (desc) desc.textContent = 'Inert <span> element without click handler caused 100% bounce rate on high-intent enterprise leads.';
+            } else if (idx === 3) {
+                if (badge) { badge.textContent = 'Stage 4: Completed'; badge.className = 'inspector-badge'; }
+                if (head) head.textContent = '1,400 visitors verified biometric passkeys and converted into paid accounts';
+                if (desc) desc.textContent = '14.0% cohort conversion rate • Golden Path verified • $4,200 estimated ARR added.';
+            }
+        }
+
+        function copyTunnelFix() {
+            var promptText = `In src/components/PricingTable.tsx: The <span className="badge">Compare Specs</span> element has cursor-pointer styling but lacks an onClick handler or accessible button semantic. 148 mobile users repeatedly rage-clicked it expecting a spec modal. Convert it to an accessible button triggering <ComparisonModal />, ensuring a minimum touch target of 44px min-height for iOS Safari.`;
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(promptText).then(function() {
+                    var btn = document.getElementById('btn-tunnel-fix');
+                    btn.innerHTML = '<span>✓ Copied to Clipboard!</span>';
+                    setTimeout(function() {
+                        btn.innerHTML = '<i data-lucide="copy" style="width: 14px; height: 14px;"></i><span>Copy 1-Click Code Prompt</span>';
+                        if (typeof lucide !== 'undefined') lucide.createIcons();
+                    }, 2200);
+                });
+            }
+        }
+
+        function copyColliderPrompt(btn) {
+            var prompt = `In src/components/Pricing.tsx: Visitors searching for 'stripe alternative india' arrive on /pricing with high intent, but 84% bounce within 4s because the static #intl-badge lacks an interactive modal. Convert the badge to an accessible <button> triggering the domestic payment modal, and add FAQPage JSON-LD schema so ChatGPT & Google bots index Indian payment methods.`;
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(prompt).then(function() {
+                    btn.innerHTML = '<span>✓ Prompt Copied to Clipboard!</span>';
+                    setTimeout(function() {
+                        btn.innerHTML = '<i data-lucide="terminal" style="width: 16px; height: 16px;"></i><span>Copy Prompt for Cursor / Claude &rarr;</span>';
+                        if (typeof lucide !== 'undefined') lucide.createIcons();
+                    }, 2200);
+                });
+            }
+        }
+
+        // FAQ Toggle
+        function toggleFaq(el) {
+            var card = el.parentElement;
+            if (card.classList.contains('open')) {
+                card.classList.remove('open');
+            } else {
+                document.querySelectorAll('.faq-card').forEach(function(c) { c.classList.remove('open'); });
+                card.classList.add('open');
+            }
+        }
+
+        // Initialization
+        window.addEventListener('DOMContentLoaded', function() {
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        });
+    </script>
+</body>
+</html>

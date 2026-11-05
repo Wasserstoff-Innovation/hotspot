@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CloudScale AI — Production Cloud Infrastructure (Hotspot Demo)</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- ⚡ REAL HOTSPOT RESIDENT TELEMETRY ENGINE ⚡ -->
+    <script src="/hotspot.js" data-api-key="hs_live_prod_demo_test" data-api-host="" data-visualizer="true"></script>
+
+    <script>
+        // When rendered inside Hotspot Session Replayer iframe
+        if (window.location.search.indexOf('hotspot_replay=1') !== -1 || window.self !== window.top) {
+            document.documentElement.classList.add('in-replay-mode');
+        }
+    </script>
+    <style>
+        .in-replay-mode .telemetry-hud {
+            display: none !important;
+        }
+        .in-replay-mode a {
+            pointer-events: none !important;
+        }
+    </style>
+
+    <style>
+        :root {
+            --primary: #2563EB;
+            --primary-hover: #1D4ED8;
+            --bg-dark: #0B0F17;
+            --bg-card: #111827;
+            --bg-card-hover: #1F2937;
+            --border: #1F2937;
+            --border-highlight: #374151;
+            --text-main: #F9FAFB;
+            --text-sub: #9CA3AF;
+            --text-dim: #6B7280;
+            --accent-green: #10B981;
+            --accent-red: #EF4444;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            min-height: 100vh;
+            padding-bottom: 6rem;
+        }
+
+        /* Fixed Telemetry Floating HUD */
+        .telemetry-hud {
+            position: fixed;
+            bottom: 1.25rem;
+            right: 1.25rem;
+            background: rgba(17, 24, 39, 0.95);
+            border: 1px solid #3B82F6;
+            border-radius: 10px;
+            padding: 0.85rem 1.25rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 15px rgba(37, 99, 235, 0.3);
+            backdrop-filter: blur(12px);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+            font-size: 0.8125rem;
+        }
+
+        .hud-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .hud-pulse {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #10B981;
+            box-shadow: 0 0 8px #10B981;
+            animation: pulse-dot 1.5s infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 0.4; transform: scale(0.9); }
+            50% { opacity: 1; transform: scale(1.1); }
+        }
+
+        .hud-counter {
+            font-family: 'JetBrains Mono', monospace;
+            background: rgba(37, 99, 235, 0.15);
+            color: #93C5FD;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 700;
+        }
+
+        .hud-btn {
+            background: #2563EB;
+            color: #FFFFFF;
+            padding: 0.35rem 0.85rem;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.75rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            transition: all 0.15s ease;
+        }
+
+        .hud-btn:hover {
+            background: #1D4ED8;
+            box-shadow: 0 0 12px rgba(37, 99, 235, 0.5);
+        }
+
+        /* Navigation */
+        header {
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(11, 15, 23, 0.8);
+            backdrop-filter: blur(8px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .nav-logo {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            font-weight: 800;
+            font-size: 1.15rem;
+            color: #FFFFFF;
+            text-decoration: none;
+        }
+
+        .logo-icon {
+            width: 26px;
+            height: 26px;
+            border-radius: 6px;
+            background: linear-gradient(135deg, #2563EB, #06B6D4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+            font-weight: 800;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 1.5rem;
+            align-items: center;
+        }
+
+        .nav-links a {
+            color: var(--text-sub);
+            text-decoration: none;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: color 0.15s;
+        }
+
+        .nav-links a:hover {
+            color: #FFFFFF;
+        }
+
+        /* Hero */
+        .hero {
+            max-width: 960px;
+            margin: 4rem auto 3rem;
+            text-align: center;
+            padding: 0 1.5rem;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(37, 99, 235, 0.1);
+            border: 1px solid rgba(37, 99, 235, 0.3);
+            color: #60A5FA;
+            padding: 0.3rem 0.85rem;
+            border-radius: 999px;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+        }
+
+        .hero h1 {
+            font-size: 3.25rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            line-height: 1.15;
+            background: linear-gradient(180deg, #FFFFFF 0%, #94A3B8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 1.25rem;
+        }
+
+        .hero p {
+            font-size: 1.125rem;
+            color: var(--text-sub);
+            max-width: 680px;
+            margin: 0 auto 2.25rem;
+        }
+
+        .hero-ctas {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+        }
+
+        .btn-primary {
+            background: #2563EB;
+            color: #FFFFFF;
+            border: none;
+            padding: 0.8rem 1.6rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.9375rem;
+            cursor: pointer;
+            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+            transition: all 0.15s ease;
+        }
+
+        .btn-primary:hover {
+            background: #1D4ED8;
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: var(--bg-card);
+            color: var(--text-main);
+            border: 1px solid var(--border-highlight);
+            padding: 0.8rem 1.6rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.9375rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-card-hover);
+        }
+
+        /* Pricing Section */
+        .pricing-section {
+            max-width: 1100px;
+            margin: 5rem auto;
+            padding: 0 1.5rem;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .section-header h2 {
+            font-size: 2rem;
+            font-weight: 800;
+            margin-bottom: 0.5rem;
+        }
+
+        .section-header p {
+            color: var(--text-sub);
+        }
+
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.75rem;
+        }
+
+        .pricing-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: border-color 0.2s;
+            position: relative;
+        }
+
+        .pricing-card:hover {
+            border-color: var(--border-highlight);
+        }
+
+        .pricing-card.featured {
+            border-color: #2563EB;
+            box-shadow: 0 0 25px rgba(37, 99, 235, 0.15);
+        }
+
+        .tier-badge {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #2563EB;
+            color: #FFFFFF;
+            font-size: 0.6875rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0.2rem 0.6rem;
+            border-radius: 999px;
+        }
+
+        .tier-name {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: #FFFFFF;
+            margin-bottom: 0.5rem;
+        }
+
+        .tier-price {
+            font-size: 2.25rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+        }
+
+        .tier-price span {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-dim);
+        }
+
+        .tier-features {
+            list-style: none;
+            margin-bottom: 2rem;
+            color: var(--text-sub);
+            font-size: 0.875rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.6rem;
+        }
+
+        .tier-features li {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .tier-features li::before {
+            content: "✓";
+            color: #10B981;
+            font-weight: 800;
+        }
+
+        /* INTENTIONALLY DEAD / BROKEN PILL TO TRIGGER RAGE CLICKS */
+        .broken-pill-box {
+            background: rgba(239, 68, 68, 0.08);
+            border: 1px dashed rgba(239, 68, 68, 0.4);
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .broken-pill-tag {
+            font-size: 0.75rem;
+            color: #F87171;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 0.35rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.3rem;
+        }
+
+        .inert-click-target {
+            display: inline-block;
+            background: #1F2937;
+            border: 1px solid #374151;
+            color: #E5E7EB;
+            padding: 0.45rem 1rem;
+            border-radius: 6px;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            cursor: pointer;
+            user-select: none;
+            transition: transform 0.05s ease;
+        }
+
+        .inert-click-target:active {
+            transform: scale(0.97);
+            background: #374151;
+        }
+
+        #rage-click-toast {
+            display: none;
+            margin-top: 0.5rem;
+            font-size: 0.75rem;
+            color: #EF4444;
+            font-weight: 700;
+            background: rgba(239, 68, 68, 0.15);
+            padding: 0.4rem;
+            border-radius: 4px;
+        }
+
+        /* Deep Scroll Content */
+        .deep-scroll-section {
+            max-width: 960px;
+            margin: 6rem auto 2rem;
+            padding: 0 1.5rem;
+        }
+
+        .deep-scroll-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 3rem;
+            text-align: center;
+        }
+
+        /* Interactive Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(8px);
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-box {
+            background: #111827;
+            border: 1px solid #374151;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 440px;
+            padding: 2rem;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+        }
+
+        .modal-header {
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-header h3 {
+            font-size: 1.25rem;
+            font-weight: 800;
+            margin-bottom: 0.35rem;
+        }
+
+        .modal-header p {
+            color: var(--text-sub);
+            font-size: 0.875rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-sub);
+            text-transform: uppercase;
+            margin-bottom: 0.35rem;
+        }
+
+        .form-group input {
+            width: 100%;
+            background: #1F2937;
+            border: 1px solid #374151;
+            border-radius: 6px;
+            padding: 0.65rem 0.85rem;
+            color: #FFFFFF;
+            font-family: inherit;
+            font-size: 0.875rem;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #2563EB;
+        }
+
+        .btn-modal-submit {
+            width: 100%;
+            background: #2563EB;
+            color: #FFFFFF;
+            border: none;
+            padding: 0.8rem;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .btn-modal-submit:hover {
+            background: #1D4ED8;
+        }
+
+        .modal-close-btn {
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            font-size: 1.25rem;
+            float: right;
+            cursor: pointer;
+            margin-top: -0.5rem;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Floating Live Telemetry HUD -->
+    <div class="telemetry-hud">
+        <div class="hud-status">
+            <span class="hud-pulse"></span>
+            <span style="font-weight: 600;">Hotspot Telemetry:</span>
+            <span class="hud-counter" id="hud-event-counter">0 events sent</span>
+        </div>
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: #9CA3AF;" id="hud-session-display">
+            Session: initializing...
+        </div>
+        <a href="/dashboard/" target="_blank" class="hud-btn" id="hud-open-dashboard">
+            <span>Open in Dashboard</span>
+            <span>↗</span>
+        </a>
+    </div>
+
+    <!-- Header -->
+    <header>
+        <a href="/demo/" class="nav-logo">
+            <div class="logo-icon">C</div>
+            <span>CloudScale AI</span>
+        </a>
+        <div class="nav-links">
+            <a href="#features">Features</a>
+            <a href="#pricing">Pricing</a>
+            <a href="#benchmarks">Benchmarks</a>
+            <button class="btn-primary" style="padding: 0.45rem 1rem; font-size: 0.8125rem;" onclick="openSignupModal('Developer Sandbox')">Start Free</button>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-badge">
+            <span>⚡ Next-Gen GPU Inference Fleet</span>
+            <span>•</span>
+            <span style="color: #10B981;">99.99% Uptime</span>
+        </div>
+        <h1>Autonomous Cloud Infrastructure for AI Workloads</h1>
+        <p>
+            Deploy PyTorch and LLM endpoints across globally distributed clusters with sub-millisecond warm routing and automatic memory defragmentation.
+        </p>
+        <div class="hero-ctas">
+            <button class="btn-primary" id="hero-btn-start" onclick="openSignupModal('Free Sandbox')">
+                Deploy Free Sandbox
+            </button>
+            <button class="btn-secondary" id="hero-btn-explore" onclick="scrollToPricing()">
+                Explore Pricing & Specs ↓
+            </button>
+        </div>
+    </section>
+
+    <!-- Pricing Section -->
+    <section class="pricing-section" id="pricing">
+        <div class="section-header">
+            <h2>Deterministic Pricing Without Surprises</h2>
+            <p>Transparent compute pricing designed for engineering teams scaling from prototype to production.</p>
+        </div>
+
+        <div class="pricing-grid">
+            
+            <!-- Tier 1 -->
+            <div class="pricing-card">
+                <div>
+                    <div class="tier-name">Developer</div>
+                    <div class="tier-price">$0 <span>/ forever</span></div>
+                    <ul class="tier-features">
+                        <li>1 Dedicated T4 GPU Instance</li>
+                        <li>5GB Shared NVMe Scratch Storage</li>
+                        <li>Community Discord Support</li>
+                        <li>Automated Container Builds</li>
+                    </ul>
+                </div>
+                <button class="btn-secondary" id="plan-btn-developer" onclick="openSignupModal('Developer Tier')">
+                    Get Free Sandbox
+                </button>
+            </div>
+
+            <!-- Tier 2 (Featured) -->
+            <div class="pricing-card featured">
+                <span class="tier-badge">Most Popular</span>
+                <div>
+                    <div class="tier-name">Growth Pro</div>
+                    <div class="tier-price">$99 <span>/ month</span></div>
+                    <ul class="tier-features">
+                        <li>4 Dedicated A10G Tensor Compute Nodes</li>
+                        <li>100GB High-Throughput Storage</li>
+                        <li>Deterministic Cold-Start Bypass</li>
+                        <li>Priority Slack Channel Support</li>
+                        <li>99.9% Production SLA</li>
+                    </ul>
+                </div>
+                <button class="btn-primary" id="plan-btn-growth-pro" onclick="openSignupModal('Growth Pro ($99/mo)')">
+                    Start 14-Day Pro Trial
+                </button>
+            </div>
+
+            <!-- Tier 3 (With Intentionally Broken Dead Pill for Rage Click Testing) -->
+            <div class="pricing-card">
+                <div>
+                    <div class="tier-name">Self-Hosted Enterprise</div>
+                    <div class="tier-price">Custom <span>/ dedicated</span></div>
+                    <ul class="tier-features">
+                        <li>Bare-Metal H100 GPU Clusters</li>
+                        <li>VPC Peering & Custom Transit Gateways</li>
+                        <li>Air-Gapped Deployment Options</li>
+                        <li>24/7 Dedicated SRE Escalation</li>
+                    </ul>
+
+                    <!-- 🔴 DEAD TAP FRICTION ELEMENT (Triggers Rage Click) -->
+                    <div class="broken-pill-box">
+                        <div class="broken-pill-tag">
+                            <span>⚠️ Friction Test Element</span>
+                        </div>
+                        <div style="font-size: 0.75rem; color: #9CA3AF; margin-bottom: 0.5rem;">
+                            Click repeatedly to test Hotspot's resident rage-click detection:
+                        </div>
+                        <span class="inert-click-target" id="pricing-tier-enterprise" onclick="handleInertClick(event)">
+                            #pricing-tier-enterprise (Dead Pill)
+                        </span>
+                        <div id="rage-click-toast">
+                            🔥 Hotspot caught 4x rapid taps! Sent to dashboard as $rageclick friction hotspot!
+                        </div>
+                    </div>
+                </div>
+                <button class="btn-secondary" id="plan-btn-enterprise" onclick="openSignupModal('Enterprise Custom')">
+                    Contact Enterprise Sales
+                </button>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- Deep Scroll Content Section (For Testing Scroll Depth) -->
+    <section class="deep-scroll-section" id="benchmarks">
+        <div class="deep-scroll-card">
+            <h3 style="font-size: 1.5rem; margin-bottom: 0.75rem;">Deep Page Scroll Telemetry Test Area</h3>
+            <p style="color: var(--text-sub); max-width: 600px; margin: 0 auto 1.5rem;">
+                Hotspot's resident physics observer measures exact scroll arrest depth. 
+                Scrolling past this threshold registers a 75%+ scroll depth milestone.
+            </p>
+            <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.8125rem; background: #0B0F17; border: 1px solid #1F2937; padding: 1rem; border-radius: 8px; display: inline-block; color: #10B981;">
+                ✓ Scroll Arrest Depth Milestone Reached
+            </div>
+        </div>
+    </section>
+
+    <!-- Signup / Passkey Conversion Modal -->
+    <div class="modal-overlay" id="signup-modal">
+        <div class="modal-box">
+            <button class="modal-close-btn" onclick="closeSignupModal()">&times;</button>
+            <div class="modal-header">
+                <h3 id="modal-plan-title">Create Your Sandbox</h3>
+                <p>Complete passkey authentication to activate your live workspace.</p>
+            </div>
+
+            <div id="modal-form-content">
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" id="input-full-name" placeholder="Sarah Connor" value="Sarah Connor">
+                </div>
+                <div class="form-group">
+                    <label>Work Email</label>
+                    <input type="email" id="input-email" placeholder="sarah@skynet.dev" value="sarah@skynet.dev">
+                </div>
+                <div class="form-group">
+                    <label>Company / Team</label>
+                    <input type="text" id="input-company" placeholder="Skynet AI" value="Skynet AI">
+                </div>
+
+                <button class="btn-modal-submit" id="btn-passkey-trigger" onclick="completePasskeyVerification()">
+                    <span style="display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                        <span>🔑</span>
+                        <span>Complete Passkey Registration</span>
+                    </span>
+                </button>
+            </div>
+
+            <!-- Conversion Success State -->
+            <div id="modal-success-state" style="display: none; text-align: center; padding: 1rem 0;">
+                <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🎉</div>
+                <h4 style="font-size: 1.15rem; font-weight: 800; color: #10B981; margin-bottom: 0.5rem;">Conversion Verified!</h4>
+                <p style="color: var(--text-sub); font-size: 0.8125rem; margin-bottom: 1.5rem;">
+                    Identified visitor & telemetry recorded as <strong style="color: #FFFFFF;" id="success-email-text"></strong> with status <code>converted</code>.
+                </p>
+                <a href="/dashboard/" target="_blank" class="btn-primary" style="display: block; text-decoration: none; text-align: center;">
+                    View Live Replay in Hotspot Dashboard →
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let eventCounter = 0;
+        let deadTapClicks = 0;
+        let deadTapTimer = null;
+
+        // Update Floating HUD with live session ID
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                const sessId = (window.hotspot && window.hotspot.get_session_id) ? window.hotspot.get_session_id() : 'hs_sess_live';
+                document.getElementById('hud-session-display').textContent = 'Session: ' + sessId;
+            }, 300);
+        });
+
+        // Intercept window.hotspot.capture to count live telemetry batches
+        const originalCapture = window.hotspot ? window.hotspot.capture : null;
+        if (window.hotspot) {
+            window.hotspot.on = function(cb) {
+                // telemetry hook
+            };
+        }
+
+        // Track clicks locally for HUD
+        document.addEventListener('click', () => {
+            eventCounter++;
+            document.getElementById('hud-event-counter').textContent = eventCounter + ' events sent';
+        });
+
+        function scrollToPricing() {
+            document.getElementById('pricing').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Handle inert element click (Rage Click simulation)
+        function handleInertClick(e) {
+            deadTapClicks++;
+            clearTimeout(deadTapTimer);
+
+            if (deadTapClicks >= 3) {
+                document.getElementById('rage-click-toast').style.display = 'block';
+                if (window.hotspot && window.hotspot.capture) {
+                    window.hotspot.capture('$rageclick', {
+                        '$el_selector': '#pricing-tier-enterprise',
+                        '$el_text': 'Self-Hosted Enterprise (Dead Pill)',
+                        'count': deadTapClicks,
+                        'x': e.clientX,
+                        'y': e.clientY,
+                    });
+                }
+            }
+
+            deadTapTimer = setTimeout(() => {
+                deadTapClicks = 0;
+            }, 1200);
+        }
+
+        function openSignupModal(planName) {
+            document.getElementById('modal-plan-title').textContent = 'Activate: ' + planName;
+            document.getElementById('modal-form-content').style.display = 'block';
+            document.getElementById('modal-success-state').style.display = 'none';
+            document.getElementById('signup-modal').classList.add('active');
+
+            if (window.hotspot && window.hotspot.capture) {
+                window.hotspot.capture('$autocapture', {
+                    '$el_selector': '#btn-passkey-trigger',
+                    '$el_text': 'Open Modal: ' + planName,
+                    'plan': planName,
+                });
+            }
+        }
+
+        function closeSignupModal() {
+            document.getElementById('signup-modal').classList.remove('active');
+        }
+
+        // Complete conversion
+        function completePasskeyVerification() {
+            const name = document.getElementById('input-full-name').value || 'Anonymous Tester';
+            const email = document.getElementById('input-email').value || 'test@example.com';
+            const company = document.getElementById('input-company').value || 'Test Org';
+
+            // Fire Hotspot Identify & Conversion Events
+            if (window.hotspot) {
+                if (window.hotspot.identify) {
+                    window.hotspot.identify(email, {
+                        '$user_name': name,
+                        '$user_email': email,
+                        '$company': company,
+                        'tier': 'Growth Pro',
+                    });
+                }
+                if (window.hotspot.capture) {
+                    window.hotspot.capture('passkey_verified', {
+                        '$user_name': name,
+                        '$user_email': email,
+                        '$company': company,
+                        'credential_id': 'cred_real_' + Math.random().toString(36).substring(2, 9),
+                    });
+                }
+            }
+
+            document.getElementById('modal-form-content').style.display = 'none';
+            document.getElementById('modal-success-state').style.display = 'block';
+            document.getElementById('success-email-text').textContent = email;
+        }
+
+        // Expose helpers for Hotspot Session Replayer
+        window.openSignupModal = openSignupModal;
+        window.closeSignupModal = closeSignupModal;
+        window.completePasskeyVerification = completePasskeyVerification;
+    </script>
+</body>
+</html>

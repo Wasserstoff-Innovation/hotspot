@@ -1,6 +1,6 @@
 /**
  * Hotspot - Modern Web Analytics & User Journey Tracking SDK
- * https://github.com/posthog/posthog (Hotspot edition)
+ * Hotspot Resident In-Browser Telemetry Engine v2.4 (https://hotspot.dev)
  *
  * Lightweight, zero-dependency, single-script tracking for:
  * - Autocapture (clicks, forms, navigation)
@@ -18,6 +18,15 @@
     if (window.__hotspot_loaded) {
         return
     }
+
+    // Check if running inside Hotspot Session Replayer iframe or preview mode
+    try {
+        if (window.location.search.includes('hotspot_replay=1') || window.self !== window.top) {
+            console.log('[Hotspot Telemetry] Replay mode detected — capturing paused to prevent recursive events.');
+            return
+        }
+    } catch (e) {}
+
     window.__hotspot_loaded = true
 
     // Storage keys
@@ -33,6 +42,7 @@
     // Configuration defaults
     var config = {
         api_key: '',
+        project_id: '',
         api_host: '',
         autocapture: true,
         capture_pageview: true,
@@ -63,13 +73,18 @@
         })()
 
     if (currentScript) {
-        var scriptKey = currentScript.getAttribute('data-api-key')
+        var scriptKey = currentScript.getAttribute('data-key') || currentScript.getAttribute('data-api-key')
+        var scriptProject =
+            currentScript.getAttribute('data-project') ||
+            currentScript.getAttribute('data-project-id') ||
+            currentScript.getAttribute('data-domain')
         var scriptHost = currentScript.getAttribute('data-api-host')
         var scriptAuto = currentScript.getAttribute('data-autocapture')
         var scriptDebug = currentScript.getAttribute('data-debug')
         var scriptVis = currentScript.getAttribute('data-visualizer')
 
         if (scriptKey) config.api_key = scriptKey
+        if (scriptProject) config.project_id = scriptProject
         if (scriptHost) config.api_host = scriptHost.replace(/\/+$/, '')
         if (scriptAuto === 'false') config.autocapture = false
         if (scriptDebug === 'true') config.debug = true
@@ -212,6 +227,46 @@
         return utm
     }
 
+    function parseInboundIntent() {
+        var ref = document.referrer || ''
+        var search = window.location.search || ''
+        var intent = {
+            $referrer_host: '',
+            $search_query: '',
+            $is_ai_referral: false,
+            $ai_source: '',
+        }
+        if (!ref) return intent
+
+        try {
+            var refUrl = new URL(ref)
+            intent.$referrer_host = refUrl.hostname
+
+            if (refUrl.hostname.indexOf('perplexity.ai') !== -1) {
+                intent.$is_ai_referral = true
+                intent.$ai_source = 'Perplexity AI'
+            } else if (refUrl.hostname.indexOf('chatgpt.com') !== -1 || refUrl.hostname.indexOf('openai.com') !== -1) {
+                intent.$is_ai_referral = true
+                intent.$ai_source = 'ChatGPT'
+            } else if (refUrl.hostname.indexOf('claude.ai') !== -1) {
+                intent.$is_ai_referral = true
+                intent.$ai_source = 'Claude'
+            }
+
+            var q = refUrl.searchParams.get('q') || refUrl.searchParams.get('query')
+            if (q) intent.$search_query = q
+        } catch (e) {}
+
+        if (!intent.$search_query && search) {
+            try {
+                var sParams = new URLSearchParams(search)
+                intent.$search_query = sParams.get('utm_term') || ''
+            } catch (e) {}
+        }
+
+        return intent
+    }
+
     function getSuperProperties() {
         try {
             var raw = storage.get(SUPER_PROPS_KEY)
@@ -251,6 +306,7 @@
         var endpoint = config.api_host + '/batch/'
         var payload = JSON.stringify({
             api_key: config.api_key,
+            project_id: config.project_id || config.api_key,
             batch: batch,
             sent_at: new Date().toISOString(),
         })
@@ -319,8 +375,23 @@
         var superProps = getSuperProperties()
         var utmProps = parseUtmParams()
 
-        var mergedProps = Object.assign({}, deviceProps, superProps, utmProps, properties || {}, {
+        var stepCounter = parseInt(storage.get(STORAGE_PREFIX + 'flow_step') || '0', 10) + 1
+        storage.set(STORAGE_PREFIX + 'flow_step', stepCounter.toString())
+
+        var eventCategory = 'behavioral_physics'
+        if (eventName === '$pageview' || eventName === '$pageleave' || eventName.indexOf('inbound') !== -1) {
+            eventCategory = 'acquisition'
+        } else if (eventName.indexOf('hydration') !== -1 || eventName.indexOf('exception') !== -1 || eventName.indexOf('vitals') !== -1) {
+            eventCategory = 'technical'
+        }
+
+        var inboundIntent = parseInboundIntent()
+
+        var mergedProps = Object.assign({}, deviceProps, superProps, utmProps, inboundIntent, properties || {}, {
             distinct_id: distinctId,
+            project_id: config.project_id || config.api_key,
+            $session_step: stepCounter,
+            $event_category: eventCategory,
         })
 
         var eventObj = {
@@ -593,6 +664,58 @@
         })
     }
 
+    // Text Selection & Buying Signals
+    function setupTextSelection() {
+        document.addEventListener('mouseup', function () {
+            try {
+                var sel = window.getSelection ? window.getSelection().toString().trim() : ''
+                if (sel && sel.length >= 4 && sel.length <= 120) {
+                    recordEvent('$text_selection', {
+                        $selected_text: sel,
+                        $text_length: sel.length,
+                        $pathname: window.location.pathname,
+                    })
+                }
+            } catch (e) {}
+        }, { passive: true })
+    }
+
+    // Live In-Browser Hydration & Core Web Vitals Audit
+    function setupHydrationAndVitals() {
+        var runAudit = function () {
+            try {
+                var title = document.title || ''
+                var ogTitle = document.querySelector('meta[property="og:title"]')
+                var ogImage = document.querySelector('meta[property="og:image"]')
+                var jsonLdScripts = document.querySelectorAll('script[type="application/ld+json"]')
+                var schemas = []
+                jsonLdScripts.forEach(function (s) {
+                    try {
+                        var parsed = JSON.parse(s.textContent || '{}')
+                        schemas.push(parsed['@type'] || 'Custom')
+                    } catch (e) {}
+                })
+
+                recordEvent('$hydration_audit', {
+                    $has_title: !!title,
+                    $has_og_title: !!ogTitle,
+                    $has_og_image: !!ogImage,
+                    $has_json_ld: jsonLdScripts.length > 0,
+                    $json_ld_schemas: schemas,
+                    $is_client_rendered: !!document.querySelector('#__next, #root, #app'),
+                })
+            } catch (e) {}
+        }
+
+        if (document.readyState === 'complete') {
+            setTimeout(runAudit, 500)
+        } else {
+            window.addEventListener('load', function () {
+                setTimeout(runAudit, 500)
+            })
+        }
+    }
+
     // ==========================================
     // In-Browser Heatmap Visualizer (Option + H)
     // ==========================================
@@ -607,6 +730,18 @@
         var hudExpanded = null
         var animFrame = null
 
+        function isDebugHudAllowed() {
+            try {
+                return (
+                    window.location &&
+                    window.location.search &&
+                    window.location.search.indexOf('hotspot_debug_hud=1') !== -1
+                )
+            } catch (e) {
+                return false
+            }
+        }
+
         try {
             var saved = sessionStorage.getItem('__hotspot_vis_clicks')
             if (saved) clicks = JSON.parse(saved)
@@ -620,6 +755,7 @@
         }
 
         function createOverlay() {
+            if (!isDebugHudAllowed()) return
             if (canvas || !document.body) return
             canvas = document.createElement('canvas')
             canvas.id = '__hotspot_vis_canvas'
@@ -633,6 +769,7 @@
         }
 
         function createHud() {
+            if (!isDebugHudAllowed()) return
             if (hudContainer || !document.body) return
             hudContainer = document.createElement('div')
             hudContainer.id = '__hotspot_hud_root'
@@ -648,7 +785,7 @@
                 '<span style="color:#FAFAFA;font-weight:700;">Hotspot</span>' +
                 '<span style="color:#71717A;">|</span>' +
                 '<span id="__hotspot_hud_pill_count" style="color:#A1A1AA;">0 Clicks</span>' +
-                '<span style="background:rgba(0,82,255,0.12);color:#0052FF;padding:2px 6px;border-radius:6px;font-size:10px;margin-left:4px;border:1px solid rgba(0,82,255,0.3);">⌥H</span>'
+                '<span style="background:rgba(0,82,255,0.12);color:#0052FF;padding:2px 6px;border-radius:6px;font-size:10px;margin-left:4px;border:1px solid rgba(0,82,255,0.3);">Debug</span>'
 
             hudExpanded = document.createElement('div')
             hudExpanded.id = '__hotspot_hud_expanded'
@@ -658,7 +795,7 @@
                 '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.08);">' +
                 '  <div style="display:flex;align-items:center;gap:8px;">' +
                 '    <div style="width:8px;height:8px;border-radius:50%;background:#0052FF;box-shadow:0 0 8px rgba(0,82,255,0.8);"></div>' +
-                '    <span style="font-weight:700;font-size:13px;letter-spacing:-0.2px;color:#FAFAFA;">Hotspot Visualizer</span>' +
+                '    <span style="font-weight:700;font-size:13px;letter-spacing:-0.2px;color:#FAFAFA;">Hotspot Debug</span>' +
                 '  </div>' +
                 '  <button id="__hotspot_hud_minimize" style="background:none;border:none;color:#71717A;cursor:pointer;font-size:16px;padding:2px 6px;border-radius:4px;">✕</button>' +
                 '</div>' +
@@ -854,31 +991,26 @@
 
         return {
             init: function () {
+                if (!isDebugHudAllowed()) {
+                    return
+                }
                 window.addEventListener('keydown', function (e) {
                     if ((e.altKey || (e.ctrlKey && e.shiftKey)) && (e.key === 'h' || e.key === 'H' || e.keyCode === 72)) {
                         toggleOverlay()
                     }
                 })
 
-                if (
-                    config.visualizer ||
-                    (window.location &&
-                        (window.location.search.indexOf('hotspot=visualize') !== -1 ||
-                            window.location.search.indexOf('hotspot_hud=1') !== -1))
-                ) {
-                    var initOverlay = function () {
-                        createOverlay()
-                        createHud()
-                        // Only show overlay canvas if explicitly requested via query param
-                        if (window.location && window.location.search.indexOf('hotspot_overlay=1') !== -1) {
-                            toggleOverlay(true)
-                        }
+                var initOverlay = function () {
+                    createOverlay()
+                    createHud()
+                    if (window.location && window.location.search.indexOf('hotspot_overlay=1') !== -1) {
+                        toggleOverlay(true)
                     }
-                    if (document.readyState === 'complete' || document.readyState === 'interactive') {
-                        initOverlay()
-                    } else {
-                        document.addEventListener('DOMContentLoaded', initOverlay)
-                    }
+                }
+                if (document.readyState === 'complete' || document.readyState === 'interactive') {
+                    initOverlay()
+                } else {
+                    document.addEventListener('DOMContentLoaded', initOverlay)
                 }
             },
             recordClick: function (c) {
@@ -1022,6 +1154,8 @@
     setupAutocapture()
     setupHistoryListeners()
     setupErrorCapture()
+    setupTextSelection()
+    setupHydrationAndVitals()
     visualizer.init()
 
     window.addEventListener('beforeunload', capturePageleave)

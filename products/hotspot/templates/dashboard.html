@@ -1,0 +1,3823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Hotspot • Product Analytics & Conversion Intelligence</title>
+    
+    <!-- Favicon: Precision Hotspot Target "O" Mark -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%232563EB'/%3E%3Cstop offset='100%25' stop-color='%231D4ED8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='16' cy='16' r='14' fill='none' stroke='url(%23g)' stroke-width='3.5'/%3E%3Ccircle cx='16' cy='16' r='8' fill='none' stroke='%233B82F6' stroke-width='1.75' stroke-dasharray='3 2'/%3E%3Ccircle cx='16' cy='16' r='4.5' fill='%2310B981'/%3E%3Ccircle cx='16' cy='16' r='1.8' fill='%23FFFFFF'/%3E%3C/svg%3E">
+
+    <!-- Typography: Inter + JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Local Libraries: Lucide Icons & GSAP -->
+    <script src="/lucide.js"></script>
+    <script src="/gsap.js"></script>
+
+    <style>
+        :root {
+            --brand-primary: #2563EB;
+            --brand-hover: #1D4ED8;
+            --brand-light: #EFF6FF;
+            --brand-border: #BFDBFE;
+
+            --sidebar-bg: #0F172A;
+            --sidebar-hover: #1E293B;
+            --sidebar-active: #2563EB;
+            --sidebar-text: #94A3B8;
+            --sidebar-text-active: #FFFFFF;
+            --sidebar-border: #1E293B;
+
+            --bg-page: #F8FAFC;
+            --bg-surface: #FFFFFF;
+            --bg-subtle: #F1F5F9;
+            --bg-card: #FFFFFF;
+
+            --text-primary: #0F172A;
+            --text-secondary: #475569;
+            --text-muted: #94A3B8;
+            --text-light: #CBD5E1;
+
+            --border-light: #E2E8F0;
+            --border-medium: #CBD5E1;
+
+            --success: #10B981;
+            --success-light: #ECFDF5;
+            --success-border: #A7F3D0;
+            
+            --warning: #F59E0B;
+            --warning-light: #FFFBEB;
+            --warning-border: #FDE68A;
+
+            --danger: #EF4444;
+            --danger-light: #FEF2F2;
+            --danger-border: #FECACA;
+
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.06), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.07), 0 4px 6px -4px rgba(0, 0, 0, 0.03);
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-page);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            font-size: 14px;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+        }
+
+        /* ─── Eradicate Any Injected Visualizer HUD Overlays ─── */
+        #__hotspot_hud_root,
+        #__hotspot_hud_pill,
+        #__hotspot_hud_expanded,
+        #__hotspot_overlay_canvas,
+        [id*="__hotspot_hud"] {
+            display: none !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
+            opacity: 0 !important;
+        }
+
+        /* ─── Modern App Shell Layout ─── */
+        .app-sidebar {
+            width: 264px;
+            background: var(--sidebar-bg);
+            color: var(--sidebar-text);
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--sidebar-border);
+            flex-shrink: 0;
+            user-select: none;
+            z-index: 40;
+        }
+
+        .sidebar-brand {
+            height: 64px;
+            padding: 0 1.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--sidebar-border);
+        }
+        .brand-logo-wrap {
+            display: flex;
+            align-items: center;
+            gap: 0.625rem;
+            text-decoration: none;
+            color: #FFFFFF;
+        }
+        .brand-logo-mark {
+            width: 30px;
+            height: 30px;
+            background: linear-gradient(135deg, #2563EB, #1D4ED8);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+        }
+        .brand-logo-text {
+            font-size: 1.15rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            color: #FFFFFF;
+        }
+        .brand-badge {
+            font-size: 0.65rem;
+            font-weight: 700;
+            background: rgba(37, 99, 235, 0.2);
+            color: #60A5FA;
+            padding: 0.15rem 0.45rem;
+            border-radius: 4px;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .sidebar-nav {
+            flex: 1;
+            padding: 1.25rem 0.85rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+        .nav-section-title {
+            font-size: 0.6875rem;
+            font-weight: 700;
+            color: #64748B;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            padding: 0 0.5rem 0.35rem;
+        }
+        .nav-items-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+        .nav-link {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.65rem 0.85rem;
+            border-radius: 7px;
+            color: var(--sidebar-text);
+            text-decoration: none;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.15s ease;
+            cursor: pointer;
+            border: none;
+            background: transparent;
+            width: 100%;
+            text-align: left;
+        }
+        .nav-link:hover {
+            background: var(--sidebar-hover);
+            color: #F8FAFC;
+        }
+        .nav-link.active {
+            background: var(--brand-primary);
+            color: #FFFFFF;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+        }
+        .nav-link-left {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            white-space: nowrap;
+        }
+        .nav-link svg {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+            opacity: 0.85;
+        }
+        .nav-link.active svg {
+            opacity: 1;
+        }
+        .nav-count-badge {
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 0.15rem 0.5rem;
+            border-radius: 9999px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #CBD5E1;
+            flex-shrink: 0;
+        }
+        .nav-link.active .nav-count-badge {
+            background: rgba(255, 255, 255, 0.25);
+            color: #FFFFFF;
+        }
+
+        .sidebar-footer {
+            padding: 1.15rem 1.25rem;
+            border-top: 1px solid var(--sidebar-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(0, 0, 0, 0.2);
+        }
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            overflow: hidden;
+        }
+        .user-avatar {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #3B82F6, #10B981);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.8125rem;
+            color: #FFFFFF;
+            flex-shrink: 0;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        }
+        .user-info {
+            overflow: hidden;
+            line-height: 1.3;
+        }
+        .user-name {
+            font-size: 0.8125rem;
+            font-weight: 700;
+            color: #F8FAFC;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .user-role {
+            font-size: 0.7rem;
+            color: #64748B;
+        }
+
+        /* ─── Right Content Area ─── */
+        .app-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: var(--bg-page);
+        }
+
+        /* ─── Top Header Bar ─── */
+        .main-header {
+            height: 64px;
+            background: #FFFFFF;
+            border-bottom: 1px solid var(--border-light);
+            padding: 0 1.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+            z-index: 30;
+        }
+        .header-breadcrumbs {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            font-size: 0.875rem;
+        }
+        .breadcrumb-root {
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+        .breadcrumb-sep {
+            color: var(--border-medium);
+        }
+        .breadcrumb-current {
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.875rem;
+        }
+
+        /* ─── Clean Brand / Project Switcher on Right ─── */
+        .brand-switcher-wrap {
+            position: relative;
+        }
+        .brand-switcher-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            background: #FFFFFF;
+            border: 1px solid var(--border-medium);
+            padding: 0.45rem 0.85rem;
+            border-radius: 7px;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            box-shadow: var(--shadow-sm);
+        }
+        .brand-switcher-btn:hover {
+            border-color: var(--brand-primary);
+            background: var(--bg-subtle);
+        }
+        .brand-pill-env {
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            background: var(--success-light);
+            color: #047857;
+            border: 1px solid var(--success-border);
+            text-transform: uppercase;
+        }
+
+        .header-status-pill {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #047857;
+            background: var(--success-light);
+            border: 1px solid var(--success-border);
+            padding: 0.35rem 0.65rem;
+            border-radius: 9999px;
+        }
+        .live-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #10B981;
+            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
+            animation: pulse-dot 2s infinite;
+        }
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.15); }
+        }
+
+        .btn-action-primary {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            background: var(--brand-primary);
+            color: #FFFFFF;
+            border: none;
+            padding: 0.5rem 0.95rem;
+            border-radius: 7px;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            box-shadow: 0 1px 3px rgba(37, 99, 235, 0.2);
+            text-decoration: none;
+        }
+        .btn-action-primary:hover {
+            background: var(--brand-hover);
+        }
+        .btn-action-secondary {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            background: #FFFFFF;
+            color: var(--text-secondary);
+            border: 1px solid var(--border-medium);
+            padding: 0.5rem 0.85rem;
+            border-radius: 7px;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .btn-action-secondary:hover {
+            color: var(--text-primary);
+            border-color: var(--text-secondary);
+            background: var(--bg-subtle);
+        }
+
+        /* ─── Main View Container ─── */
+        .content-scrollable {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem 1.75rem;
+        }
+        .tab-pane {
+            display: none;
+            animation: fadeIn 0.2s ease;
+        }
+        .tab-pane.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(3px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ─── Metric KPI Cards with Elegant Icon Boxes ─── */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.25rem;
+            margin-bottom: 1.5rem;
+        }
+        .kpi-card {
+            background: #FFFFFF;
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            padding: 1.25rem 1.35rem;
+            box-shadow: var(--shadow-sm);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .kpi-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.65rem;
+        }
+        .kpi-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+        .kpi-icon-box {
+            width: 34px;
+            height: 34px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .kpi-icon-box svg {
+            width: 18px;
+            height: 18px;
+        }
+        .kpi-value {
+            font-size: 1.875rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            line-height: 1.1;
+            letter-spacing: -0.02em;
+        }
+        .kpi-subtext {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .kpi-badge-positive {
+            color: #047857;
+            font-weight: 700;
+        }
+        .kpi-badge-negative {
+            color: #B91C1C;
+            font-weight: 700;
+        }
+
+        /* ─── Filter & Search Bar ─── */
+        .filter-toolbar {
+            background: #FFFFFF;
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            padding: 0.85rem 1.15rem;
+            margin-bottom: 1.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            box-shadow: var(--shadow-sm);
+            flex-wrap: wrap;
+        }
+        .filter-left-group {
+            display: flex;
+            align-items: center;
+            gap: 0.85rem;
+            flex: 1;
+        }
+        .search-box-wrap {
+            position: relative;
+            min-width: 280px;
+            max-width: 420px;
+            flex: 1;
+        }
+        .search-box-wrap svg {
+            position: absolute;
+            left: 0.85rem;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 16px;
+            height: 16px;
+            color: var(--text-muted);
+        }
+        .search-input {
+            width: 100%;
+            height: 36px;
+            padding: 0 0.85rem 0 2.4rem;
+            border-radius: 6px;
+            border: 1px solid var(--border-medium);
+            font-size: 0.8125rem;
+            font-family: inherit;
+            color: var(--text-primary);
+            background: var(--bg-page);
+            outline: none;
+            transition: all 0.15s ease;
+        }
+        .search-input:focus {
+            border-color: var(--brand-primary);
+            background: #FFFFFF;
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+        }
+        .filter-pills-row {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+        }
+        .filter-pill {
+            padding: 0.45rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border: 1px solid var(--border-medium);
+            background: #FFFFFF;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .filter-pill:hover {
+            background: var(--bg-subtle);
+            color: var(--text-primary);
+            border-color: var(--text-secondary);
+        }
+        .filter-pill.active {
+            background: var(--text-primary);
+            color: #FFFFFF;
+            border-color: var(--text-primary);
+        }
+        .filter-pill svg {
+            width: 14px;
+            height: 14px;
+        }
+        .filter-select {
+            height: 36px;
+            padding: 0 0.85rem;
+            border-radius: 6px;
+            border: 1px solid var(--border-medium);
+            font-size: 0.78125rem;
+            font-weight: 500;
+            background: #FFFFFF;
+            color: var(--text-secondary);
+            outline: none;
+            cursor: pointer;
+        }
+
+        /* ─── TAB 1: 3-Column Studio Replay Workspace ─── */
+        .replay-compact-topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 0.85rem;
+            flex-wrap: wrap;
+        }
+        .compact-stat-strip {
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            font-family: var(--font-mono);
+            background: #FFFFFF;
+            padding: 0.35rem 0.85rem;
+            border-radius: 6px;
+            border: 1px solid var(--border-light);
+        }
+        .stat-bullet {
+            color: #CBD5E1;
+        }
+        .compact-select {
+            height: 32px;
+            font-size: 0.75rem;
+            padding: 0 0.65rem;
+        }
+
+        .replay-workspace-grid {
+            display: grid;
+            grid-template-columns: 280px 1fr 310px;
+            gap: 1rem;
+            height: calc(100vh - 170px);
+            min-height: 580px;
+        }
+        @media (max-width: 1300px) {
+            .replay-workspace-grid {
+                grid-template-columns: 250px 1fr 270px;
+            }
+        }
+
+        /* Column 1: Master Directory */
+        .replay-directory-pane {
+            background: #FFFFFF;
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+        }
+        .directory-header {
+            padding: 0.65rem 0.95rem;
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.78125rem;
+            font-weight: 700;
+            background: var(--bg-subtle);
+        }
+        .directory-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+        .session-card {
+            padding: 0.65rem 0.8rem;
+            border-radius: 6px;
+            border: 1px solid var(--border-light);
+            background: #FFFFFF;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+        }
+        .session-card:hover {
+            border-color: var(--brand-border);
+            background: var(--bg-subtle);
+        }
+        .session-card.active {
+            border-color: var(--brand-primary);
+            background: #EFF6FF;
+            box-shadow: 0 0 0 1px var(--brand-primary);
+        }
+        .session-card-header {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+        }
+        .session-user-name {
+            font-size: 0.8125rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 170px;
+        }
+        .session-time-ago {
+            font-size: 0.6875rem;
+            color: var(--text-muted);
+            flex-shrink: 0;
+            font-family: var(--font-mono);
+        }
+        .session-user-email {
+            font-size: 0.71875rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            line-height: 1.2;
+        }
+        .session-card-mid {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.6875rem;
+            color: var(--text-secondary);
+        }
+        .session-url-pill {
+            font-family: var(--font-mono);
+            font-size: 0.6875rem;
+            background: var(--bg-subtle);
+            padding: 0.1rem 0.35rem;
+            border-radius: 4px;
+            color: var(--text-primary);
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            border: 1px solid var(--border-light);
+        }
+        .session-card-badges {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            flex-wrap: wrap;
+        }
+        .tag-pill {
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 0.12rem 0.4rem;
+            border-radius: 4px;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+        .tag-rageclick {
+            background: var(--danger-light);
+            color: #DC2626;
+            border: 1px solid var(--danger-border);
+        }
+        .tag-converted {
+            background: var(--success-light);
+            color: #047857;
+            border: 1px solid var(--success-border);
+        }
+        .tag-device {
+            background: var(--bg-subtle);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-light);
+        }
+
+        /* Column 2: Maximized Player Hero */
+        .replay-player-pane {
+            background: #FFFFFF;
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+            height: 100%;
+        }
+        /* Player Header: Structured Two-Tier Architecture */
+        .player-header-wrap {
+            display: flex;
+            flex-direction: column;
+            border-bottom: 1px solid var(--border-light);
+            background: #FFFFFF;
+            flex-shrink: 0;
+        }
+        .player-identity-bar {
+            padding: 0.55rem 0.95rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            min-height: 48px;
+            flex-wrap: wrap;
+        }
+        .player-user-info {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            min-width: 0;
+        }
+        .player-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #2563EB, #1D4ED8);
+            color: #FFFFFF;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.75rem;
+            flex-shrink: 0;
+        }
+        .player-titles {
+            display: flex;
+            flex-direction: column;
+            line-height: 1.25;
+            min-width: 0;
+        }
+        .player-name-row {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+        }
+        .player-name-text {
+            font-size: 0.875rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            white-space: nowrap;
+        }
+        .player-email-text {
+            font-size: 0.71875rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 200px;
+        }
+        .player-outcomes-wrap {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            flex-wrap: wrap;
+            margin-left: auto;
+        }
+
+        /* Tier 2: Dedicated Viewport Control & Metadata Ribbon */
+        .player-subbar-ribbon {
+            padding: 0.35rem 0.95rem;
+            background: #F8FAFC;
+            border-top: 1px solid var(--border-light);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.65rem;
+            flex-shrink: 0;
+        }
+        .viewport-device-toggle {
+            display: inline-flex;
+            align-items: center;
+            background: #FFFFFF;
+            border: 1px solid var(--border-light);
+            border-radius: 6px;
+            padding: 2px;
+            gap: 2px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+        }
+        .device-toggle-btn {
+            border: none;
+            background: transparent;
+            font-size: 0.6875rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            padding: 0.2rem 0.55rem;
+            border-radius: 4px;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .device-toggle-btn svg {
+            width: 12px;
+            height: 12px;
+        }
+        .device-toggle-btn.active {
+            background: #2563EB;
+            color: #FFFFFF;
+            box-shadow: 0 1px 2px rgba(37, 99, 235, 0.2);
+        }
+        .player-meta-badges {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            flex-wrap: wrap;
+        }
+        .meta-tag {
+            font-size: 0.6875rem;
+            color: var(--text-secondary);
+            background: #FFFFFF;
+            padding: 0.18rem 0.45rem;
+            border-radius: 4px;
+            border: 1px solid var(--border-light);
+            font-weight: 500;
+            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+        .session-id-pill {
+            font-size: 0.6875rem;
+            font-family: var(--font-mono);
+            color: var(--text-muted);
+            background: #FFFFFF;
+            border: 1px solid var(--border-light);
+            padding: 0.18rem 0.45rem;
+            border-radius: 4px;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+        .session-id-pill:hover {
+            background: var(--bg-subtle);
+            color: var(--text-primary);
+        }
+
+        /* Mobile 3-Pane Switcher Bar (Appears on <= 1024px) */
+        .mobile-pane-switcher {
+            display: none;
+            align-items: center;
+            background: #FFFFFF;
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            padding: 4px;
+            margin-bottom: 0.75rem;
+            gap: 4px;
+            box-shadow: var(--shadow-sm);
+        }
+        .mobile-pane-btn {
+            flex: 1;
+            border: none;
+            background: transparent;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            padding: 0.45rem 0.6rem;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.35rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .mobile-pane-btn svg {
+            width: 14px;
+            height: 14px;
+        }
+        .mobile-pane-btn.active {
+            background: #EFF6FF;
+            color: #2563EB;
+            box-shadow: 0 1px 2px rgba(37, 99, 235, 0.1);
+        }
+
+        /* Mobile Hamburger Button */
+        .mobile-hamburger-btn {
+            display: none;
+            width: 34px;
+            height: 34px;
+            border-radius: 6px;
+            border: 1px solid var(--border-light);
+            background: #FFFFFF;
+            color: var(--text-primary);
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .mobile-hamburger-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+        .mobile-sidebar-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            backdrop-filter: blur(2px);
+            z-index: 999;
+        }
+        .mobile-sidebar-backdrop.active {
+            display: block;
+        }
+
+        /* Mobile Viewport Chassis Emulation */
+        .viewport-scaled-container.mobile-chassis {
+            border-radius: 36px !important;
+            border: 8px solid #1E293B !important;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.1) !important;
+            overflow: hidden;
+            position: relative;
+        }
+        .viewport-scaled-container.mobile-chassis::before {
+            content: '';
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90px;
+            height: 18px;
+            background: #000000;
+            border-radius: 12px;
+            z-index: 120;
+            pointer-events: none;
+        }
+
+        .browser-right-indicators {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            margin-left: auto;
+            flex-shrink: 0;
+        }
+        .viewport-res-pill {
+            font-size: 0.625rem;
+            font-family: var(--font-mono);
+            color: #94A3B8;
+            background: #1E293B;
+            padding: 0.12rem 0.45rem;
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            font-weight: 600;
+        }
+
+        /* Responsive Breakpoints */
+        @media (max-width: 1024px) {
+            .mobile-pane-switcher {
+                display: flex !important;
+            }
+            .replay-workspace-grid {
+                display: block !important;
+                height: auto !important;
+                min-height: 540px;
+            }
+            .replay-directory-pane,
+            .replay-player-pane,
+            .replay-timeline-pane {
+                display: none !important;
+                width: 100% !important;
+                height: 580px !important;
+            }
+            .replay-player-pane.mobile-active,
+            .replay-directory-pane.mobile-active,
+            .replay-timeline-pane.mobile-active {
+                display: flex !important;
+            }
+            .player-actions-group {
+                margin-left: 0;
+                width: 100%;
+                justify-content: space-between;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .app-sidebar {
+                position: fixed;
+                top: 0;
+                left: 0;
+                bottom: 0;
+                width: 270px;
+                z-index: 1000;
+                transform: translateX(-100%);
+                transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            }
+            .app-sidebar.mobile-open {
+                transform: translateX(0);
+                box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+            }
+            .mobile-hamburger-btn {
+                display: inline-flex !important;
+            }
+            .main-header {
+                padding: 0 0.85rem;
+                height: 52px;
+                min-height: 52px;
+                flex-wrap: nowrap;
+                justify-content: space-between;
+            }
+            .search-box-wrap {
+                display: none !important;
+            }
+            .btn-action-secondary {
+                display: none !important;
+            }
+            .header-actions {
+                width: auto;
+                gap: 0.45rem;
+            }
+            .brand-switcher-btn span#header-project-name {
+                max-width: 100px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+            .replay-compact-topbar {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 0.5rem;
+            }
+            .compact-stat-strip {
+                flex-wrap: wrap;
+                justify-content: center;
+                font-size: 0.72rem;
+            }
+            .player-identity-bar {
+                padding: 0.45rem 0.75rem;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.45rem;
+            }
+            .player-outcomes-wrap {
+                margin-left: 0;
+                width: 100%;
+                justify-content: flex-start;
+            }
+            .player-subbar-ribbon {
+                padding: 0.35rem 0.75rem;
+                flex-wrap: wrap;
+                gap: 0.45rem;
+            }
+            .viewport-res-pill {
+                display: none !important;
+            }
+        }
+
+        .player-screen-canvas {
+            flex: 1;
+            background: #0B0F17;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-height: 460px;
+        }
+        .mock-browser-topbar {
+            height: 34px;
+            background: #111827;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            align-items: center;
+            padding: 0 0.85rem;
+            gap: 0.6rem;
+            flex-shrink: 0;
+        }
+        .browser-dots {
+            display: flex;
+            gap: 5px;
+        }
+        .b-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        .b-red { background: #EF4444; }
+        .b-yellow { background: #F59E0B; }
+        .b-green { background: #10B981; }
+        .browser-url-bar {
+            background: #1E293B;
+            border-radius: 4px;
+            font-family: var(--font-mono);
+            font-size: 0.6875rem;
+            color: #94A3B8;
+            padding: 0.18rem 0.65rem;
+            flex: 1;
+            max-width: 440px;
+            margin: 0 auto;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.35rem;
+            min-width: 0;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+        #mock-browser-url {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 100%;
+        }
+        .live-replay-indicator {
+            margin-left: auto;
+            font-size: 0.625rem;
+            font-family: var(--font-mono);
+            color: #10B981;
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.25);
+            padding: 0.12rem 0.4rem;
+            border-radius: 4px;
+            font-weight: 700;
+        }
+
+        .viewport-stage {
+            flex: 1;
+            position: relative;
+            background: #0B0F17;
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+        }
+        .viewport-scaled-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 1280px;
+            height: 800px;
+            transform-origin: top left;
+        }
+        .viewport-scaled-container iframe {
+            width: 1280px;
+            height: 800px;
+            border: none;
+            background: #0B0F17;
+        }
+        #replayer-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 1280px;
+            height: 800px;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        /* Column 3: Live Event Stream Pane */
+        .replay-timeline-pane {
+            background: #FFFFFF;
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+        }
+        .timeline-pane-header {
+            padding: 0.65rem 0.95rem;
+            border-bottom: 1px solid var(--border-light);
+            background: var(--bg-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.78125rem;
+            font-weight: 700;
+        }
+        .timeline-pane-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+        .timeline-event-row {
+            display: flex;
+            align-items: center;
+            padding: 0.35rem 0.55rem;
+            border-radius: 5px;
+            gap: 0.6rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            border: 1px solid transparent;
+        }
+        .timeline-event-row:hover {
+            background: var(--bg-subtle);
+        }
+        .timeline-event-row.active {
+            background: #EFF6FF;
+            border-color: #BFDBFE;
+        }
+        .ev-time {
+            color: var(--text-muted);
+            font-size: 0.6875rem;
+            font-family: var(--font-mono);
+            flex-shrink: 0;
+            width: 48px;
+        }
+        .ev-name-badge {
+            font-weight: 700;
+            padding: 0.12rem 0.4rem;
+            border-radius: 4px;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            font-size: 0.65rem;
+            flex-shrink: 0;
+        }
+        .ev-name-badge svg {
+            width: 11px;
+            height: 11px;
+        }
+        .ev-target {
+            color: var(--text-secondary);
+            font-family: var(--font-mono);
+            font-size: 0.6875rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex: 1;
+        }
+
+        /* Scrubber Controls Bar */
+        .player-controls-bar {
+            height: 46px;
+            background: #FFFFFF;
+            border-top: 1px solid var(--border-light);
+            display: flex;
+            align-items: center;
+            padding: 0 1rem;
+            gap: 0.85rem;
+            flex-shrink: 0;
+        }
+        .play-toggle-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            border: none;
+            background: #2563EB;
+            color: #FFFFFF;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            flex-shrink: 0;
+        }
+        .play-toggle-btn:hover {
+            background: #1D4ED8;
+            transform: scale(1.02);
+        }
+        .play-toggle-btn svg {
+            width: 14px;
+            height: 14px;
+        }
+        .scrubber-track-wrap {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        .scrubber-time-label {
+            font-family: var(--font-mono);
+            font-size: 0.6875rem;
+            color: var(--text-secondary);
+            min-width: 38px;
+            flex-shrink: 0;
+        }
+        .scrubber-bar-outer {
+            flex: 1;
+            height: 5px;
+            background: #E2E8F0;
+            border-radius: 999px;
+            position: relative;
+            cursor: pointer;
+        }
+        .scrubber-bar-fill {
+            height: 100%;
+            background: #2563EB;
+            border-radius: 999px;
+            position: relative;
+            width: 0%;
+        }
+        .scrubber-bar-thumb {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #2563EB;
+            border: 2px solid #FFFFFF;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+            position: absolute;
+            right: -6px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        .speed-pill-group {
+            display: flex;
+            align-items: center;
+            background: var(--bg-subtle);
+            border-radius: 6px;
+            border: 1px solid var(--border-light);
+            padding: 2px;
+            gap: 2px;
+            flex-shrink: 0;
+        }
+        .speed-btn {
+            background: none;
+            border: none;
+            font-size: 0.6875rem;
+            font-weight: 700;
+            color: var(--text-secondary);
+            padding: 0.15rem 0.45rem;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .speed-btn.active {
+            background: #FFFFFF;
+            color: var(--text-primary);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+
+        /* ─── TAB 2: Funnel Intelligence Stats (NOT a decorative diagram) ─── */
+        .funnel-steps-container {
+            background: #FFFFFF;
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            padding: 1.6rem;
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 1.5rem;
+        }
+        .funnel-header-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.35rem;
+        }
+        .section-heading-sm {
+            font-size: 1.05rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            letter-spacing: -0.01em;
+        }
+        .section-desc-sm {
+            font-size: 0.8125rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+
+        .funnel-steps-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .funnel-steps-table th {
+            text-align: left;
+            padding: 0.85rem 1.15rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border-medium);
+            background: var(--bg-subtle);
+        }
+        .funnel-steps-table td {
+            padding: 1.1rem 1.15rem;
+            border-bottom: 1px solid var(--border-light);
+            font-size: 0.875rem;
+            vertical-align: middle;
+        }
+        .funnel-steps-table tr:hover td {
+            background: #F8FAFC;
+        }
+        .step-index-badge {
+            width: 26px;
+            height: 26px;
+            border-radius: 6px;
+            background: var(--text-primary);
+            color: #FFFFFF;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.75rem;
+            margin-right: 0.65rem;
+            flex-shrink: 0;
+        }
+        .step-name-cell {
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .step-target-code {
+            font-family: var(--font-mono);
+            font-size: 0.71875rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+        }
+        .bar-visual-wrap {
+            width: 100%;
+            height: 12px;
+            background: var(--bg-subtle);
+            border-radius: 6px;
+            overflow: hidden;
+            display: flex;
+        }
+        .bar-visual-fill {
+            height: 100%;
+            border-radius: 6px;
+            transition: width 0.5s ease;
+        }
+
+        /* Color-coded dropoff severity */
+        .badge-severity {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.25rem 0.6rem;
+            border-radius: 5px;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+        .badge-severity svg {
+            width: 13px;
+            height: 13px;
+        }
+        .sev-green {
+            background: var(--success-light);
+            color: #047857;
+            border: 1px solid var(--success-border);
+        }
+        .sev-yellow {
+            background: var(--warning-light);
+            color: #B45309;
+            border: 1px solid var(--warning-border);
+        }
+        .sev-red {
+            background: var(--danger-light);
+            color: #B91C1C;
+            border: 1px solid var(--danger-border);
+        }
+
+        /* ─── TAB 3: User Sequence & Decision Flow Graph (Node Diagram) ─── */
+        .flow-diagram-container {
+            background: #FFFFFF;
+            border: 1px solid var(--border-light);
+            border-radius: 12px;
+            padding: 1.75rem;
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 1.5rem;
+        }
+        .flow-canvas-workspace {
+            position: relative;
+            background: #FAFAFC;
+            background-image: radial-gradient(#CBD5E1 1.2px, transparent 1.2px);
+            background-size: 20px 20px;
+            border: 1px solid var(--border-light);
+            border-radius: 10px;
+            padding: 1.75rem 1.25rem;
+            overflow-x: auto;
+            margin: 1.25rem 0;
+        }
+        .flow-grid-layout {
+            display: grid;
+            grid-template-columns: 220px 58px 220px 58px 220px 58px 220px;
+            align-items: stretch;
+            min-width: 1060px;
+            position: relative;
+        }
+        .col-stage-header {
+            font-size: 0.75rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--border-light);
+        }
+        .col-stage-header i, .col-stage-header svg {
+            width: 14px;
+            height: 14px;
+            color: var(--brand-primary);
+        }
+        .nodes-column {
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+            z-index: 2;
+        }
+        .flow-node-card {
+            background: #FFFFFF;
+            border: 1.5px solid var(--border-light);
+            border-radius: 10px;
+            padding: 1.1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .flow-node-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px -2px rgba(0,0,0,0.08);
+        }
+        .flow-node-card.card-healthy {
+            border-left: 4px solid #10B981;
+        }
+        .flow-node-card.card-warning {
+            border-left: 4px solid #F59E0B;
+        }
+        .flow-node-card.card-critical {
+            border-left: 4px solid #EF4444;
+            background: #FEF2F2;
+            border-color: #FECACA;
+        }
+        .flow-node-card.card-golden {
+            border-left: 4px solid #10B981;
+            background: #ECFDF5;
+            border-color: #A7F3D0;
+        }
+        .flow-node-card.card-entry {
+            border-left: 4px solid #2563EB;
+        }
+        .node-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+        }
+        .node-title-wrap {
+            display: flex;
+            align-items: center;
+            gap: 0.55rem;
+        }
+        .node-title {
+            font-size: 0.875rem;
+            font-weight: 800;
+            color: var(--text-primary);
+        }
+        .circle-node {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            display: inline-block;
+            position: relative;
+            flex-shrink: 0;
+        }
+        .circle-green {
+            background: #10B981;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2), 0 0 8px rgba(16, 185, 129, 0.6);
+        }
+        .circle-yellow {
+            background: #F59E0B;
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2), 0 0 8px rgba(245, 158, 11, 0.6);
+        }
+        .circle-red {
+            background: #EF4444;
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2), 0 0 10px rgba(239, 68, 68, 0.8);
+            animation: red-beacon 1.2s infinite alternate;
+        }
+        @keyframes red-beacon {
+            from { transform: scale(0.95); opacity: 0.85; }
+            to { transform: scale(1.15); opacity: 1; }
+        }
+        .circle-blue {
+            background: #2563EB;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2), 0 0 8px rgba(37, 99, 235, 0.5);
+        }
+        .node-path-badge {
+            font-family: var(--font-mono);
+            font-size: 0.6875rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            background: var(--bg-subtle);
+            border: 1px solid var(--border-light);
+            padding: 0.15rem 0.45rem;
+            border-radius: 4px;
+            width: fit-content;
+        }
+        .node-behavior-insight {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+            margin: 0.2rem 0;
+        }
+        .node-metric-bar {
+            height: 6px;
+            background: #E2E8F0;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 0.3rem;
+        }
+        .node-metric-fill {
+            height: 100%;
+            border-radius: 3px;
+        }
+        .node-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.71875rem;
+            color: var(--text-muted);
+            font-weight: 600;
+            padding-top: 0.35rem;
+            border-top: 1px dashed var(--border-light);
+        }
+        .connector-column {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            padding-top: 2rem;
+        }
+        .connector-svg-wrap {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 2rem;
+            left: 0;
+            pointer-events: none;
+        }
+        .decision-diamond-node {
+            width: 32px;
+            height: 32px;
+            background: #0F172A;
+            border: 2px solid #38BDF8;
+            border-radius: 4px;
+            transform: rotate(45deg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 10px rgba(15, 23, 42, 0.3), 0 0 10px rgba(56, 189, 248, 0.4);
+            z-index: 10;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .decision-diamond-node:hover {
+            transform: rotate(45deg) scale(1.1);
+        }
+        .decision-diamond-node i, .decision-diamond-node svg {
+            transform: rotate(-45deg);
+            color: #38BDF8;
+            width: 14px;
+            height: 14px;
+        }
+        .decision-label {
+            font-size: 0.65rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #0F172A;
+            background: #FFFFFF;
+            border: 1px solid var(--border-light);
+            padding: 0.15rem 0.35rem;
+            border-radius: 3px;
+            margin-top: 0.6rem;
+            z-index: 10;
+            white-space: nowrap;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .branch-pill {
+            position: absolute;
+            font-size: 0.625rem;
+            font-weight: 700;
+            font-family: var(--font-mono);
+            padding: 0.15rem 0.4rem;
+            border-radius: 3px;
+            z-index: 5;
+            white-space: nowrap;
+        }
+        .bp-top {
+            top: 65px;
+            left: 2px;
+            background: #ECFDF5;
+            color: #047857;
+            border: 1px solid #A7F3D0;
+        }
+        .bp-bottom {
+            bottom: 85px;
+            left: 2px;
+            background: #FEF2F2;
+            color: #B91C1C;
+            border: 1px solid #FECACA;
+        }
+
+        /* Top Sequences Table */
+        .seq-table-card {
+            background: #FFFFFF;
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+        }
+
+        /* ─── TAB 4: Live Telemetry Stream ─── */
+        .stream-console-pane {
+            background: #0B0F17;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            height: calc(100vh - 220px);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: var(--shadow-lg);
+        }
+        .console-topbar {
+            background: #111827;
+            padding: 0.75rem 1.15rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: #94A3B8;
+        }
+        .console-stream-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.15rem;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            line-height: 1.6;
+            color: #E2E8F0;
+            display: flex;
+            flex-direction: column;
+            gap: 0.45rem;
+        }
+        .stream-log-entry {
+            display: flex;
+            align-items: baseline;
+            gap: 0.85rem;
+            padding: 0.3rem 0.6rem;
+            border-radius: 5px;
+            transition: background 0.15s ease;
+        }
+        .stream-log-entry:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .log-ts { color: #64748B; flex-shrink: 0; }
+        .log-ev-name { font-weight: 700; width: 110px; flex-shrink: 0; }
+        .log-payload { color: #94A3B8; word-break: break-all; flex: 1; }
+
+        /* ─── TAB 5: SDK & Keys ─── */
+        .code-snippet-box {
+            background: #0B0F17;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 1.25rem;
+            font-family: var(--font-mono);
+            font-size: 0.8125rem;
+            color: #E2E8F0;
+            position: relative;
+            margin: 0.75rem 0 1.5rem;
+        }
+        .copy-snippet-btn {
+            position: absolute;
+            top: 0.75rem;
+            right: 0.75rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #FFFFFF;
+            padding: 0.3rem 0.6rem;
+            border-radius: 5px;
+            font-size: 0.71875rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ─── APP SIDEBAR (Left Navigation) ─── -->
+    <div class="mobile-sidebar-backdrop" id="mobile-sidebar-backdrop" onclick="toggleMobileSidebar()"></div>
+    <aside class="app-sidebar">
+        <!-- Brand Header -->
+        <div class="sidebar-brand">
+            <a href="/dashboard" class="brand-logo-wrap">
+                <div class="brand-logo-mark">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5">
+                        <circle cx="12" cy="12" r="9"/>
+                        <circle cx="12" cy="12" r="3" fill="#10B981" stroke="none"/>
+                    </svg>
+                </div>
+                <span class="brand-logo-text">Hotspot</span>
+            </a>
+            <span class="brand-badge">v2.4 Pro</span>
+        </div>
+
+        <!-- Sidebar Navigation Menu Items -->
+        <nav class="sidebar-nav">
+            <!-- Section: Analytics -->
+            <div class="nav-section-title">Product Analytics</div>
+            <div class="nav-items-group">
+                <button class="nav-link active" onclick="switchDashboardTab('tab-replay', this)">
+                    <div class="nav-link-left">
+                        <i data-lucide="play-circle"></i>
+                        <span>Session Replay</span>
+                    </div>
+                    <span class="nav-count-badge" id="nav-count-sessions">8</span>
+                </button>
+
+                <button class="nav-link" onclick="switchDashboardTab('tab-funnels', this)">
+                    <div class="nav-link-left">
+                        <i data-lucide="filter"></i>
+                        <span>Funnels & Dropoffs</span>
+                    </div>
+                    <span class="nav-count-badge" id="nav-count-funnel">37.5%</span>
+                </button>
+
+                <button class="nav-link" onclick="switchDashboardTab('tab-paths', this)">
+                    <div class="nav-link-left">
+                        <i data-lucide="git-branch"></i>
+                        <span>User Paths & Flows</span>
+                    </div>
+                    <span class="nav-count-badge" style="background: rgba(239,68,68,0.2); color: #FCA5A5; border: 1px solid rgba(239,68,68,0.3);">Leak</span>
+                </button>
+
+                <button class="nav-link" onclick="switchDashboardTab('tab-stream', this)">
+                    <div class="nav-link-left">
+                        <i data-lucide="radio"></i>
+                        <span>Live Stream</span>
+                    </div>
+                    <span class="live-dot"></span>
+                </button>
+            </div>
+
+            <!-- Section: Developer & Integration -->
+            <div class="nav-section-title" style="margin-top: 0.5rem;">Developer & Keys</div>
+            <div class="nav-items-group">
+                <button class="nav-link" onclick="switchDashboardTab('tab-install', this)">
+                    <div class="nav-link-left">
+                        <i data-lucide="key-round"></i>
+                        <span>API Keys & SDK</span>
+                    </div>
+                </button>
+
+                <button class="nav-link" onclick="switchDashboardTab('tab-install', this)">
+                    <div class="nav-link-left">
+                        <i data-lucide="sliders"></i>
+                        <span>Ingestion Settings</span>
+                    </div>
+                </button>
+            </div>
+        </nav>
+
+        <!-- Sidebar Footer (User Account & Health) -->
+        <div class="sidebar-footer">
+            <div class="user-profile">
+                <div class="user-avatar" id="sidebar-user-avatar">EA</div>
+                <div class="user-info">
+                    <div class="user-name" id="sidebar-user-name">Engineering Admin</div>
+                    <div class="user-role" id="sidebar-user-role">Live Production Store</div>
+                </div>
+            </div>
+            <div class="header-status-pill" style="padding: 0.25rem 0.55rem; font-size: 0.7rem;">
+                <span class="live-dot" style="width: 5px; height: 5px;"></span>
+                <span>12ms</span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- ─── APP MAIN CONTENT ─── -->
+    <main class="app-main">
+        <!-- Top Header Bar -->
+        <header class="main-header">
+            <div style="display: flex; align-items: center; gap: 0.65rem;">
+                <button class="mobile-hamburger-btn" onclick="toggleMobileSidebar()" title="Toggle Navigation Menu">
+                    <i data-lucide="menu"></i>
+                </button>
+                <!-- Breadcrumbs -->
+                <div class="header-breadcrumbs">
+                    <span class="breadcrumb-root">Hotspot</span>
+                    <span class="breadcrumb-sep">/</span>
+                    <span class="breadcrumb-current" id="header-breadcrumb-title">Session Replay</span>
+                </div>
+            </div>
+
+            <!-- Right Controls: Brand Switcher on the Right & Live Actions -->
+            <div class="header-actions">
+                <!-- Search Filter -->
+                <div class="search-box-wrap" style="min-width: 240px;">
+                    <i data-lucide="search"></i>
+                    <input type="text" class="search-input" id="global-search-input" placeholder="Filter users, paths, emails... (⌘K)" oninput="handleSearchFilter(this.value)">
+                </div>
+
+                <!-- Sleek Brand / Project Switcher on Right -->
+                <div class="brand-switcher-wrap">
+                    <button class="brand-switcher-btn" id="project-switcher-toggle" onclick="toggleProjectDropdown()">
+                        <div style="width: 20px; height: 20px; border-radius: 5px; background: #2563EB; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800;">C</div>
+                        <span id="header-project-name">CloudScale AI</span>
+                        <span class="brand-pill-env">Prod</span>
+                        <i data-lucide="chevron-down" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
+                    </button>
+                </div>
+
+                <!-- Linear Flow & Break-off Simulator Trigger -->
+                <button class="btn-action-secondary" onclick="switchDashboardTab('tab-funnels', document.querySelectorAll('.sidebar-nav .nav-link')[1]); scrollToSimulator();" title="Simulate linear cohort flow through friction break-off walls">
+                    <i data-lucide="play-circle" style="width: 15px; height: 15px; color: #2563EB;"></i>
+                    <span>Simulate Break-off Walls</span>
+                </button>
+
+                <!-- Copy Script Button -->
+                <button class="btn-action-primary" onclick="switchDashboardTab('tab-install', document.querySelectorAll('.sidebar-nav .nav-link')[4])">
+                    <i data-lucide="code" style="width: 14px; height: 14px;"></i>
+                    <span>Script SDK</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Scrollable Content Area -->
+        <div class="content-scrollable">
+
+            <!-- ═══════════════════════════════════════════════════════════════════ -->
+            <!-- TAB 1: 3-COLUMN STUDIO REPLAY WORKSPACE (Full-Height Immersive)     -->
+            <!-- ═══════════════════════════════════════════════════════════════════ -->
+            <div class="tab-pane active" id="tab-replay">
+                
+                <!-- Sleek Single-Line Compact Metric Strip -->
+                <div class="replay-compact-topbar">
+                    <div class="compact-stat-strip">
+                        <span><strong id="kpi-active-sessions">8</strong> Active Sessions</span>
+                        <span class="stat-bullet">•</span>
+                        <span style="color: #059669;"><strong id="kpi-conversion-rate">37.5%</strong> Conversion</span>
+                        <span class="stat-bullet">•</span>
+                        <span style="color: #DC2626;"><strong id="kpi-rage-clicks">2</strong> Friction Chokes</span>
+                        <span class="stat-bullet">•</span>
+                        <span><strong id="kpi-avg-scroll">50%</strong> Avg Scroll Arrest Depth</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <select class="filter-select compact-select" id="device-filter-select" onchange="handleDropdownFilter()">
+                            <option value="all">🖥️ All Devices</option>
+                            <option value="desktop">💻 Desktop Only</option>
+                            <option value="mobile">📱 Mobile</option>
+                        </select>
+                        <select class="filter-select compact-select" id="os-filter-select" onchange="handleDropdownFilter()">
+                            <option value="all">⚙️ All OS</option>
+                            <option value="macos">macOS</option>
+                            <option value="windows">Windows</option>
+                            <option value="linux">Linux</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 3-Column Studio Replay Workspace -->
+                                <!-- Mobile 3-Pane Switcher Bar (Visible on screens <= 1024px) -->
+                <div class="mobile-pane-switcher">
+                    <button class="mobile-pane-btn active" id="btn-pane-player" onclick="switchMobileWorkspacePane('player')">
+                        <i data-lucide="play-circle"></i>
+                        <span>Replay Player</span>
+                    </button>
+                    <button class="mobile-pane-btn" id="btn-pane-directory" onclick="switchMobileWorkspacePane('directory')">
+                        <i data-lucide="users"></i>
+                        <span>Sessions (<span id="mobile-sessions-count">3</span>)</span>
+                    </button>
+                    <button class="mobile-pane-btn" id="btn-pane-timeline" onclick="switchMobileWorkspacePane('timeline')">
+                        <i data-lucide="list"></i>
+                        <span>Events (<span id="mobile-events-count">23</span>)</span>
+                    </button>
+                </div>
+
+                <div class="replay-workspace-grid">
+                    
+                    <!-- Column 1: Visitor Sessions Directory -->
+                    <div class="replay-directory-pane">
+                        <div class="directory-header">
+                            <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                <i data-lucide="users" style="width: 14px; height: 14px; color: var(--text-muted);"></i>
+                                <span>Visitor Sessions</span>
+                            </div>
+                            <span style="font-weight: 600; color: var(--text-muted); font-size: 0.72rem;" id="session-count-label">8 recorded</span>
+                        </div>
+                        <div class="directory-filter-bar">
+                            <select class="directory-filter-select" id="session-tag-filter" onchange="applySessionTagFilter(this.value, null)">
+                                <option value="all">All Sessions</option>
+                                <option value="rageclicks">🔥 Has Rage Clicks</option>
+                                <option value="converted">✓ Converted</option>
+                                <option value="bounced">↗ Bounced (&lt;15s)</option>
+                            </select>
+                        </div>
+                        <div class="directory-list" id="sessions-directory-list">
+                            <!-- Populated dynamically via JS -->
+                        </div>
+                    </div>
+
+                    <!-- Column 2: Maximized Player Hero Canvas -->
+                    <div class="replay-player-pane mobile-active">
+                        
+                        <!-- Sleek Two-Tier Structured Session Header with Dedicated Device Ribbon -->
+                        <div class="player-header-wrap">
+                            <!-- Tier 1: User Identity & Primary Session Outcomes -->
+                            <div class="player-identity-bar">
+                                <div class="player-user-info">
+                                    <div class="player-avatar" id="player-avatar-badge">AT</div>
+                                    <div class="player-titles">
+                                        <div class="player-name-row">
+                                            <span class="player-name-text" id="player-user-name">Alex Turner</span>
+                                        </div>
+                                        <div class="player-email-text" id="player-user-email">alex.turner@cloudscale.ai</div>
+                                    </div>
+                                </div>
+                                <div class="player-outcomes-wrap">
+                                    <span class="tag-pill tag-rageclick" id="player-rage-badge" style="display: none;">
+                                        <i data-lucide="flame"></i>
+                                        <span>4x Rage Click</span>
+                                    </span>
+                                    <span class="tag-pill tag-converted" id="player-conv-badge" style="display: none;">
+                                        <i data-lucide="check-circle-2"></i>
+                                        <span>Converted ✓</span>
+                                    </span>
+                                    <div class="session-id-pill" id="player-session-id-label" title="Click to copy Session ID" onclick="copySessionId()">
+                                        <span>--</span>
+                                        <i data-lucide="copy" style="width: 11px; height: 11px; cursor: pointer;"></i>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Tier 2: Viewport Device Switcher & Telemetry Ribbon -->
+                            <div class="player-subbar-ribbon">
+                                <div class="viewport-device-toggle" title="Toggle Viewport Device Emulation">
+                                    <button class="device-toggle-btn active" id="btn-device-desktop" onclick="setReplayerDeviceMode('desktop')">
+                                        <i data-lucide="monitor"></i>
+                                        <span>Desktop</span>
+                                    </button>
+                                    <button class="device-toggle-btn" id="btn-device-mobile" onclick="setReplayerDeviceMode('mobile')">
+                                        <i data-lucide="smartphone"></i>
+                                        <span>Mobile</span>
+                                    </button>
+                                </div>
+                                <div class="player-meta-badges">
+                                    <span class="meta-tag" id="player-device-meta">
+                                        <i data-lucide="laptop" style="width: 11px; height: 11px;"></i>
+                                        <span id="player-device-spec">macOS • Chrome</span>
+                                    </span>
+                                    <span class="meta-tag">
+                                        <i data-lucide="clock" style="width: 11px; height: 11px;"></i>
+                                        <span id="player-duration-spec">00:30</span>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Browser Mock Topbar -->
+                        <div class="mock-browser-topbar">
+                            <div class="browser-dots">
+                                <span class="b-dot b-red"></span>
+                                <span class="b-dot b-yellow"></span>
+                                <span class="b-dot b-green"></span>
+                            </div>
+                            <div class="browser-url-bar">
+                                <i data-lucide="lock" style="width: 11px; height: 11px; color: #10B981;"></i>
+                                <span id="mock-browser-url">http://localhost:8000/demo/</span>
+                            </div>
+                            <div class="browser-right-indicators">
+                                <span class="viewport-res-pill" id="viewport-res-indicator">1280 × 800</span>
+                                <span class="live-replay-indicator">● LIVE DOM REPLAY</span>
+                            </div>
+                        </div>
+
+                        <!-- Viewport Stage with Auto-Scaled 1280x800 Desktop Viewport -->
+                        <div class="viewport-stage" id="viewport-stage">
+                            <div class="viewport-scaled-container" id="viewport-scaled-container">
+                                <iframe id="replayer-web-frame" src="/demo/?hotspot_replay=1" title="Hotspot Live DOM Session Replayer"></iframe>
+
+                                <div id="replayer-overlay">
+                                    <div class="cursor-pointer-dot" id="replayer-cursor" style="left: 50%; top: 50%; display: none;"></div>
+                                    <div id="replayer-click-ripple" style="position: absolute; width: 36px; height: 36px; border-radius: 50%; border: 3px solid #3B82F6; background: rgba(59, 130, 246, 0.25); transform: translate(-50%, -50%) scale(0); transition: all 0.35s ease-out; z-index: 109; pointer-events: none;"></div>
+                                    <div class="cursor-rage-pulse" id="replayer-rage-pulse" style="left: 50%; top: 50%; display: none;"></div>
+                                    <div class="scroll-depth-indicator" id="replayer-scroll-indicator" style="top: 64%; display: none;">
+                                        <i data-lucide="arrow-down-circle" style="width: 12px; height: 12px;"></i>
+                                        <span id="replayer-scroll-text">64% SCROLL ARREST DEPTH</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Player Controls Bar -->
+                        <div class="player-controls-bar">
+                            <button class="play-toggle-btn" id="btn-play-toggle" onclick="togglePlayback()" title="Play/Pause Recording">
+                                <i data-lucide="play" id="icon-play-state"></i>
+                            </button>
+                            <div class="scrubber-track-wrap">
+                                <span class="scrubber-time-label" id="scrubber-current-time">00:00</span>
+                                <div class="scrubber-bar-outer" id="scrubber-outer" onclick="seekPlayback(event)">
+                                    <div class="scrubber-bar-fill" id="scrubber-fill" style="width: 0%;">
+                                        <div class="scrubber-bar-thumb"></div>
+                                    </div>
+                                </div>
+                                <span class="scrubber-time-label" id="scrubber-total-time">00:30</span>
+                            </div>
+                            <div class="speed-pill-group">
+                                <button class="speed-btn active" onclick="setSpeed(1, this)">1x</button>
+                                <button class="speed-btn" onclick="setSpeed(2, this)">2x</button>
+                                <button class="speed-btn" onclick="setSpeed(4, this)">4x</button>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Column 3: Live Micro-Event Stream Pane -->
+                    <div class="replay-timeline-pane">
+                        <div class="timeline-pane-header">
+                            <div style="display: flex; align-items: center; gap: 0.4rem;">
+                                <i data-lucide="list" style="width: 14px; height: 14px; color: var(--text-secondary);"></i>
+                                <span>Micro-Events (<span id="event-stream-count">0</span>)</span>
+                            </div>
+                            <span style="font-family: var(--font-mono); font-size: 0.6875rem; color: var(--text-muted);">Click to scrub</span>
+                        </div>
+                        <div class="timeline-pane-list" id="timeline-events-list">
+                            <!-- Populated dynamically via JS -->
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- ═══════════════════════════════════════════════════════════════════ -->
+            <!-- TAB 2: FUNNELS & DROPOFFS (Stats & Leak Intelligence)              -->
+            <!-- ═══════════════════════════════════════════════════════════════════ -->
+            <div class="tab-pane" id="tab-funnels">
+
+                <!-- ─── LINEAR FLOW & BREAK-OFF WALL SIMULATOR ─── -->
+                <div class="funnel-steps-container" id="section-flow-simulator" style="border: 1px solid #BFDBFE; background: linear-gradient(to bottom, #FFFFFF, #F8FAFC); margin-bottom: 1.75rem; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.05);">
+                    <div class="funnel-header-row" style="margin-bottom: 1rem;">
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 0.6rem;">
+                                <div style="width: 28px; height: 28px; border-radius: 6px; background: #EFF6FF; color: #2563EB; display: flex; align-items: center; justify-content: center;">
+                                    <i data-lucide="play-circle" style="width: 17px; height: 17px;"></i>
+                                </div>
+                                <div class="section-heading-sm">Linear Flow & Friction Break-off Wall Simulator</div>
+                                <span class="brand-badge" style="background:#EFF6FF; color:#2563EB; border-color:#BFDBFE;">Scenario Engine</span>
+                            </div>
+                            <div class="section-desc-sm" style="margin-top: 0.35rem;">
+                                Simulate how a cohort traverses the linear acquisition journey. Toggle break-off barrier fixes to project conversion lift and ARR recovery.
+                            </div>
+                        </div>
+
+                        <!-- Cohort Controls -->
+                        <div style="display: flex; align-items: center; gap: 0.75rem; background: #FFFFFF; padding: 0.5rem 0.85rem; border-radius: 8px; border: 1px solid var(--border-medium);">
+                            <span style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">Cohort:</span>
+                            <input type="number" id="sim-cohort-input" value="1000" min="100" max="50000" step="100" style="width: 80px; padding: 0.25rem 0.5rem; border: 1px solid var(--border-medium); border-radius: 5px; font-family: var(--font-mono); font-size: 0.8125rem; font-weight: 700; text-align: center;" onchange="runFlowSimulation()">
+                            <span style="font-size: 0.75rem; color: var(--text-muted);">visitors</span>
+                            <button class="btn-action-primary" style="padding: 0.35rem 0.75rem; font-size: 0.75rem;" onclick="runFlowSimulation()">
+                                <i data-lucide="refresh-cw" style="width: 13px; height: 13px;"></i>
+                                <span>Re-Simulate</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Visual Linear Flow Pipeline with Break-off Walls -->
+                    <div style="display: grid; grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr; gap: 0.75rem; align-items: stretch; margin: 1.5rem 0; overflow-x: auto; padding-bottom: 0.5rem;">
+                        
+                        <!-- Stage 1 -->
+                        <div style="background: #FFFFFF; border: 1px solid var(--border-light); border-radius: 8px; padding: 1rem; display: flex; flex-direction: column; justify-content: space-between; box-shadow: var(--shadow-sm);">
+                            <div>
+                                <div style="font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Stage 1</div>
+                                <div style="font-size: 0.875rem; font-weight: 800; color: var(--text-primary); margin-top: 0.2rem;">Inbound Ingress</div>
+                                <div style="font-size: 0.71875rem; color: var(--text-secondary); margin-top: 0.25rem;">Search, AI & Direct</div>
+                            </div>
+                            <div style="margin-top: 1rem;">
+                                <div style="font-size: 1.35rem; font-weight: 800; color: #2563EB;" id="sim-stage-1-count">1,000</div>
+                                <div style="font-size: 0.7rem; font-weight: 600; color: var(--text-muted);">100% of cohort</div>
+                            </div>
+                        </div>
+
+                        <!-- Break-off Wall 1 Barrier -->
+                        <div id="sim-wall-card-1" style="width: 170px; background: #FEF2F2; border: 2px dashed #EF4444; border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; justify-content: space-between; text-align: center; transition: all 0.25s ease;">
+                            <div>
+                                <div style="display: flex; align-items: center; justify-content: center; gap: 0.3rem;">
+                                    <span style="font-size: 0.85rem;">🧱</span>
+                                    <span style="font-size: 0.7rem; font-weight: 800; color: #991B1B; text-transform: uppercase;">Break-off Wall #1</span>
+                                </div>
+                                <div style="font-size: 0.71875rem; font-weight: 700; color: #B91C1C; margin-top: 0.25rem;" id="sim-wall-1-title">Dead Tap Friction</div>
+                                <div style="font-family: var(--font-mono); font-size: 0.65rem; color: #7F1D1D; margin-top: 0.15rem;">#pricing-tier-enterprise</div>
+                                <div style="font-size: 0.75rem; font-weight: 800; color: #DC2626; margin: 0.5rem 0;" id="sim-wall-1-loss">🔴 -375 Deflected</div>
+                            </div>
+                            <button id="sim-toggle-wall-1" onclick="toggleWall(1)" style="background: #FFFFFF; border: 1px solid #DC2626; color: #DC2626; border-radius: 5px; padding: 0.3rem 0.5rem; font-size: 0.6875rem; font-weight: 700; cursor: pointer; transition: all 0.15s ease;">
+                                Simulate DOM Fix
+                            </button>
+                        </div>
+
+                        <!-- Stage 2 -->
+                        <div style="background: #FFFFFF; border: 1px solid var(--border-light); border-radius: 8px; padding: 1rem; display: flex; flex-direction: column; justify-content: space-between; box-shadow: var(--shadow-sm);">
+                            <div>
+                                <div style="font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Stage 2</div>
+                                <div style="font-size: 0.875rem; font-weight: 800; color: var(--text-primary); margin-top: 0.2rem;">Plan Exploration</div>
+                                <div style="font-size: 0.71875rem; color: var(--text-secondary); margin-top: 0.25rem;">Viewing /pricing specs</div>
+                            </div>
+                            <div style="margin-top: 1rem;">
+                                <div style="font-size: 1.35rem; font-weight: 800; color: var(--text-primary);" id="sim-stage-2-count">625</div>
+                                <div style="font-size: 0.7rem; font-weight: 600; color: var(--text-muted);" id="sim-stage-2-pct">62.5% passing</div>
+                            </div>
+                        </div>
+
+                        <!-- Break-off Wall 2 Barrier -->
+                        <div id="sim-wall-card-2" style="width: 170px; background: #FEF2F2; border: 2px dashed #EF4444; border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; justify-content: space-between; text-align: center; transition: all 0.25s ease;">
+                            <div>
+                                <div style="display: flex; align-items: center; justify-content: center; gap: 0.3rem;">
+                                    <span style="font-size: 0.85rem;">🧱</span>
+                                    <span style="font-size: 0.7rem; font-weight: 800; color: #991B1B; text-transform: uppercase;">Break-off Wall #2</span>
+                                </div>
+                                <div style="font-size: 0.71875rem; font-weight: 700; color: #B91C1C; margin-top: 0.25rem;" id="sim-wall-2-title">64% Scroll Arrest</div>
+                                <div style="font-family: var(--font-mono); font-size: 0.65rem; color: #7F1D1D; margin-top: 0.15rem;">CTA Below Fold</div>
+                                <div style="font-size: 0.75rem; font-weight: 800; color: #DC2626; margin: 0.5rem 0;" id="sim-wall-2-loss">🔴 -175 Deflected</div>
+                            </div>
+                            <button id="sim-toggle-wall-2" onclick="toggleWall(2)" style="background: #FFFFFF; border: 1px solid #DC2626; color: #DC2626; border-radius: 5px; padding: 0.3rem 0.5rem; font-size: 0.6875rem; font-weight: 700; cursor: pointer; transition: all 0.15s ease;">
+                                Simulate Sticky CTA
+                            </button>
+                        </div>
+
+                        <!-- Stage 3 -->
+                        <div style="background: #FFFFFF; border: 1px solid var(--border-light); border-radius: 8px; padding: 1rem; display: flex; flex-direction: column; justify-content: space-between; box-shadow: var(--shadow-sm);">
+                            <div>
+                                <div style="font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Stage 3</div>
+                                <div style="font-size: 0.875rem; font-weight: 800; color: var(--text-primary); margin-top: 0.2rem;">Auth / Modal</div>
+                                <div style="font-size: 0.71875rem; color: var(--text-secondary); margin-top: 0.25rem;">Passkey dialog open</div>
+                            </div>
+                            <div style="margin-top: 1rem;">
+                                <div style="font-size: 1.35rem; font-weight: 800; color: var(--text-primary);" id="sim-stage-3-count">450</div>
+                                <div style="font-size: 0.7rem; font-weight: 600; color: var(--text-muted);" id="sim-stage-3-pct">45.0% passing</div>
+                            </div>
+                        </div>
+
+                        <!-- Break-off Wall 3 Barrier -->
+                        <div id="sim-wall-card-3" style="width: 170px; background: #FFFBEB; border: 2px dashed #F59E0B; border-radius: 8px; padding: 0.75rem; display: flex; flex-direction: column; justify-content: space-between; text-align: center; transition: all 0.25s ease;">
+                            <div>
+                                <div style="display: flex; align-items: center; justify-content: center; gap: 0.3rem;">
+                                    <span style="font-size: 0.85rem;">🧱</span>
+                                    <span style="font-size: 0.7rem; font-weight: 800; color: #92400E; text-transform: uppercase;">Break-off Wall #3</span>
+                                </div>
+                                <div style="font-size: 0.71875rem; font-weight: 700; color: #B45309; margin-top: 0.25rem;" id="sim-wall-3-title">Biometric Cancel</div>
+                                <div style="font-family: var(--font-mono); font-size: 0.65rem; color: #78350F; margin-top: 0.15rem;">WebAuthn Abort</div>
+                                <div style="font-size: 0.75rem; font-weight: 800; color: #B45309; margin: 0.5rem 0;" id="sim-wall-3-loss">🟡 -171 Deflected</div>
+                            </div>
+                            <button id="sim-toggle-wall-3" onclick="toggleWall(3)" style="background: #FFFFFF; border: 1px solid #B45309; color: #B45309; border-radius: 5px; padding: 0.3rem 0.5rem; font-size: 0.6875rem; font-weight: 700; cursor: pointer; transition: all 0.15s ease;">
+                                Add Magic Fallback
+                            </button>
+                        </div>
+
+                        <!-- Stage 4: Conversion -->
+                        <div style="background: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 8px; padding: 1rem; display: flex; flex-direction: column; justify-content: space-between; box-shadow: var(--shadow-sm);">
+                            <div>
+                                <div style="font-size: 0.7rem; font-weight: 700; color: #047857; text-transform: uppercase; letter-spacing: 0.05em;">Stage 4</div>
+                                <div style="font-size: 0.875rem; font-weight: 800; color: #065F46; margin-top: 0.2rem;">Verified Conversions</div>
+                                <div style="font-size: 0.71875rem; color: #047857; margin-top: 0.25rem;">Active Paid Workspaces</div>
+                            </div>
+                            <div style="margin-top: 1rem;">
+                                <div style="font-size: 1.35rem; font-weight: 800; color: #047857;" id="sim-stage-4-count">279</div>
+                                <div style="font-size: 0.7rem; font-weight: 700; color: #059669;" id="sim-stage-4-pct">27.9% net rate</div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Projected Impact Scorecard Footer -->
+                    <div style="background: #FFFFFF; border: 1px solid var(--border-light); border-radius: 8px; padding: 0.85rem 1.25rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+                        <div style="display: flex; align-items: center; gap: 1.5rem;">
+                            <div>
+                                <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Baseline Conv.</div>
+                                <div style="font-size: 1.15rem; font-weight: 800; color: var(--text-secondary);">26.0%</div>
+                            </div>
+                            <div style="width: 1px; height: 32px; background: var(--border-light);"></div>
+                            <div>
+                                <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Simulated Rate</div>
+                                <div style="font-size: 1.15rem; font-weight: 800; color: #2563EB;" id="sim-kpi-rate">27.9%</div>
+                            </div>
+                            <div style="width: 1px; height: 32px; background: var(--border-light);"></div>
+                            <div>
+                                <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Net Conversion Lift</div>
+                                <div style="font-size: 1.15rem; font-weight: 800; color: #059669;" id="sim-kpi-lift">+1.9%</div>
+                            </div>
+                            <div style="width: 1px; height: 32px; background: var(--border-light);"></div>
+                            <div>
+                                <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Projected ARR Recovery</div>
+                                <div style="font-size: 1.15rem; font-weight: 800; color: #059669;" id="sim-kpi-arr">+$9,120 / yr</div>
+                            </div>
+                        </div>
+
+                        <div style="font-size: 0.75rem; color: var(--text-secondary); max-width: 320px; line-height: 1.3;" id="sim-narrative-note">
+                            Click <strong>"Simulate DOM Fix"</strong> on any break-off wall above to model barrier elimination.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Funnel Intelligence Overview Card -->
+                <div class="funnel-steps-container">
+                    <div class="funnel-header-row">
+                        <div>
+                            <div class="section-heading-sm">Conversion Funnel & Dropoff Leak Intelligence</div>
+                            <div class="section-desc-sm">Step-by-step conversion rates and dropped-off visitor volumes across the core acquisition path.</div>
+                        </div>
+                        <div style="text-align: right; background: var(--bg-subtle); padding: 0.75rem 1.25rem; border-radius: 8px; border: 1px solid var(--border-light);">
+                            <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Overall Conversion</div>
+                            <div style="font-size: 1.75rem; font-weight: 800; color: #10B981; line-height: 1.1;" id="funnel-overall-conv">37.5%</div>
+                        </div>
+                    </div>
+
+                    <!-- Step-by-Step Table with Color-Coded Dropoff Severity -->
+                    <table class="funnel-steps-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 28%;"><span style="display: flex; align-items: center; gap: 0.4rem;"><i data-lucide="milestone" style="width: 14px; height: 14px;"></i> Funnel Step</span></th>
+                                <th style="width: 15%;"><span style="display: flex; align-items: center; gap: 0.4rem;"><i data-lucide="users" style="width: 14px; height: 14px;"></i> Entrants Reached</span></th>
+                                <th style="width: 27%;"><span style="display: flex; align-items: center; gap: 0.4rem;"><i data-lucide="bar-chart-2" style="width: 14px; height: 14px;"></i> Progression Bar</span></th>
+                                <th style="width: 18%;"><span style="display: flex; align-items: center; gap: 0.4rem;"><i data-lucide="trending-down" style="width: 14px; height: 14px;"></i> Step Dropoff Loss</span></th>
+                                <th style="width: 12%;"><span style="display: flex; align-items: center; gap: 0.4rem;"><i data-lucide="clock" style="width: 14px; height: 14px;"></i> Median Time</span></th>
+                            </tr>
+                        </thead>
+                        <tbody id="funnel-steps-tbody">
+                            <!-- Populated dynamically via JS -->
+                        </tbody>
+                    </table>
+
+                    <!-- Critical Choke Point Alert Banner -->
+                    <div style="margin-top: 1.5rem; background: var(--danger-light); border: 1px solid var(--danger-border); border-radius: 8px; padding: 1rem 1.35rem; display: flex; align-items: center; justify-content: space-between;">
+                        <div style="display: flex; align-items: center; gap: 0.85rem;">
+                            <div style="width: 36px; height: 36px; border-radius: 50%; background: #FEE2E2; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                <i data-lucide="alert-triangle" style="width: 20px; height: 20px; color: #DC2626;"></i>
+                            </div>
+                            <div>
+                                <div style="font-size: 0.875rem; font-weight: 800; color: #991B1B;">Primary Choke Point Detected: Step 3 Intent & Trigger Modal</div>
+                                <div style="font-size: 0.78125rem; color: #B91C1C; margin-top: 0.15rem;">
+                                    37.5% of visitors drop off when clicking inert comparison pill "#pricing-tier-enterprise" instead of continuing.
+                                </div>
+                            </div>
+                        </div>
+                        <button class="btn-action-secondary" style="background:#fff; border-color:var(--danger-border); color:#B91C1C; font-weight:600;" onclick="filterReplaysForChokePoint()">
+                            <span>Filter 2 Dropped Replays →</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Friction Elements Hotspot Breakdown -->
+                <div class="funnel-steps-container">
+                    <div class="funnel-header-row">
+                        <div>
+                            <div class="section-heading-sm">Rage Click & Dead Tap Friction Hotspots</div>
+                            <div class="section-desc-sm">DOM elements generating rapid rage taps where visitors expected interactivity.</div>
+                        </div>
+                    </div>
+
+                    <table class="funnel-steps-table">
+                        <thead>
+                            <tr>
+                                <th>Target Element Selector</th>
+                                <th>Element Text</th>
+                                <th>Rage Tap Count</th>
+                                <th>Affected Sessions</th>
+                                <th>Estimated Lost Leads</th>
+                            </tr>
+                        </thead>
+                        <tbody id="friction-elements-tbody">
+                            <!-- Populated dynamically via JS -->
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+
+            <!-- ═══════════════════════════════════════════════════════════════════ -->
+            <!-- TAB 3: USER SEQUENCE FLOWS (Path Sequences with Ranges)            -->
+            <!-- ═══════════════════════════════════════════════════════════════════ -->
+            <div class="tab-pane" id="tab-paths">
+                
+                <div class="flow-diagram-container">
+                    <div class="funnel-header-row">
+                        <div>
+                            <div class="section-heading-sm" style="display: flex; align-items: center; gap: 0.5rem;">
+                                <i data-lucide="network" style="width: 18px; height: 18px; color: var(--brand-primary);"></i>
+                                User Sequence & Decision Flow Graph
+                            </div>
+                            <div class="section-desc-sm">Visual sequence flow mapping visitor arrival, decision branches, friction choke points, and dropoff leaks across the site.</div>
+                        </div>
+                        <div style="display: flex; gap: 0.6rem; flex-wrap: wrap;">
+                            <span class="badge-severity sev-green"><span class="circle-node circle-green" style="width: 10px; height: 10px;"></span> &lt;35% Dropoff (Healthy Golden Path)</span>
+                            <span class="badge-severity sev-yellow"><span class="circle-node circle-yellow" style="width: 10px; height: 10px;"></span> 35-55% Dropoff (Moderate Friction)</span>
+                            <span class="badge-severity sev-red"><span class="circle-node circle-red" style="width: 10px; height: 10px;"></span> &gt;55% Dropoff (Critical Rage Leak)</span>
+                            <span class="badge-severity" style="background: #0F172A; color: #38BDF8; border-color: #1E293B;">
+                                <span style="width: 8px; height: 8px; background: #38BDF8; transform: rotate(45deg); display: inline-block;"></span>
+                                Decision Node
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Flow Canvas Workspace with Dot Matrix Grid -->
+                    <div class="flow-canvas-workspace">
+                        <div class="flow-grid-layout">
+                            
+                            <!-- COLUMN 1: STEP 1 INBOUND ARRIVAL -->
+                            <div class="nodes-column">
+                                <div class="col-stage-header">
+                                    <i data-lucide="log-in"></i>
+                                    <span>Step 1 • Inbound Arrival</span>
+                                </div>
+
+                                <!-- Node 1A: Home Landing -->
+                                <div class="flow-node-card card-entry">
+                                    <div class="node-head">
+                                        <div class="node-title-wrap">
+                                            <span class="circle-node circle-blue"></span>
+                                            <span class="node-title">Home Landing</span>
+                                        </div>
+                                        <span class="badge-severity sev-green" style="padding: 0.15rem 0.4rem; font-size: 0.6875rem;">100% Entry</span>
+                                    </div>
+                                    <div class="node-path-badge">/</div>
+                                    <div class="node-behavior-insight">
+                                        Google Search (58%) & Direct (42%). 6 visitors land on hero section.
+                                    </div>
+                                    <div class="node-metric-bar">
+                                        <div class="node-metric-fill" style="width: 100%; background: #2563EB;"></div>
+                                    </div>
+                                    <div class="node-footer">
+                                        <span>6 visitors (75% share)</span>
+                                        <span style="color: #10B981;">0% dropoff</span>
+                                    </div>
+                                </div>
+
+                                <!-- Node 1B: Direct Docs -->
+                                <div class="flow-node-card card-entry">
+                                    <div class="node-head">
+                                        <div class="node-title-wrap">
+                                            <span class="circle-node circle-blue"></span>
+                                            <span class="node-title">Direct Docs</span>
+                                        </div>
+                                        <span class="badge-severity sev-green" style="padding: 0.15rem 0.4rem; font-size: 0.6875rem;">100% Entry</span>
+                                    </div>
+                                    <div class="node-path-badge">/docs</div>
+                                    <div class="node-behavior-insight">
+                                        Developer referral from Perplexity and LLM citations to API docs.
+                                    </div>
+                                    <div class="node-metric-bar">
+                                        <div class="node-metric-fill" style="width: 33%; background: #2563EB;"></div>
+                                    </div>
+                                    <div class="node-footer">
+                                        <span>2 visitors (25% share)</span>
+                                        <span style="color: #10B981;">0% dropoff</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- CONNECTOR 1: DECISION JUNCTION 1 -->
+                            <div class="connector-column">
+                                <svg class="connector-svg-wrap" viewBox="0 0 58 340" fill="none">
+                                    <path d="M 0,90 C 25,90 28,80 58,80" stroke="#10B981" stroke-width="2.5" />
+                                    <path d="M 0,90 C 28,90 28,260 58,260" stroke="#EF4444" stroke-width="2" stroke-dasharray="4 3" />
+                                </svg>
+                                <div class="branch-pill bp-top">75% View</div>
+                                <div class="decision-diamond-node" title="Decision Point 1: Navigation Choice">
+                                    <i data-lucide="git-branch"></i>
+                                </div>
+                                <div class="decision-label">Choice D1</div>
+                                <div class="branch-pill bp-bottom">25% Exit</div>
+                            </div>
+
+                            <!-- COLUMN 2: STEP 2 NAVIGATION PATH -->
+                            <div class="nodes-column">
+                                <div class="col-stage-header">
+                                    <i data-lucide="compass"></i>
+                                    <span>Step 2 • Navigation Path</span>
+                                </div>
+
+                                <!-- Node 2A: View Pricing -->
+                                <div class="flow-node-card card-healthy">
+                                    <div class="node-head">
+                                        <div class="node-title-wrap">
+                                            <span class="circle-node circle-green"></span>
+                                            <span class="node-title">View Pricing</span>
+                                        </div>
+                                        <span class="badge-severity sev-green" style="padding: 0.15rem 0.4rem; font-size: 0.6875rem;">75% Retained</span>
+                                    </div>
+                                    <div class="node-path-badge">/pricing</div>
+                                    <div class="node-behavior-insight">
+                                        Deep scroll past feature fold to pricing table. 4 evaluate Pro & Enterprise.
+                                    </div>
+                                    <div class="node-metric-bar">
+                                        <div class="node-metric-fill" style="width: 75%; background: #10B981;"></div>
+                                    </div>
+                                    <div class="node-footer">
+                                        <span>6 visitors retained</span>
+                                        <span style="color: #F59E0B;">25% dropoff</span>
+                                    </div>
+                                </div>
+
+                                <!-- Node 2B: Immediate Bounce -->
+                                <div class="flow-node-card card-critical">
+                                    <div class="node-head">
+                                        <div class="node-title-wrap">
+                                            <span class="circle-node circle-red"></span>
+                                            <span class="node-title">Immediate Bounce</span>
+                                        </div>
+                                        <span class="badge-severity sev-red" style="padding: 0.15rem 0.4rem; font-size: 0.6875rem;">100% Exit</span>
+                                    </div>
+                                    <div class="node-path-badge" style="color: #991B1B;">[Quick Exit &lt;10s]</div>
+                                    <div class="node-behavior-insight" style="color: #991B1B;">
+                                        Mobile Safari visitors bounce without scrolling past initial hero fold.
+                                    </div>
+                                    <div class="node-metric-bar">
+                                        <div class="node-metric-fill" style="width: 100%; background: #EF4444;"></div>
+                                    </div>
+                                    <div class="node-footer" style="color: #991B1B;">
+                                        <span>2 visitors bounced</span>
+                                        <span>100% loss</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- CONNECTOR 2: DECISION JUNCTION 2 -->
+                            <div class="connector-column">
+                                <svg class="connector-svg-wrap" viewBox="0 0 58 340" fill="none">
+                                    <path d="M 0,80 C 25,80 28,80 58,80" stroke="#F59E0B" stroke-width="2.5" />
+                                    <path d="M 0,80 C 28,80 28,260 58,260" stroke="#EF4444" stroke-width="2.5" stroke-dasharray="4 3" />
+                                </svg>
+                                <div class="branch-pill bp-top" style="background: #FFFBEB; color: #B45309; border-color: #FDE68A;">67% Pro</div>
+                                <div class="decision-diamond-node" title="Decision Point 2: Plan Selection">
+                                    <i data-lucide="git-branch"></i>
+                                </div>
+                                <div class="decision-label">Choice D2</div>
+                                <div class="branch-pill bp-bottom">33% Rage</div>
+                            </div>
+
+                            <!-- COLUMN 3: STEP 3 ACTION & FRICTION -->
+                            <div class="nodes-column">
+                                <div class="col-stage-header">
+                                    <i data-lucide="mouse-pointer"></i>
+                                    <span>Step 3 • Action & Friction</span>
+                                </div>
+
+                                <!-- Node 3A: Trigger Passkey -->
+                                <div class="flow-node-card card-warning">
+                                    <div class="node-head">
+                                        <div class="node-title-wrap">
+                                            <span class="circle-node circle-yellow"></span>
+                                            <span class="node-title">Trigger Passkey</span>
+                                        </div>
+                                        <span class="badge-severity sev-yellow" style="padding: 0.15rem 0.4rem; font-size: 0.6875rem;">50% Retained</span>
+                                    </div>
+                                    <div class="node-path-badge">#btn-passkey-trigger</div>
+                                    <div class="node-behavior-insight">
+                                        Registration modal opens; visitors input email and trigger passkey prompt.
+                                    </div>
+                                    <div class="node-metric-bar">
+                                        <div class="node-metric-fill" style="width: 50%; background: #F59E0B;"></div>
+                                    </div>
+                                    <div class="node-footer">
+                                        <span>4 visitors active</span>
+                                        <span style="color: #F59E0B;">33% dropoff</span>
+                                    </div>
+                                </div>
+
+                                <!-- Node 3B: Rage Click Static Pill -->
+                                <div class="flow-node-card card-critical" style="cursor: pointer;" onclick="switchTab('replay');" title="Click to inspect rage click session in Replayer">
+                                    <div class="node-head">
+                                        <div class="node-title-wrap">
+                                            <span class="circle-node circle-red"></span>
+                                            <span class="node-title">Rage Click Static Pill</span>
+                                        </div>
+                                        <span class="badge-severity sev-red" style="padding: 0.15rem 0.4rem; font-size: 0.6875rem;">78% Dropoff</span>
+                                    </div>
+                                    <div class="node-path-badge" style="color: #991B1B;">#pricing-tier-enterprise</div>
+                                    <div class="node-behavior-insight" style="color: #991B1B;">
+                                        <strong>4x rapid taps in 620ms</strong> on inert text pill. 100% of these users bounce!
+                                    </div>
+                                    <div class="node-metric-bar">
+                                        <div class="node-metric-fill" style="width: 78%; background: #EF4444;"></div>
+                                    </div>
+                                    <div class="node-footer" style="color: #991B1B;">
+                                        <span>2 visitors stalled</span>
+                                        <span style="font-weight: 800;">-$2,400 ARR</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- CONNECTOR 3: DECISION JUNCTION 3 -->
+                            <div class="connector-column">
+                                <svg class="connector-svg-wrap" viewBox="0 0 58 340" fill="none">
+                                    <path d="M 0,80 C 25,80 28,80 58,80" stroke="#10B981" stroke-width="2.5" />
+                                    <path d="M 0,80 C 28,80 28,260 58,260" stroke="#EF4444" stroke-width="2" stroke-dasharray="4 3" />
+                                </svg>
+                                <div class="branch-pill bp-top">75% Touch</div>
+                                <div class="decision-diamond-node" title="Decision Point 3: Biometric Auth">
+                                    <i data-lucide="git-branch"></i>
+                                </div>
+                                <div class="decision-label">Choice D3</div>
+                                <div class="branch-pill bp-bottom">25% Cancel</div>
+                            </div>
+
+                            <!-- COLUMN 4: STEP 4 CONVERSION OUTCOME -->
+                            <div class="nodes-column">
+                                <div class="col-stage-header">
+                                    <i data-lucide="flag"></i>
+                                    <span>Step 4 • Conversion Outcome</span>
+                                </div>
+
+                                <!-- Node 4A: Passkey Verified -->
+                                <div class="flow-node-card card-golden" style="cursor: pointer;" onclick="switchTab('replay');" title="Click to view converted session replay">
+                                    <div class="node-head">
+                                        <div class="node-title-wrap">
+                                            <span class="circle-node circle-green"></span>
+                                            <span class="node-title">Passkey Verified ✓</span>
+                                        </div>
+                                        <span class="badge-severity sev-green" style="padding: 0.15rem 0.4rem; font-size: 0.6875rem;">Golden Path</span>
+                                    </div>
+                                    <div class="node-path-badge" style="color: #047857;">passkey_verified</div>
+                                    <div class="node-behavior-insight" style="color: #065F46;">
+                                        Hardware biometric authenticated. Live accounts provisioned successfully.
+                                    </div>
+                                    <div class="node-metric-bar">
+                                        <div class="node-metric-fill" style="width: 37.5%; background: #10B981;"></div>
+                                    </div>
+                                    <div class="node-footer" style="color: #047857;">
+                                        <span>3 conversions (37.5%)</span>
+                                        <span style="font-weight: 800;">+$4,200 ARR</span>
+                                    </div>
+                                </div>
+
+                                <!-- Node 4B: Session Inactive -->
+                                <div class="flow-node-card card-critical">
+                                    <div class="node-head">
+                                        <div class="node-title-wrap">
+                                            <span class="circle-node circle-red"></span>
+                                            <span class="node-title">Session Inactive</span>
+                                        </div>
+                                        <span class="badge-severity sev-red" style="padding: 0.15rem 0.4rem; font-size: 0.6875rem;">Abandonment</span>
+                                    </div>
+                                    <div class="node-path-badge" style="color: #991B1B;">[Abandonment Exit]</div>
+                                    <div class="node-behavior-insight" style="color: #991B1B;">
+                                        Total dropoff across all barriers: 5 visitors lost to dead clicks and prompt cancel.
+                                    </div>
+                                    <div class="node-metric-bar">
+                                        <div class="node-metric-fill" style="width: 62.5%; background: #EF4444;"></div>
+                                    </div>
+                                    <div class="node-footer" style="color: #991B1B;">
+                                        <span>5 visitors lost total</span>
+                                        <span>Leaked ARR</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sequence Paths Ranking Table -->
+                <div class="seq-table-card">
+                    <div class="directory-header" style="background: #FFFFFF; padding: 1.15rem 1.35rem;">
+                        <div>
+                            <div class="section-heading-sm">Most Common User Sequence Paths</div>
+                            <div class="section-desc-sm">Ranked paths taken by visitors with calculated conversion and dropoff severity.</div>
+                        </div>
+                    </div>
+
+                    <table class="funnel-steps-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 8%;">Rank</th>
+                                <th style="width: 44%;">Sequence Flow Steps</th>
+                                <th style="width: 14%;">Session Volume</th>
+                                <th style="width: 16%;">Conversion / Dropoff</th>
+                                <th style="width: 18%;">Average Duration</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sequence-paths-tbody">
+                            <!-- Populated dynamically via JS -->
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+
+            <!-- ═══════════════════════════════════════════════════════════════════ -->
+            <!-- TAB 4: LIVE TELEMETRY STREAM                                       -->
+            <!-- ═══════════════════════════════════════════════════════════════════ -->
+            <div class="tab-pane" id="tab-stream">
+                <div class="stream-console-pane">
+                    <div class="console-topbar">
+                        <div style="display: flex; align-items: center; gap: 0.6rem;">
+                            <span class="live-dot"></span>
+                            <span>Client Telemetry Event Bus • 0ms Main-Thread Blocking</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <span id="stream-rate-label">Rate: 14 ev/min</span>
+                            <button class="btn-action-secondary" style="padding: 0.25rem 0.6rem; font-size: 0.71875rem; background: rgba(255,255,255,0.08); color: #fff; border: none;" onclick="triggerSimulatedVisitor()">
+                                Ingest Test Event
+                            </button>
+                        </div>
+                    </div>
+                    <div class="console-stream-body" id="console-stream-events">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══════════════════════════════════════════════════════════════════ -->
+            <!-- TAB 5: API KEYS & INSTALLATION                                     -->
+            <!-- ═══════════════════════════════════════════════════════════════════ -->
+            <div class="tab-pane" id="tab-install">
+                <div class="funnel-steps-container" style="max-width: 840px;">
+                    <div class="section-heading-sm">Hotspot SDK & API Key Configuration</div>
+                    <div class="section-desc-sm">Add one line to your app to enable resident telemetry and session tracking.</div>
+
+                    <div style="margin-top: 1.5rem;">
+                        <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase;">Your Project API Key</label>
+                        <div style="display: flex; gap: 0.5rem; margin-top: 0.35rem;">
+                            <input type="text" readonly value="hs_live_740bf8263397" id="input-api-key" style="flex: 1; padding: 0.55rem 0.85rem; border-radius: 6px; border: 1px solid var(--border-medium); font-family: var(--font-mono); font-size: 0.8125rem; background: var(--bg-subtle);">
+                            <button class="btn-action-primary" onclick="copyApiKey()">
+                                <i data-lucide="copy" style="width: 14px; height: 14px;"></i>
+                                <span>Copy Key</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 2rem;">
+                        <div class="section-heading-sm" style="font-size: 0.9375rem;">1. Next.js 14 / 15 (App Router)</div>
+                        <div class="code-snippet-box">
+                            <button class="copy-snippet-btn" onclick="navigator.clipboard.writeText('// in app/layout.tsx\n&lt;Script defer src=&quot;https://cdn.hotspot.so/hotspot.js&quot; data-key=&quot;hs_live_740bf8263397&quot; /&gt;')">
+                                <i data-lucide="copy" style="width: 12px; height: 12px;"></i>
+                                <span>Copy</span>
+                            </button>
+                            <code>// in app/layout.tsx
+import Script from 'next/script'
+
+export default function RootLayout({ children }) {
+  return (
+    &lt;html lang="en"&gt;
+      &lt;head&gt;
+        &lt;Script defer src="https://cdn.hotspot.so/hotspot.js" data-key="hs_live_740bf8263397" /&gt;
+      &lt;/head&gt;
+      &lt;body&gt;{children}&lt;/body&gt;
+    &lt;/html&gt;
+  )
+}</code>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 1rem;">
+                        <div class="section-heading-sm" style="font-size: 0.9375rem;">2. Plain HTML / Webflow / Shopify</div>
+                        <div class="code-snippet-box">
+                            <button class="copy-snippet-btn" onclick="navigator.clipboard.writeText('&lt;script defer src=&quot;https://cdn.hotspot.so/hotspot.js&quot; data-key=&quot;hs_live_740bf8263397&quot;&gt;&lt;/script&gt;')">
+                                <i data-lucide="copy" style="width: 12px; height: 12px;"></i>
+                                <span>Copy</span>
+                            </button>
+                            <code>&lt;!-- Place inside &lt;head&gt; --&gt;
+&lt;script defer src="https://cdn.hotspot.so/hotspot.js" data-key="hs_live_740bf8263397"&gt;&lt;/script&gt;</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- ─── Interactive Dashboard Logic ─── -->
+    <script>
+        let currentActiveTab = 'tab-replay';
+        let allSessions = [];
+        let selectedSessionId = null;
+        let selectedSessionData = null;
+        let currentFilterTag = 'all';
+        let isPlaybackPlaying = false;
+        let playbackTimer = null;
+        let playbackProgress = 25;
+        let playbackSpeed = 1;
+
+        // Initialize Lucide Icons
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.lucide) {
+                lucide.createIcons();
+            }
+            fetchAnalyticsData();
+            // Poll real-time data every 4 seconds
+            setInterval(fetchAnalyticsData, 4000);
+        });
+
+        // Tab Switching
+
+        // Auto-scale desktop (1280x800) or mobile (390x844) canvas to fit replayer stage
+        function updatePlayerScale() {
+            const stage = document.getElementById('viewport-stage');
+            const container = document.getElementById('viewport-scaled-container');
+            if (!stage || !container) return;
+            const stageW = stage.clientWidth;
+            const stageH = stage.clientHeight;
+            if (stageW === 0 || stageH === 0) return;
+
+            const isMobile = currentReplayerDeviceMode === 'mobile';
+            const targetW = isMobile ? 390 : 1280;
+            const targetH = isMobile ? 844 : 800;
+            const scale = Math.min(stageW / targetW, stageH / targetH);
+
+            container.style.transform = `scale(${scale})`;
+            const leftOffset = Math.max(0, (stageW - targetW * scale) / 2);
+            const topOffset = Math.max(0, (stageH - targetH * scale) / 2);
+            container.style.left = `${leftOffset}px`;
+            container.style.top = `${topOffset}px`;
+        }
+        window.addEventListener('resize', updatePlayerScale);
+
+        // ─── REPLAYER DEVICE MODE EMULATION (Desktop 1280x800 vs Mobile 390x844) ───
+        let currentReplayerDeviceMode = 'desktop';
+
+        function setReplayerDeviceMode(mode) {
+            currentReplayerDeviceMode = mode;
+            const btnDesktop = document.getElementById('btn-device-desktop');
+            const btnMobile = document.getElementById('btn-device-mobile');
+            const container = document.getElementById('viewport-scaled-container');
+            const iframe = document.getElementById('replayer-web-frame');
+            const overlay = document.getElementById('replayer-overlay');
+            const resIndicator = document.getElementById('viewport-res-indicator');
+
+            if (btnDesktop) btnDesktop.classList.toggle('active', mode === 'desktop');
+            if (btnMobile) btnMobile.classList.toggle('active', mode === 'mobile');
+
+            if (mode === 'mobile') {
+                if (container) {
+                    container.classList.add('mobile-chassis');
+                    container.style.width = '390px';
+                    container.style.height = '844px';
+                }
+                if (iframe) {
+                    iframe.style.width = '390px';
+                    iframe.style.height = '844px';
+                }
+                if (overlay) {
+                    overlay.style.width = '390px';
+                    overlay.style.height = '844px';
+                }
+                if (resIndicator) resIndicator.textContent = '390 × 844';
+            } else {
+                if (container) {
+                    container.classList.remove('mobile-chassis');
+                    container.style.width = '1280px';
+                    container.style.height = '800px';
+                }
+                if (iframe) {
+                    iframe.style.width = '1280px';
+                    iframe.style.height = '800px';
+                }
+                if (overlay) {
+                    overlay.style.width = '1280px';
+                    overlay.style.height = '800px';
+                }
+                if (resIndicator) resIndicator.textContent = '1280 × 800';
+            }
+
+            updatePlayerScale();
+            setTimeout(updatePlayerScale, 50);
+        }
+
+        // ─── MOBILE WORKSPACE PANE SWITCHING ───
+        function switchMobileWorkspacePane(paneName) {
+            document.querySelectorAll('.mobile-pane-btn').forEach(b => b.classList.remove('active'));
+            const activeBtn = document.getElementById(`btn-pane-${paneName}`);
+            if (activeBtn) activeBtn.classList.add('active');
+
+            const dirPane = document.querySelector('.replay-directory-pane');
+            const playerPane = document.querySelector('.replay-player-pane');
+            const timelinePane = document.querySelector('.replay-timeline-pane');
+
+            if (dirPane) dirPane.classList.toggle('mobile-active', paneName === 'directory');
+            if (playerPane) playerPane.classList.toggle('mobile-active', paneName === 'player');
+            if (timelinePane) timelinePane.classList.toggle('mobile-active', paneName === 'timeline');
+
+            if (paneName === 'player') {
+                setTimeout(updatePlayerScale, 50);
+                setTimeout(updatePlayerScale, 200);
+            }
+        }
+
+        function toggleMobileSidebar() {
+            const sidebar = document.querySelector('.app-sidebar');
+            const backdrop = document.getElementById('mobile-sidebar-backdrop');
+            if (sidebar) sidebar.classList.toggle('mobile-open');
+            if (backdrop) backdrop.classList.toggle('active');
+        }
+
+        function copySessionId() {
+            const idLabel = document.getElementById('player-session-id-label');
+            const fullId = idLabel?.querySelector('span')?.getAttribute('data-full-id') || idLabel?.querySelector('span')?.textContent || '';
+            if (fullId && fullId !== '--') {
+                navigator.clipboard.writeText(fullId);
+                const span = idLabel.querySelector('span');
+                const orig = span.textContent;
+                span.textContent = 'Copied!';
+                setTimeout(() => { span.textContent = orig; }, 1200);
+            }
+        }
+
+
+        function switchDashboardTab(tabId, btnElem) {
+            currentActiveTab = tabId;
+            document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.app-sidebar .nav-link').forEach(el => el.classList.remove('active'));
+
+            const targetPane = document.getElementById(tabId);
+            if (targetPane) targetPane.classList.add('active');
+            if (btnElem) btnElem.classList.add('active');
+            if (tabId === 'tab-replay') {
+                setTimeout(updatePlayerScale, 50);
+                setTimeout(updatePlayerScale, 200);
+            }
+
+            // Update Breadcrumb Title
+            const titles = {
+                'tab-replay': 'Session Replay',
+                'tab-funnels': 'Funnels & Dropoff Analysis',
+                'tab-paths': 'User Paths & Flows',
+                'tab-stream': 'Live Telemetry Stream',
+                'tab-install': 'API Keys & Installation',
+            };
+            const breadcrumb = document.getElementById('header-breadcrumb-title');
+            if (breadcrumb) breadcrumb.textContent = titles[tabId] || 'Analytics';
+
+            if (window.lucide) lucide.createIcons();
+        }
+
+        // Fetch Analytics Summary from Backend API
+        async function fetchAnalyticsData() {
+            try {
+                const searchQ = document.getElementById('global-search-input')?.value || '';
+                const deviceVal = document.getElementById('device-filter-select')?.value || 'all';
+                const osVal = document.getElementById('os-filter-select')?.value || 'all';
+                
+                let url = `/api/analytics?filter=${encodeURIComponent(currentFilterTag)}&device=${encodeURIComponent(deviceVal)}&os=${encodeURIComponent(osVal)}`;
+                if (searchQ) url += `&search=${encodeURIComponent(searchQ)}`;
+
+                const res = await fetch(url);
+                if (!res.ok) return;
+                const data = await res.json();
+                if (data.status !== 1) return;
+
+                allSessions = data.sessions || [];
+                updateKpiCards(data.metrics);
+                renderSessionDirectory(allSessions);
+                renderFunnelSteps(data.funnel_steps, data.metrics);
+                renderSequencePaths(data.sequence_paths);
+                renderFrictionElements(data.friction_elements);
+
+                // Auto-select highest-signal session (rage clicks or converted) if none selected
+                if (!selectedSessionId && allSessions.length > 0) {
+                    const bestSession = allSessions.find(s => (s.rageclicks > 0 || s.converted) && s.events_count > 5) || allSessions[0];
+                    selectSession(bestSession.session_id);
+                }
+
+                // Update nav badge counters
+                const countBadge = document.getElementById('nav-count-sessions');
+                if (countBadge) countBadge.textContent = data.metrics?.total_sessions || data.sessions?.length || '0';
+
+                const funnelBadge = document.getElementById('nav-count-funnel');
+                if (funnelBadge) funnelBadge.textContent = (data.metrics?.conversion_rate || 0) + '%';
+
+                if (window.lucide) lucide.createIcons();
+
+            } catch (err) {
+                console.warn('Analytics fetch poll:', err);
+            }
+        }
+
+        // Update Top KPI Cards
+        function updateKpiCards(m) {
+            if (!m) return;
+            const elSessions = document.getElementById('kpi-active-sessions');
+            if (elSessions) elSessions.textContent = m.total_sessions || 0;
+
+            const elConv = document.getElementById('kpi-conversion-rate');
+            if (elConv) elConv.textContent = (m.conversion_rate || 0) + '%';
+
+            const elRage = document.getElementById('kpi-rage-clicks');
+            if (elRage) elRage.textContent = m.total_rage_clicks || 0;
+
+            const elScroll = document.getElementById('kpi-avg-scroll');
+            if (elScroll) elScroll.textContent = (m.avg_scroll_depth || 0) + '%';
+
+            const labelCount = document.getElementById('session-count-label');
+            if (labelCount) labelCount.textContent = `${m.filtered_sessions_count || 0} recorded`;
+
+            const funnelOverall = document.getElementById('funnel-overall-conv');
+            if (funnelOverall) funnelOverall.textContent = (m.conversion_rate || 0) + '%';
+        }
+
+        // Render Session Directory Cards (Spacious, Clear Hierarchy)
+        function renderSessionDirectory(sessions) {
+            const container = document.getElementById('sessions-directory-list');
+            if (!container) return;
+
+            if (sessions.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 2.5rem 1rem; color: var(--text-muted); font-size: 0.8125rem;">
+                        <i data-lucide="filter" style="width: 24px; height: 24px; margin: 0 auto 0.5rem; display: block; opacity: 0.5;"></i>
+                        No visitor sessions matched the current filter.
+                    </div>
+                `;
+                if (window.lucide) lucide.createIcons();
+                return;
+            }
+
+            container.innerHTML = sessions.map(s => {
+                const isSelected = s.session_id === selectedSessionId;
+                const displayName = s.user_name || s.user_email || s.distinct_id || 'Anonymous Visitor';
+                const emailDisplay = s.user_email || (s.company !== 'Unassigned' ? s.company : 'Guest User');
+                const rageBadge = s.rageclicks > 0 ? `<span class="tag-pill tag-rageclick"><i data-lucide="flame"></i> ${s.rageclicks}x Rage Click</span>` : '';
+                const convBadge = s.converted ? `<span class="tag-pill tag-converted"><i data-lucide="check-circle-2"></i> Converted</span>` : '';
+                const devIcon = s.device_type === 'mobile' ? 'smartphone' : 'monitor';
+                
+                return `
+                    <div class="session-card ${isSelected ? 'active' : ''}" onclick="selectSession('${s.session_id}')">
+                        <div class="session-card-header">
+                            <span class="session-user-name" title="${displayName}">${displayName}</span>
+                            <span class="session-time-ago">${s.time_ago}</span>
+                        </div>
+                        <div class="session-user-email">${emailDisplay}</div>
+                        <div class="session-card-mid">
+                            <span class="session-url-pill"><i data-lucide="file-text"></i> ${s.entry_page || '/'}</span>
+                            <span>•</span>
+                            <span style="display: flex; align-items: center; gap: 0.2rem;"><i data-lucide="clock" style="width:11px; height:11px;"></i> ${s.duration_str}</span>
+                            <span>•</span>
+                            <span style="display: flex; align-items: center; gap: 0.2rem;"><i data-lucide="activity" style="width:11px; height:11px;"></i> ${s.events_count} ev</span>
+                        </div>
+                        <div class="session-card-badges">
+                            ${rageBadge}
+                            ${convBadge}
+                            <span class="tag-pill tag-device"><i data-lucide="${devIcon}"></i> ${s.device || 'Desktop'}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            if (window.lucide) lucide.createIcons();
+        }
+
+        // Select a Session & Load Details into Replayer
+        async function selectSession(sessionId) {
+            if (window.innerWidth <= 1024) {
+                switchMobileWorkspacePane('player');
+            }
+            selectedSessionId = sessionId;
+            document.querySelectorAll('.session-card').forEach(c => c.classList.remove('active'));
+            
+            // Mark active in directory list
+            renderSessionDirectory(allSessions);
+
+            try {
+                const res = await fetch(`/api/session/${encodeURIComponent(sessionId)}`);
+                if (!res.ok) return;
+                const data = await res.json();
+                if (data.status !== 1) return;
+
+                selectedSessionData = data;
+                populateReplayerData(data.session || data);
+            } catch (err) {
+                console.error('Failed to load session events:', err);
+            }
+        }
+
+        // Populate Replayer Stage & Timeline with Session Data
+        function populateReplayerData(s) {
+            const userNameEl = document.getElementById('player-user-name');
+            const name = s.user_name || s.user_email || s.distinct_id || 'Visitor';
+            if (userNameEl) userNameEl.textContent = name;
+
+            const emailEl = document.getElementById('player-user-email');
+            if (emailEl) emailEl.textContent = s.user_email || (s.company !== 'Unassigned' ? s.company : 'Guest Telemetry');
+
+            const avatarEl = document.getElementById('player-avatar-badge');
+            if (avatarEl) {
+                const initials = name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+                avatarEl.textContent = initials || 'V';
+            }
+
+            const idLabel = document.getElementById('player-session-id-label');
+            if (idLabel) {
+                const sId = s.session_id || '';
+                const span = idLabel.querySelector('span');
+                if (span) {
+                    span.textContent = sId.length > 14 ? `${sId.substring(0, 8)}...` : sId;
+                    span.setAttribute('data-full-id', sId);
+                    idLabel.setAttribute('title', `Session: ${sId} (Click icon to copy)`);
+                }
+            }
+
+            const devSpec = document.getElementById('player-device-spec');
+            if (devSpec) devSpec.textContent = s.device ? s.device.split(' ')[0] : 'macOS • Chrome';
+
+            const countrySpec = document.getElementById('player-country-spec');
+            if (countrySpec) countrySpec.textContent = s.country === 'US' ? 'United States' : s.country === 'GB' ? 'United Kingdom' : s.country === 'DE' ? 'Germany' : s.country || 'Global';
+
+            const durSpec = document.getElementById('player-duration-spec');
+            const durationSec = s.duration || 30;
+            const m = Math.floor(durationSec / 60);
+            const sec = durationSec % 60;
+            const durFormatted = `${m < 10 ? '0' : ''}${m}:${sec < 10 ? '0' : ''}${sec}`;
+            if (durSpec) durSpec.textContent = `${durFormatted}`;
+
+            const rageBadge = document.getElementById('player-rage-badge');
+            if (rageBadge) {
+                if (s.rageclicks > 0) {
+                    rageBadge.style.display = 'inline-flex';
+                    rageBadge.querySelector('span').textContent = `${s.rageclicks}x Rage Click`;
+                } else {
+                    rageBadge.style.display = 'none';
+                }
+            }
+
+            const convBadge = document.getElementById('player-conv-badge');
+            if (convBadge) {
+                convBadge.style.display = s.converted ? 'inline-flex' : 'none';
+            }
+
+            const ragePulse = document.getElementById('replayer-rage-pulse');
+            if (ragePulse) {
+                ragePulse.style.display = 'none';
+            }
+
+            // Update real DOM replayer iframe to point to visited page
+            const iframe = document.getElementById('replayer-web-frame');
+            if (iframe) {
+                const targetPath = s.entry_page || '/demo/';
+                const targetUrl = targetPath + (targetPath.includes('?') ? '&' : '?') + 'hotspot_replay=1';
+                if (!iframe.src.endsWith(targetUrl)) {
+                    iframe.src = targetUrl;
+                }
+            }
+
+            const mockUrl = document.getElementById('mock-browser-url');
+            if (mockUrl) mockUrl.textContent = window.location.origin + (s.entry_page || '/demo/');
+
+            updatePlayerScale();
+            setTimeout(updatePlayerScale, 60);
+            setTimeout(updatePlayerScale, 250);
+
+            // Highlight first event once iframe loads
+            setTimeout(() => {
+                if (s.events && s.events.length > 0) {
+                    seekToEvent(0);
+                }
+            }, 600);
+
+            // Update mobile pane counts
+            const mSessCount = document.getElementById('mobile-sessions-count');
+            if (mSessCount) mSessCount.textContent = allSessions ? allSessions.length : '3';
+            const mEvCount = document.getElementById('mobile-events-count');
+            if (mEvCount) mEvCount.textContent = s.events ? s.events.length : '0';
+
+            // Auto-detect if session was recorded on mobile
+            const isMobileSession = s.device_type === 'mobile' || (s.device && (s.device.toLowerCase().includes('mobile') || s.device.toLowerCase().includes('ios') || s.device.toLowerCase().includes('android')));
+            if (isMobileSession && currentReplayerDeviceMode !== 'mobile') {
+                setReplayerDeviceMode('mobile');
+            } else if (!isMobileSession && currentReplayerDeviceMode !== 'desktop') {
+                setReplayerDeviceMode('desktop');
+            }
+
+            const totalTimeEl = document.getElementById('scrubber-total-time');
+            if (totalTimeEl) totalTimeEl.textContent = durFormatted;
+
+            // Render Timeline Rows with Event Category Icons
+            const timelineContainer = document.getElementById('timeline-events-list');
+            const countEl = document.getElementById('event-stream-count');
+            if (countEl) countEl.textContent = s.events ? s.events.length : 0;
+
+            if (timelineContainer && s.events) {
+                timelineContainer.innerHTML = s.events.map((ev, i) => {
+                    const relT = (i * 3.2).toFixed(1);
+                    const props = ev.properties || {};
+                    const target = props.$el_selector || props.$pathname || props.$title || 'DOM window';
+                    
+                    let evIcon = 'activity';
+                    let evBg = 'background: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE;';
+                    if (ev.event === '$pageview') {
+                        evIcon = 'globe';
+                        evBg = 'background: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE;';
+                    } else if (ev.event === '$scroll') {
+                        evIcon = 'arrow-down';
+                        evBg = 'background: #FFFBEB; color: #B45309; border: 1px solid #FDE68A;';
+                    } else if (ev.event === '$autocapture') {
+                        evIcon = 'mouse-pointer-click';
+                        evBg = 'background: #F1F5F9; color: #334155; border: 1px solid #CBD5E1;';
+                    } else if (ev.event === '$rageclick') {
+                        evIcon = 'flame';
+                        evBg = 'background: #FEF2F2; color: #DC2626; border: 1px solid #FECACA;';
+                    } else if (ev.event === 'passkey_verified' || ev.event === '$form_submit') {
+                        evIcon = 'shield-check';
+                        evBg = 'background: #ECFDF5; color: #047857; border: 1px solid #A7F3D0;';
+                    }
+
+                    return `
+                        <div class="timeline-event-row" onclick="seekToEvent(${i})">
+                            <span class="ev-time">00:${relT < 10 ? '0' : ''}${relT}</span>
+                            <span class="ev-name-badge" style="${evBg}">
+                                <i data-lucide="${evIcon}"></i>
+                                <span>${ev.event}</span>
+                            </span>
+                            <span class="ev-target">${target}</span>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            if (window.lucide) lucide.createIcons();
+        }
+
+        // Render Funnel Steps Table (Stats & Dropoff Intelligence)
+        function renderFunnelSteps(steps, metrics) {
+            const tbody = document.getElementById('funnel-steps-tbody');
+            if (!tbody || !steps) return;
+
+            tbody.innerHTML = steps.map((st, i) => {
+                const isFirst = i === 0;
+                let dropoffBadge = '';
+                if (isFirst) {
+                    dropoffBadge = `<span style="color: var(--text-muted); font-size: 0.75rem; font-weight: 500;">Baseline (0% loss)</span>`;
+                } else if (st.severity === 'green') {
+                    dropoffBadge = `<span class="badge-severity sev-green"><i data-lucide="check"></i> ${st.dropoff_from_prev}% dropoff (${st.dropoff_count} lost)</span>`;
+                } else if (st.severity === 'yellow') {
+                    dropoffBadge = `<span class="badge-severity sev-yellow"><i data-lucide="alert-circle"></i> ${st.dropoff_from_prev}% dropoff (${st.dropoff_count} lost)</span>`;
+                } else {
+                    dropoffBadge = `<span class="badge-severity sev-red"><i data-lucide="alert-triangle"></i> ${st.dropoff_from_prev}% dropoff (${st.dropoff_count} lost)</span>`;
+                }
+
+                const barColor = st.severity === 'green' ? '#10B981' : st.severity === 'yellow' ? '#F59E0B' : '#EF4444';
+
+                return `
+                    <tr>
+                        <td>
+                            <div style="display: flex; align-items: center;">
+                                <span class="step-index-badge">${st.step_number}</span>
+                                <div>
+                                    <div class="step-name-cell">${st.name}</div>
+                                    <div class="step-target-code">${st.target}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span style="font-weight: 800; font-size: 1rem; color: var(--text-primary);">${st.count}</span>
+                            <span style="color: var(--text-muted); font-size: 0.75rem; margin-left: 0.25rem;">(${st.pct_of_total}%)</span>
+                        </td>
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 0.85rem;">
+                                <div class="bar-visual-wrap">
+                                    <div class="bar-visual-fill" style="width: ${st.pct_of_total}%; background: ${barColor};"></div>
+                                </div>
+                                <span style="font-size: 0.8125rem; font-weight: 700; width: 45px; text-align: right;">${st.conv_from_prev}%</span>
+                            </div>
+                        </td>
+                        <td>${dropoffBadge}</td>
+                        <td style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-secondary); font-weight: 600;">
+                            <span style="display: flex; align-items: center; gap: 0.35rem;">
+                                <i data-lucide="clock" style="width: 12px; height: 12px; color: var(--text-muted);"></i>
+                                ${st.median_time}
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            if (window.lucide) lucide.createIcons();
+        }
+
+        // Render User Sequence Paths
+        function renderSequencePaths(paths) {
+            const tbody = document.getElementById('sequence-paths-tbody');
+            if (!tbody || !paths) return;
+
+            tbody.innerHTML = paths.map(p => {
+                const stepsChain = p.steps.map(s => `
+                    <span style="font-family: var(--font-mono); font-size: 0.71875rem; background: var(--bg-subtle); padding: 0.2rem 0.5rem; border-radius: 4px; border: 1px solid var(--border-light); font-weight: 600; color: ${s.color === 'red' ? '#B91C1C' : s.color === 'yellow' ? '#B45309' : '#047857'};">
+                        ${s.label}
+                    </span>
+                `).join('<i data-lucide="arrow-right" style="width: 12px; height: 12px; color: #94A3B8; margin: 0 0.15rem;"></i>');
+
+                const severityIcon = p.dropoff_severity === 'green' ? 'check-circle-2' : p.dropoff_severity === 'yellow' ? 'alert-circle' : 'alert-triangle';
+
+                return `
+                    <tr>
+                        <td><span style="font-weight: 800; font-size: 0.9375rem; color: var(--text-muted);">#${p.rank}</span></td>
+                        <td>
+                            <div style="font-weight: 700; margin-bottom: 0.45rem; color: var(--text-primary);">${p.name}</div>
+                            <div style="display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap;">${stepsChain}</div>
+                            <div style="font-size: 0.71875rem; color: var(--text-muted); margin-top: 0.45rem;">${p.notes}</div>
+                        </td>
+                        <td>
+                            <span style="font-weight: 800; font-size: 0.9375rem;">${p.session_count}</span>
+                            <span style="color: var(--text-muted); font-size: 0.75rem;">(${p.volume_pct}%)</span>
+                        </td>
+                        <td>
+                            <span class="badge-severity sev-${p.dropoff_severity}">
+                                <i data-lucide="${severityIcon}"></i>
+                                <span>${p.conversion_rate > 0 ? p.conversion_rate + '% converted' : 'Dropoff Barrier'}</span>
+                            </span>
+                        </td>
+                        <td style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-secondary); font-weight: 600;">
+                            <span style="display: flex; align-items: center; gap: 0.35rem;">
+                                <i data-lucide="clock" style="width: 12px; height: 12px; color: var(--text-muted);"></i>
+                                ${p.avg_time}
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            if (window.lucide) lucide.createIcons();
+        }
+
+        // Render Friction Elements Hotspots
+        function renderFrictionElements(elements) {
+            const tbody = document.getElementById('friction-elements-tbody');
+            if (!tbody || !elements) return;
+
+            if (elements.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 2rem;">No friction elements recorded yet.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = elements.map(el => `
+                <tr>
+                    <td style="font-family: var(--font-mono); font-size: 0.75rem; font-weight: 600; color: #DC2626;">${el.selector}</td>
+                    <td style="font-weight: 600;">${el.text}</td>
+                    <td><span class="tag-pill tag-rageclick"><i data-lucide="flame"></i> ${el.count}x Rage Taps</span></td>
+                    <td style="font-weight: 600;">${el.sessions_affected} sessions</td>
+                    <td><span style="color: #DC2626; font-weight: 700;">-${el.estimated_lost_conversions} ARR conversions</span></td>
+                </tr>
+            `).join('');
+
+            if (window.lucide) lucide.createIcons();
+        }
+
+        // Session Tag Filter (All / Rage / Converted / Bounced)
+        function applySessionTagFilter(tag, btnElem) {
+            currentFilterTag = tag;
+            document.querySelectorAll('.filter-pills-row .filter-pill').forEach(b => b.classList.remove('active'));
+            if (btnElem) btnElem.classList.add('active');
+            fetchAnalyticsData();
+        }
+
+        // Dropdown Filters
+        function handleDropdownFilter() {
+            fetchAnalyticsData();
+        }
+
+        // Search Filter Input Handler
+        let searchDebounceTimer = null;
+        function handleSearchFilter(val) {
+            clearTimeout(searchDebounceTimer);
+            searchDebounceTimer = setTimeout(() => {
+                fetchAnalyticsData();
+            }, 250);
+        }
+
+        let currentPlaybackEventIdx = 0;
+
+        function setSpeed(speed, btn) {
+            playbackSpeed = speed;
+            document.querySelectorAll('.speed-pill-group .speed-btn').forEach(b => b.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+        }
+
+        // Replay Play/Pause Controls - Stepping through real micro-events
+        function togglePlayback() {
+            isPlaybackPlaying = !isPlaybackPlaying;
+            const icon = document.getElementById('icon-play-state');
+            if (icon) {
+                icon.setAttribute('data-lucide', isPlaybackPlaying ? 'pause' : 'play');
+                if (window.lucide) lucide.createIcons();
+            }
+
+            const events = selectedSessionData?.events || (selectedSessionData?.session && selectedSessionData.session.events) || [];
+
+            if (isPlaybackPlaying) {
+                if (events.length === 0) return;
+                playbackTimer = setInterval(() => {
+                    seekToEvent(currentPlaybackEventIdx);
+                    currentPlaybackEventIdx++;
+                    if (currentPlaybackEventIdx >= events.length) {
+                        currentPlaybackEventIdx = 0;
+                        togglePlayback();
+                    }
+                }, Math.max(400, 1500 / playbackSpeed));
+            } else {
+                clearInterval(playbackTimer);
+            }
+        }
+
+        function playEventOnStage(ev) {
+            if (!ev) return;
+            const iframe = document.getElementById('replayer-web-frame');
+            if (!iframe) return;
+
+            const cursor = document.getElementById('replayer-cursor');
+            const ripple = document.getElementById('replayer-click-ripple');
+            const rage = document.getElementById('replayer-rage-pulse');
+            const scrollLine = document.getElementById('replayer-scroll-indicator');
+
+            const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+            const props = ev.properties || {};
+
+            // 1. Scroll Events
+            if (ev.event === '$scroll' && props.$scroll_depth_percent !== undefined) {
+                const depth = props.$scroll_depth_percent;
+                if (iframeDoc && iframe.contentWindow) {
+                    const maxScroll = Math.max(0, (iframeDoc.documentElement.scrollHeight || 1600) - iframe.clientHeight);
+                    const scrollY = (depth / 100) * maxScroll;
+                    iframe.contentWindow.scrollTo({ top: scrollY, behavior: 'smooth' });
+                }
+                if (scrollLine) {
+                    scrollLine.style.display = 'flex';
+                    scrollLine.style.top = Math.min(85, Math.max(15, depth)) + '%';
+                    const txt = document.getElementById('replayer-scroll-text');
+                    if (txt) txt.textContent = `${depth}% SCROLL ARREST DEPTH`;
+                }
+                return;
+            }
+
+            // 2. Click / Rage Click / Form Events
+            const selector = props.$el_selector;
+            let targetEl = null;
+            if (selector && iframeDoc) {
+                try {
+                    targetEl = iframeDoc.querySelector(selector);
+                } catch (e) {}
+            }
+
+            const isRage = ev.event === '$rageclick' || !!props.is_rage || (selector && selector.includes('pricing-tier-enterprise'));
+
+            // Safe fallback coordinates within visible stage
+            let cx = 450;
+            let cy = 250;
+
+            if (targetEl) {
+                // Ensure target is scrolled into view in iframe instantly for exact coords
+                if (iframe.contentWindow) {
+                    const elTop = targetEl.offsetTop || 0;
+                    const targetScroll = Math.max(0, elTop - 180);
+                    iframe.contentWindow.scrollTo({ top: targetScroll, behavior: 'auto' });
+                }
+
+                const isMob = currentReplayerDeviceMode === 'mobile';
+                const stageW = isMob ? 390 : 1280;
+                const stageH = isMob ? 844 : 800;
+                const rect = targetEl.getBoundingClientRect();
+                
+                cx = Math.max(40, Math.min(stageW - 40, rect.left + rect.width / 2));
+                cy = Math.max(40, Math.min(stageH - 40, rect.top + rect.height / 2));
+
+                // Visual target outline pulse
+                const origOutline = targetEl.style.outline;
+                const origBoxShadow = targetEl.style.boxShadow;
+                targetEl.style.outline = isRage ? '3px solid #EF4444' : '2px solid #2563EB';
+                targetEl.style.boxShadow = isRage ? '0 0 20px rgba(239, 68, 68, 0.7)' : '0 0 12px rgba(37, 99, 235, 0.4)';
+                setTimeout(() => {
+                    targetEl.style.outline = origOutline;
+                    targetEl.style.boxShadow = origBoxShadow;
+                }, 1600);
+
+                // Modal state synchronization
+                if (selector === '#plan-btn-growth-pro' || selector === '#plan-btn-developer' || selector === '#hero-btn-start') {
+                    if (iframe.contentWindow?.openSignupModal) {
+                        iframe.contentWindow.openSignupModal('Growth Pro ($99/mo)');
+                    }
+                } else if (selector === 'button.modal-close-btn') {
+                    if (iframe.contentWindow?.closeSignupModal) {
+                        iframe.contentWindow.closeSignupModal();
+                    }
+                } else if (selector === '#btn-passkey-trigger' || ev.event === 'passkey_verified') {
+                    if (iframe.contentWindow?.completePasskeyVerification) {
+                        iframe.contentWindow.completePasskeyVerification();
+                    }
+                }
+            } else if (props.x !== undefined && props.y !== undefined) {
+                cx = props.x;
+                cy = props.y;
+            }
+
+            // Move cursor to active element
+            if (cursor) {
+                cursor.style.display = 'block';
+                cursor.style.left = `${cx}px`;
+                cursor.style.top = `${cy}px`;
+                cursor.style.background = isRage ? '#EF4444' : '#2563EB';
+                cursor.style.boxShadow = isRage ? '0 0 18px rgba(239, 68, 68, 0.95)' : '0 0 14px rgba(37, 99, 235, 0.85)';
+            }
+
+            // Trigger ripple or rage effect
+            if (isRage) {
+                if (rage) {
+                    rage.style.display = 'block';
+                    rage.style.left = `${cx}px`;
+                    rage.style.top = `${cy}px`;
+                    setTimeout(() => { rage.style.display = 'none'; }, 2200);
+                }
+            } else if (ripple) {
+                if (rage) rage.style.display = 'none';
+                ripple.style.left = `${cx}px`;
+                ripple.style.top = `${cy}px`;
+                ripple.style.transform = 'translate(-50%, -50%) scale(1.6)';
+                ripple.style.opacity = '1';
+                setTimeout(() => {
+                    ripple.style.transform = 'translate(-50%, -50%) scale(0)';
+                    ripple.style.opacity = '0';
+                }, 350);
+            }
+        }
+
+        function updateScrubberUI() {
+            const fill = document.getElementById('scrubber-fill');
+            if (fill) fill.style.width = `${playbackProgress}%`;
+
+            const currentLabel = document.getElementById('scrubber-current-time');
+            const events = selectedSessionData?.events || (selectedSessionData?.session && selectedSessionData.session.events) || [];
+            const totalSec = Math.min(60, Math.max(15, events.length * 2));
+            const curSec = Math.floor((playbackProgress / 100) * totalSec);
+            const m = Math.floor(curSec / 60);
+            const s = curSec % 60;
+            if (currentLabel) currentLabel.textContent = `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+        }
+
+        function seekPlayback(evt) {
+            const outer = document.getElementById('scrubber-outer');
+            if (!outer) return;
+            const rect = outer.getBoundingClientRect();
+            const clickX = evt.clientX - rect.left;
+            playbackProgress = Math.max(0, Math.min(100, Math.round((clickX / rect.width) * 100)));
+            updateScrubberUI();
+
+            const events = selectedSessionData?.events || (selectedSessionData?.session && selectedSessionData.session.events) || [];
+            if (events.length > 0) {
+                const idx = Math.min(events.length - 1, Math.floor((playbackProgress / 100) * events.length));
+                seekToEvent(idx);
+            }
+        }
+
+        function seekToEvent(idx) {
+            currentPlaybackEventIdx = idx;
+            if (!selectedSessionData) return;
+            const events = selectedSessionData.events || (selectedSessionData.session && selectedSessionData.session.events);
+            if (!events || !events[idx]) return;
+
+            document.querySelectorAll('.timeline-event-row').forEach((r, i) => {
+                if (i === idx) {
+                    r.style.background = '#EFF6FF';
+                    r.style.borderColor = '#BFDBFE';
+                    r.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                } else {
+                    r.style.background = '';
+                    r.style.borderColor = '';
+                }
+            });
+
+            playbackProgress = Math.round(((idx + 1) / events.length) * 100);
+            updateScrubberUI();
+            playEventOnStage(events[idx]);
+        }
+
+        // Trigger Live Visitor Simulation
+        async function triggerSimulatedVisitor() {
+            try {
+                const res = await fetch('/api/simulate_visitor');
+                const data = await res.json();
+                if (data.status === 1) {
+                    await fetchAnalyticsData();
+                    if (data.simulated_session_id) {
+                        selectSession(data.simulated_session_id);
+                    }
+                }
+            } catch (err) {
+                console.error('Simulation trigger failed:', err);
+            }
+        }
+
+        function filterReplaysForChokePoint() {
+            switchDashboardTab('tab-replay', document.querySelector('.nav-link:nth-child(1)'));
+            applySessionTagFilter('rageclicks', document.querySelectorAll('.filter-pills-row .filter-pill')[1]);
+        }
+
+        function copyApiKey() {
+            const input = document.getElementById('input-api-key');
+            if (input) {
+                navigator.clipboard.writeText(input.value);
+                alert('Project API Key copied to clipboard!');
+            }
+        }
+
+        function toggleProjectDropdown() {
+            alert('Active Project: acme.dev (Production). Configure team environments in Project Settings.');
+        }
+    
+        // ─── LINEAR FLOW & BREAK-OFF WALLS SIMULATION ENGINE ───
+        let simFixWall1 = false;
+        let simFixWall2 = false;
+        let simFixWall3 = false;
+
+        async function runFlowSimulation() {
+            const cohortSize = parseInt(document.getElementById('sim-cohort-input')?.value || '1000', 10);
+            const url = `/api/simulate_flow?cohort_size=${cohortSize}&fix_wall_1=${simFixWall1}&fix_wall_2=${simFixWall2}&fix_wall_3=${simFixWall3}`;
+
+            try {
+                const res = await fetch(url);
+                if (!res.ok) return;
+                const data = await res.json();
+                if (data.status !== 1) return;
+
+                // Update stages
+                document.getElementById('sim-stage-1-count').textContent = data.stages[0].entrants.toLocaleString();
+                document.getElementById('sim-stage-2-count').textContent = data.stages[1].entrants.toLocaleString();
+                document.getElementById('sim-stage-2-pct').textContent = data.stages[1].pct + '% passing';
+                
+                document.getElementById('sim-stage-3-count').textContent = data.stages[2].entrants.toLocaleString();
+                document.getElementById('sim-stage-3-pct').textContent = data.stages[2].pct + '% passing';
+
+                document.getElementById('sim-stage-4-count').textContent = data.stages[3].entrants.toLocaleString();
+                document.getElementById('sim-stage-4-pct').textContent = data.stages[3].pct + '% net rate';
+
+                // Update Wall 1
+                const w1 = data.walls[0];
+                const w1Card = document.getElementById('sim-wall-card-1');
+                const w1Loss = document.getElementById('sim-wall-1-loss');
+                const w1Btn = document.getElementById('sim-toggle-wall-1');
+                if (simFixWall1) {
+                    w1Card.style.background = '#ECFDF5';
+                    w1Card.style.borderColor = '#10B981';
+                    w1Loss.textContent = `🟢 -${w1.dropped_count} (${w1.drop_pct}% loss)`;
+                    w1Btn.textContent = '✓ Barrier Fixed';
+                    w1Btn.style.background = '#10B981';
+                    w1Btn.style.color = '#fff';
+                    w1Btn.style.borderColor = '#10B981';
+                } else {
+                    w1Card.style.background = '#FEF2F2';
+                    w1Card.style.borderColor = '#EF4444';
+                    w1Loss.textContent = `🔴 -${w1.dropped_count} Deflected`;
+                    w1Btn.textContent = 'Simulate DOM Fix';
+                    w1Btn.style.background = '#fff';
+                    w1Btn.style.color = '#DC2626';
+                    w1Btn.style.borderColor = '#DC2626';
+                }
+
+                // Update Wall 2
+                const w2 = data.walls[1];
+                const w2Card = document.getElementById('sim-wall-card-2');
+                const w2Loss = document.getElementById('sim-wall-2-loss');
+                const w2Btn = document.getElementById('sim-toggle-wall-2');
+                if (simFixWall2) {
+                    w2Card.style.background = '#ECFDF5';
+                    w2Card.style.borderColor = '#10B981';
+                    w2Loss.textContent = `🟢 -${w2.dropped_count} (${w2.drop_pct}% loss)`;
+                    w2Btn.textContent = '✓ Barrier Fixed';
+                    w2Btn.style.background = '#10B981';
+                    w2Btn.style.color = '#fff';
+                    w2Btn.style.borderColor = '#10B981';
+                } else {
+                    w2Card.style.background = '#FEF2F2';
+                    w2Card.style.borderColor = '#EF4444';
+                    w2Loss.textContent = `🔴 -${w2.dropped_count} Deflected`;
+                    w2Btn.textContent = 'Simulate Sticky CTA';
+                    w2Btn.style.background = '#fff';
+                    w2Btn.style.color = '#DC2626';
+                    w2Btn.style.borderColor = '#DC2626';
+                }
+
+                // Update Wall 3
+                const w3 = data.walls[2];
+                const w3Card = document.getElementById('sim-wall-card-3');
+                const w3Loss = document.getElementById('sim-wall-3-loss');
+                const w3Btn = document.getElementById('sim-toggle-wall-3');
+                if (simFixWall3) {
+                    w3Card.style.background = '#ECFDF5';
+                    w3Card.style.borderColor = '#10B981';
+                    w3Loss.textContent = `🟢 -${w3.dropped_count} (${w3.drop_pct}% loss)`;
+                    w3Btn.textContent = '✓ Barrier Fixed';
+                    w3Btn.style.background = '#10B981';
+                    w3Btn.style.color = '#fff';
+                    w3Btn.style.borderColor = '#10B981';
+                } else {
+                    w3Card.style.background = '#FFFBEB';
+                    w3Card.style.borderColor = '#F59E0B';
+                    w3Loss.textContent = `🟡 -${w3.dropped_count} Deflected`;
+                    w3Btn.textContent = 'Add Magic Fallback';
+                    w3Btn.style.background = '#fff';
+                    w3Btn.style.color = '#B45309';
+                    w3Btn.style.borderColor = '#B45309';
+                }
+
+                // Update KPI Impact Scorecard
+                const m = data.metrics;
+                document.getElementById('sim-kpi-rate').textContent = m.simulated_conversion_rate + '%';
+                document.getElementById('sim-kpi-lift').textContent = (m.conversion_lift_pct >= 0 ? '+' : '') + m.conversion_lift_pct + '%';
+                document.getElementById('sim-kpi-arr').textContent = '+$' + m.projected_arr_recovery.toLocaleString() + ' / yr';
+
+                const narrative = document.getElementById('sim-narrative-note');
+                const fixedCount = [simFixWall1, simFixWall2, simFixWall3].filter(Boolean).length;
+                if (fixedCount === 0) {
+                    narrative.innerHTML = 'All 3 friction break-off walls active. Deflecting <strong>721 visitors</strong> before checkout.';
+                } else if (fixedCount === 3) {
+                    narrative.innerHTML = `<strong>Maximum Optimization!</strong> All barriers eliminated. Net conversion reaches <strong>${m.simulated_conversion_rate}%</strong> (${m.recovered_conversions} extra customers, +$${m.projected_arr_recovery.toLocaleString()}/yr).`;
+                } else {
+                    narrative.innerHTML = `Simulating <strong>${fixedCount} of 3</strong> barrier fixes. Recovers <strong>+${m.recovered_conversions} customers</strong> (+${m.conversion_lift_pct}% net conversion lift).`;
+                }
+
+            } catch (err) {
+                console.error('Flow simulation error:', err);
+            }
+        }
+
+        function toggleWall(wallNum) {
+            if (wallNum === 1) simFixWall1 = !simFixWall1;
+            if (wallNum === 2) simFixWall2 = !simFixWall2;
+            if (wallNum === 3) simFixWall3 = !simFixWall3;
+            runFlowSimulation();
+        }
+
+        function scrollToSimulator() {
+            setTimeout(() => {
+                const el = document.getElementById('section-flow-simulator');
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
+        }
+
+    </script>
+</body>
+</html>
