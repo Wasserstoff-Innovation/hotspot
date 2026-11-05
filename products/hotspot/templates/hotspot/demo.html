@@ -1370,6 +1370,10 @@
                                     <input id="contact-email" name="email" type="email" required autocomplete="email" placeholder="you@example.com">
                                 </div>
                                 <div class="field">
+                                    <label for="contact-order">Order number (optional)</label>
+                                    <input id="contact-order" name="order" type="text" autocomplete="off" placeholder="AO-1234" data-hotspot-mask>
+                                </div>
+                                <div class="field">
                                     <label for="contact-message">Message</label>
                                     <textarea id="contact-message" name="message" required placeholder="What can we help with?"></textarea>
                                 </div>
@@ -1382,7 +1386,7 @@
                             <span>Thanks, we got your message. This is a sample, so no one will answer.</span>
                             <button type="button" class="link-button" id="contact-again" data-action="reset-form" data-form="contact" data-done="contact-done">Send another</button>
                         </div>
-                        <p class="hint">Records a form submit</p>
+                        <p class="hint">Records a form submit. The order number is masked in the replay, the other fields are not.</p>
                     </div>
                     <div class="panel">
                         <h2>Test an error</h2>

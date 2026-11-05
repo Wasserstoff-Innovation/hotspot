@@ -9,6 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Satisfy&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/hotspot/assets/replay.css?v={{ version }}">
     <style>
         :root {
             --brand: #2563EB;
@@ -298,6 +299,8 @@
         .chip.bounced { background: var(--subtle); border-color: var(--border); color: var(--muted); }
         .chip.ai { background: #F5F3FF; border-color: #DDD6FE; color: #5B21B6; }
         .chip.mono { font-family: var(--mono); font-weight: 500; }
+        .chip.replay { background: #F0FDFA; border-color: #99F6E4; color: #0F766E; }
+        .chip .ico { width: 10px; height: 10px; }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 
         /* Notices */
@@ -391,11 +394,15 @@
         .pane-msg h3 { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
 
         /* Replay */
-        .replay-head { display: flex; align-items: center; gap: 12px; padding: 9px 14px; border-bottom: 1px solid var(--border); font-size: 12.5px; color: var(--text-2); flex-wrap: wrap; }
+        .replay-head { display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-bottom: 1px solid var(--border); font-size: 12.5px; color: var(--text-2); flex-wrap: wrap; }
         .replay-head .frame-label { font-variant-numeric: tabular-nums; }
-        .replay-head .right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+        .replay-head .right { margin-left: auto; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .replay-empty { border-bottom: 1px solid var(--border); }
+        .replay-empty p { max-width: 560px; margin: 0 auto; }
+        .replay-empty code { font-family: var(--mono); font-size: 12px; }
         .stage { position: relative; background: var(--dark); padding: 20px; display: flex; justify-content: center; align-items: flex-start; overflow: hidden; min-height: 200px; }
         .stage-scale { position: relative; }
+        .stage-msg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 20px; color: #CBD5E1; font-size: 13px; background: rgba(11, 15, 23, 0.72); }
         .device { position: absolute; left: 0; top: 0; transform-origin: 0 0; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55); --u: 1px; }
         .device.phone { background: #0F172A; padding: calc(var(--u) * 16) calc(var(--u) * 12); border-radius: calc(var(--u) * 42); box-shadow: 0 0 0 calc(var(--u) * 2) #334155, 0 24px 60px rgba(0, 0, 0, 0.6); }
         .device.phone .viewport { border-radius: calc(var(--u) * 22); }
@@ -440,124 +447,31 @@
             background-image: linear-gradient(#E4E9F0 1px, transparent 1px), linear-gradient(90deg, #E4E9F0 1px, transparent 1px);
             background-size: 48px 48px;
         }
-        .viewport iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #fff; pointer-events: none; }
-        .overlay { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
-        .mk { position: absolute; transform: translate(-50%, -50%); }
-        .mk-click { width: calc(var(--u) * 16); height: calc(var(--u) * 16); border-radius: 50%; background: var(--brand); border: calc(var(--u) * 2.5) solid #fff; box-shadow: 0 0 0 calc(var(--u) * 1.5) rgba(37, 99, 235, 0.55); }
-        .mk-ripple { width: calc(var(--u) * 16); height: calc(var(--u) * 16); border-radius: 50%; border: calc(var(--u) * 2) solid var(--brand); opacity: 0; animation: ripple 0.9s ease-out forwards; }
-        @keyframes ripple { 0% { transform: translate(-50%, -50%) scale(1); opacity: 0.9; } 100% { transform: translate(-50%, -50%) scale(3.4); opacity: 0; } }
-        .mk-rage { width: calc(var(--u) * 22); height: calc(var(--u) * 22); border-radius: 50%; border: calc(var(--u) * 3) solid var(--danger); animation: rage 1.1s ease-out infinite; }
-        .mk-rage.d2 { animation-delay: 0.36s; }
-        .mk-rage.d3 { animation-delay: 0.72s; }
-        .mk-rage-core { width: calc(var(--u) * 12); height: calc(var(--u) * 12); border-radius: 50%; background: var(--danger); border: calc(var(--u) * 2) solid #fff; }
-        @keyframes rage { 0% { transform: translate(-50%, -50%) scale(0.6); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(2.8); opacity: 0; } }
-        .mk-dead { width: calc(var(--u) * 20); height: calc(var(--u) * 20); border-radius: 50%; border: calc(var(--u) * 3) solid var(--warning); background: rgba(245, 158, 11, 0.18); animation: deadpop 0.4s ease-out; }
-        @keyframes deadpop { from { transform: translate(-50%, -50%) scale(0.4); } to { transform: translate(-50%, -50%) scale(1); } }
-        .mk-label {
-            position: absolute;
-            transform: translate(-50%, 0);
-            margin-top: calc(var(--u) * 14);
-            font-size: calc(var(--u) * 11);
-            font-weight: 600;
-            line-height: 1.2;
-            padding: calc(var(--u) * 3) calc(var(--u) * 7);
-            border-radius: calc(var(--u) * 6);
-            white-space: nowrap;
-            color: #fff;
-            background: var(--text);
-            max-width: calc(var(--u) * 260);
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .mk-label.rage { background: var(--danger); }
-        .mk-label.dead { background: #B45309; }
-        .cursor {
-            position: absolute;
-            width: calc(var(--u) * 14);
-            height: calc(var(--u) * 14);
-            border-radius: 50%;
-            background: rgba(15, 23, 42, 0.85);
-            border: calc(var(--u) * 2) solid #fff;
-            box-shadow: 0 calc(var(--u) * 2) calc(var(--u) * 6) rgba(0, 0, 0, 0.35);
-            transform: translate(-50%, -50%);
-            transition: left 0.45s cubic-bezier(0.2, 0.8, 0.2, 1), top 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
-        }
-        .cursor.still { transition: none; }
-        .srail { position: absolute; right: calc(var(--u) * 6); top: calc(var(--u) * 8); bottom: calc(var(--u) * 8); width: calc(var(--u) * 6); border-radius: 999px; background: rgba(15, 23, 42, 0.1); }
-        .srail i { position: absolute; left: 0; right: 0; top: 0; height: 0; background: var(--brand); border-radius: 999px; transition: height 0.6s ease; }
-        .srail b {
-            position: absolute;
-            right: calc(var(--u) * 10);
-            top: 0;
-            transform: translateY(-50%);
-            font-size: calc(var(--u) * 11);
-            font-weight: 600;
-            color: var(--brand);
-            background: #fff;
-            padding: calc(var(--u) * 1) calc(var(--u) * 5);
-            border-radius: calc(var(--u) * 5);
-            white-space: nowrap;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
-            transition: top 0.6s ease;
-        }
-        .fbadge {
-            position: absolute;
-            left: 50%;
-            top: calc(var(--u) * 14);
-            transform: translateX(-50%);
-            background: var(--success);
-            color: #fff;
-            font-size: calc(var(--u) * 12);
-            font-weight: 600;
-            padding: calc(var(--u) * 5) calc(var(--u) * 12);
-            border-radius: 999px;
-            box-shadow: 0 calc(var(--u) * 4) calc(var(--u) * 12) rgba(16, 185, 129, 0.35);
-            animation: pop 0.3s ease-out;
-            white-space: nowrap;
-        }
-        @keyframes pop { from { transform: translateX(-50%) scale(0.7); opacity: 0; } to { transform: translateX(-50%) scale(1); opacity: 1; } }
-        .estrip {
-            position: absolute;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: #7F1D1D;
-            color: #FEE2E2;
-            font-family: var(--mono);
-            font-size: calc(var(--u) * 12);
-            padding: calc(var(--u) * 8) calc(var(--u) * 14);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .estrip b { color: #fff; font-family: var(--font); font-weight: 600; margin-right: calc(var(--u) * 8); }
-        .echip {
-            position: absolute;
-            left: calc(var(--u) * 14);
-            top: calc(var(--u) * 14);
-            background: var(--text);
-            color: #fff;
-            font-family: var(--mono);
-            font-size: calc(var(--u) * 12);
-            padding: calc(var(--u) * 4) calc(var(--u) * 10);
-            border-radius: calc(var(--u) * 8);
-            max-width: 70%;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-            animation: pop2 0.25s ease-out;
-        }
-        @keyframes pop2 { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
-        .pflash { position: absolute; inset: 0; background: #fff; animation: pflash 0.5s ease-out forwards; }
-        @keyframes pflash { from { opacity: 0.95; } to { opacity: 0; } }
-        .stage-msg { color: #94A3B8; font-size: 13px; align-self: center; text-align: center; padding: 40px 0; }
+        .viewport iframe { display: block; border: 0; background: #fff; }
         .controls { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-top: 1px solid var(--border); flex-wrap: wrap; }
-        .controls input[type="range"] { flex: 1; min-width: 140px; accent-color: var(--brand); height: 20px; margin: 0; }
+        .scrub-wrap { flex: 1; min-width: 160px; }
+        .scrub-wrap input[type="range"] { display: block; width: 100%; accent-color: var(--brand); height: 20px; margin: 0; }
+        .scrub-marks { position: relative; height: 9px; margin: 0 8px; }
+        .scrub-marks button { position: absolute; top: 1px; width: 7px; height: 7px; margin-left: -3px; padding: 0; border: 0; border-radius: 2px; background: var(--border-2); }
+        .scrub-marks button:hover { transform: scale(1.6); }
+        .scrub-marks .pv { background: var(--brand); }
+        .scrub-marks .click { background: #94A3B8; }
+        .scrub-marks .dead { background: var(--warning); }
+        .scrub-marks .rage { background: var(--danger); }
+        .scrub-marks .err { background: var(--danger); border-radius: 50%; }
+        .scrub-marks .form { background: var(--success); }
         .controls .clock { font-family: var(--mono); font-size: 12px; color: var(--text-2); white-space: nowrap; min-width: 92px; text-align: right; font-variant-numeric: tabular-nums; }
-        .preview-note { padding: 6px 14px 8px; font-size: 12px; color: var(--text-2); border-top: 1px solid var(--border); }
-        .preview-note code { font-family: var(--mono); font-size: 11.5px; }
-        .timeline-head { display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); font-size: 12.5px; font-weight: 600; }
-        .timeline-head .meta { margin-left: auto; color: var(--muted); font-weight: 400; font-size: 12px; }
+        .replay-note { padding: 8px 14px; font-size: 12px; color: #92400E; background: #FFFBEB; border-top: 1px solid #FDE68A; }
+        .ptabs { display: flex; align-items: center; gap: 2px; padding: 0 8px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+        .ptab { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 10px; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; background: transparent; color: var(--text-2); font-size: 12.5px; font-weight: 600; }
+        .ptab:hover { color: var(--text); }
+        .ptab.active { color: var(--brand); border-bottom-color: var(--brand); }
+        .ptab .count { font-size: 11px; color: var(--text-2); background: var(--subtle); border: 1px solid var(--border); padding: 0 6px; line-height: 16px; border-radius: 999px; font-variant-numeric: tabular-nums; }
+        .ptab .count:empty { display: none; }
+        .ptab .count.danger { background: #FEF2F2; border-color: #FECACA; color: #B91C1C; }
+        .ptabs .meta { margin-left: auto; color: var(--muted); font-size: 12px; white-space: nowrap; padding: 0 6px; }
+        .panel { display: none; }
+        .panel.active { display: block; }
         .timeline { list-style: none; margin: 0; padding: 0; max-height: 330px; overflow: auto; position: relative; }
         .trow {
             display: grid;
@@ -582,10 +496,37 @@
         .trow.dead .ico { color: var(--warning); }
         .trow.form .ico, .trow.ident .ico { color: var(--success); }
         .trow.pv .ico { color: var(--brand); }
+        .trow.vitals .ico { color: #7C3AED; }
         .trow .d { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); }
         .trow .d .n { font-weight: 600; color: var(--text); }
         .trow .d .mono { font-size: 11.5px; }
+        .trow.crow-c { grid-template-columns: 76px 44px minmax(0, 1fr); align-items: start; }
+        .trow.crow-c .d { white-space: normal; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+        .trow .lvl { font-family: var(--mono); font-size: 10.5px; font-weight: 600; text-transform: uppercase; color: var(--muted); padding-top: 2px; }
+        .trow.warn .lvl, .trow.warn .d { color: #B45309; }
+        .trow.error .lvl, .trow.error .d { color: #B91C1C; }
+        .trow.crow-n { grid-template-columns: 76px 44px 40px minmax(0, 1fr) 56px; }
+        .trow .method, .trow .status { font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--text-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+        .trow .dur { font-family: var(--mono); font-size: 11px; color: var(--muted); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+        .trow.failed .status, .trow.failed .d { color: #B91C1C; }
+        .panel-empty { padding: 26px 16px; text-align: center; color: var(--muted); font-size: 12.5px; }
         .kbd { display: inline-block; font-family: var(--mono); font-size: 10.5px; padding: 0 5px; border: 1px solid var(--border-2); border-bottom-width: 2px; border-radius: 4px; color: var(--text-2); line-height: 16px; }
+
+        /* Web vitals */
+        .vitals-card { display: flex; align-items: center; gap: 20px; padding: 10px 16px; margin-bottom: 14px; flex-wrap: wrap; }
+        .vitals-card .v-title { font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+        .vitals-card .v-title small { display: block; font-weight: 400; color: var(--muted); font-size: 11px; }
+        .vitals-card .vital { display: flex; flex-direction: column; min-width: 72px; }
+        .vitals-card .v-label { font-size: 11px; font-weight: 500; color: var(--text-2); white-space: nowrap; }
+        .vitals-card .v-value { font-size: 18px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .vitals-card .v-rating { font-size: 11px; color: var(--muted); white-space: nowrap; }
+        .vitals-card .v-empty { font-size: 12.5px; color: var(--text-2); }
+        .vitals-card .v-meta { margin-left: auto; font-size: 12px; color: var(--muted); white-space: nowrap; }
+        .good { color: #047857; }
+        .needs { color: #B45309; }
+        .poor { color: #B91C1C; }
+        .t td.vital { font-weight: 500; }
+        .t td.vital.none { color: var(--muted); font-weight: 400; }
 
         /* Empty states */
         .empty { padding: 36px 24px; text-align: center; color: var(--text-2); font-size: 13px; }
@@ -660,6 +601,7 @@
         .crow .ev.err { color: #FB7185; }
         .crow .ev.form, .crow .ev.ident { color: #34D399; }
         .crow .ev.custom { color: #FCD34D; }
+        .crow .ev.vitals { color: #C084FC; }
         .crow .sid { color: #94A3B8; }
         .crow .tgt { color: #CBD5E1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .crow .tgt .p { color: #64748B; }
@@ -685,7 +627,7 @@
         @media (max-width: 1100px) { .api-list { grid-template-columns: minmax(0, 1fr); } }
     </style>
 </head>
-<body data-site-url="{{ site_url }}" data-sdk-url="{{ sdk_url }}" data-api-key="{{ api_key }}" data-version="{{ version }}" data-protected="{{ dashboard_protected }}" data-demo="{{ demo_enabled }}" data-storage="{{ storage }}">
+<body data-site-url="{{ site_url }}" data-sdk-url="{{ sdk_url }}" data-api-key="{{ api_key }}" data-version="{{ version }}" data-protected="{{ dashboard_protected }}" data-demo="{{ demo_enabled }}" data-replay="{{ replay_enabled }}" data-storage="{{ storage }}">
 <div class="app" id="app">
     <aside class="sidebar">
         <a class="brand" href="/" aria-label="Hotspot">
@@ -771,6 +713,7 @@
             <section class="tab" data-tab="sessions" id="tab-sessions">
                 <div class="page-head"><h1>Sessions</h1><p id="sessionsScope"></p></div>
                 <div class="kpis" id="kpis"></div>
+                <div class="card vitals-card" id="vitalsCard"></div>
                 <div class="toolbar" id="sessionToolbar">
                     <select class="select" id="fStatus" aria-label="Status">
                         <option value="all">All statuses</option>
@@ -826,9 +769,15 @@
                                 <span class="ico" data-icon="monitor" id="frameIcon"></span>
                                 <span class="frame-label" id="frameLabel"></span>
                                 <span id="frameDevice"></span>
+                                <span class="chip active" id="liveChip" hidden title="The visitor is still on the site, so the recording keeps growing">Live</span>
                                 <div class="right">
-                                    <label class="toggle" id="previewToggleLabel"><input type="checkbox" id="previewToggle"> Load page preview</label>
+                                    <span class="chip" id="skipChip" hidden>Skipping inactivity</span>
+                                    <label class="toggle" id="skipToggleLabel" title="Jump over pauses longer than 10 seconds"><input type="checkbox" id="skipToggle" checked> Skip inactivity</label>
                                 </div>
+                            </div>
+                            <div class="empty replay-empty" id="replayEmpty" hidden>
+                                <h3>No replay for this session</h3>
+                                <p id="replayEmptyText"></p>
                             </div>
                             <div class="stage" id="stage">
                                 <div class="stage-scale" id="stageScale">
@@ -838,31 +787,35 @@
                                             <span class="url"><b id="barPath"></b></span>
                                             <span class="ttl" id="barTitle"></span>
                                         </div>
-                                        <div class="viewport" id="viewport">
-                                            <iframe id="preview" title="Page preview" sandbox="allow-scripts" referrerpolicy="no-referrer" hidden></iframe>
-                                            <div class="overlay" id="overlay">
-                                                <div class="markers" id="markers"></div>
-                                                <div class="cursor still" id="cursor" hidden></div>
-                                                <div class="srail" id="srail" hidden><i id="srailFill"></i><b id="srailLabel"></b></div>
-                                                <div class="estrip" id="estrip" hidden></div>
-                                            </div>
-                                        </div>
+                                        <div class="viewport" id="viewport"></div>
                                     </div>
                                 </div>
+                                <div class="stage-msg" id="stageMsg" hidden></div>
                             </div>
-                            <div class="controls">
+                            <div class="controls" id="controls">
                                 <button class="btn icon" type="button" data-action="play" id="playBtn" title="Play (space)" aria-label="Play"><span class="ico" id="playIcon"></span></button>
-                                <input type="range" id="scrub" min="0" max="0" step="1" value="0" aria-label="Replay position">
+                                <div class="scrub-wrap">
+                                    <input type="range" id="scrub" min="0" max="100" step="100" value="0" aria-label="Replay position">
+                                    <div class="scrub-marks" id="scrubMarks"></div>
+                                </div>
                                 <span class="clock" id="clock">0:00 / 0:00</span>
                                 <span class="seg" id="speedSeg">
                                     <button type="button" data-action="speed" data-speed="1" class="active">1x</button>
                                     <button type="button" data-action="speed" data-speed="2">2x</button>
                                     <button type="button" data-action="speed" data-speed="4">4x</button>
+                                    <button type="button" data-action="speed" data-speed="8">8x</button>
                                 </span>
                             </div>
-                            <div class="preview-note" id="previewNote" hidden></div>
-                            <div class="timeline-head"><span>Timeline</span><span class="meta" id="timelineMeta"></span></div>
-                            <ol class="timeline" id="timeline"></ol>
+                            <div class="replay-note" id="truncNote" hidden>This recording reached the size limit, so the end of the session is missing.</div>
+                            <div class="ptabs" role="tablist">
+                                <button class="ptab active" type="button" role="tab" aria-selected="true" data-action="panel" data-panel="events" id="ptab-events">Events<span class="count" id="countEvents"></span></button>
+                                <button class="ptab" type="button" role="tab" aria-selected="false" data-action="panel" data-panel="console" id="ptab-console">Console<span class="count" id="countConsole"></span></button>
+                                <button class="ptab" type="button" role="tab" aria-selected="false" data-action="panel" data-panel="network" id="ptab-network">Network<span class="count" id="countNetwork"></span></button>
+                                <span class="meta" id="timelineMeta"></span>
+                            </div>
+                            <div class="panel active" id="panel-events"><ol class="timeline" id="timeline"></ol></div>
+                            <div class="panel" id="panel-console"><ol class="timeline" id="consoleList"></ol></div>
+                            <div class="panel" id="panel-network"><ol class="timeline" id="networkList"></ol></div>
                         </div>
                     </div>
                 </div>
@@ -935,7 +888,7 @@
                 <div class="page-head"><h1>Pages</h1><p>Views, time on page, scroll depth and exits per page, and where sessions come from.</p></div>
                 <div class="card">
                     <div class="card-head"><h2>Pages</h2><span class="meta" id="pagesMeta"></span></div>
-                    <div class="table-wrap"><table class="t"><thead><tr><th>Page</th><th class="num">Views</th><th class="num">Sessions</th><th class="num">Average time</th><th class="num">Average scroll</th><th class="num">Exits</th><th class="num">Exit rate</th></tr></thead><tbody id="pagesTable"></tbody></table></div>
+                    <div class="table-wrap"><table class="t"><thead><tr><th>Page</th><th class="num">Views</th><th class="num">Sessions</th><th class="num">Average time</th><th class="num">Average scroll</th><th class="num">Exits</th><th class="num">Exit rate</th><th class="num" title="Largest contentful paint, 75th percentile">LCP</th><th class="num" title="Cumulative layout shift, 75th percentile">CLS</th><th class="num" title="Interaction to next paint, 75th percentile">INP</th></tr></thead><tbody id="pagesTable"></tbody></table></div>
                 </div>
                 <div class="grid2" style="margin-top: 16px;">
                     <div class="card">
@@ -985,7 +938,8 @@
                             <div class="card-head"><h2>Script tag</h2></div>
                             <div class="card-body">
                                 <pre class="snippet"><code id="snippetInstall">&lt;script src="{{ sdk_url }}" data-api-key="{{ api_key }}" defer&gt;&lt;/script&gt;</code><button class="btn sm" type="button" data-action="copy" data-target="snippetInstall"><span class="ico" data-icon="copy"></span>Copy</button></pre>
-                                <p style="margin-top: 12px;">Add it to the <code class="mono">&lt;head&gt;</code> of every page. It records page views (including single-page-app route changes), clicks, rage clicks, dead clicks, scroll depth, form submits and JavaScript errors. Input values are never recorded.</p>
+                                <p style="margin-top: 12px;">Add it to the <code class="mono">&lt;head&gt;</code> of every page. It records page views (including single-page-app route changes), clicks, rage clicks, dead clicks, scroll depth, form submits, JavaScript errors and web vitals, plus a replay of each session with its console output and network requests.</p>
+                                <p>Typed values show up in the replay unless the field is masked. Password and payment fields are always masked; add <code class="mono">data-hotspot-mask</code> to anything else.</p>
                                 <p>Call <code class="mono">window.hotspot.identify(userId, { email, name })</code> after sign-in to see people instead of visitor ids.</p>
                             </div>
                         </div>
@@ -1000,6 +954,14 @@
                                     <dt><code>data-capture-pageview="false"</code></dt><dd>Turn off automatic page views.</dd>
                                     <dt><code>data-debug="true"</code></dt><dd>Log every captured event to the browser console.</dd>
                                     <dt><code>data-debug-hud="true"</code></dt><dd>Show an on-page overlay of your own clicks. Toggle it with Alt+H, or add <code>?hotspot_debug_hud=1</code> to a URL.</dd>
+                                    <dt><code>data-replay="false"</code></dt><dd>Turn off the session recording. The event timeline still works.</dd>
+                                    <dt><code>data-mask-inputs="all"</code></dt><dd>Mask every typed value in the recording.</dd>
+                                    <dt><code>data-mask-text="true"</code></dt><dd>Mask all text on the page in the recording.</dd>
+                                    <dt><code>data-capture-console="false"</code></dt><dd>Leave console output out of the recording.</dd>
+                                    <dt><code>data-capture-network="false"</code></dt><dd>Leave network requests out of the recording.</dd>
+                                    <dt><code>data-capture-web-vitals="false"</code></dt><dd>Turn off web vitals.</dd>
+                                    <dt><code>data-hotspot-mask</code></dt><dd>On any element: mask its text and typed values in the recording.</dd>
+                                    <dt><code>data-hotspot-block</code></dt><dd>On any element: replace it with an empty box of the same size in the recording.</dd>
                                 </dl>
                             </div>
                         </div>
@@ -1039,6 +1001,7 @@
     </div>
 </div>
 
+<script src="/hotspot/assets/replay.js?v={{ version }}" nonce="{{ csp_nonce }}"></script>
 <script nonce="{{ csp_nonce }}">
 (function () {
     'use strict';
@@ -1051,6 +1014,7 @@
         version: body.getAttribute('data-version') || '',
         isProtected: body.getAttribute('data-protected') === '1',
         demoEnabled: body.getAttribute('data-demo') === '1',
+        replayEnabled: body.getAttribute('data-replay') === '1',
         storage: body.getAttribute('data-storage') || ''
     };
     var TABS = ['sessions', 'funnel', 'paths', 'friction', 'pages', 'errors', 'live', 'install'];
@@ -1061,7 +1025,8 @@
     var REFRESH_MS = 10000;
     var LIVE_POLL_MS = 3000;
     var MAX_LIVE_ROWS = 300;
-    var MAX_GAP_MS = 3000;
+    var RECORDING_POLL_MS = 5000;
+    var ACTIVE_WINDOW_SECONDS = 300;
     var SVG_NS = 'http://www.w3.org/2000/svg';
 
     // ---------- Small helpers ----------
@@ -1154,6 +1119,75 @@
         try { return new URL(url).host; } catch (err) { return url; }
     }
     function shortId(id) { var s = String(id || ''); return s.length > 8 ? s.slice(-8) : s; }
+    function fmtMs(ms) {
+        if (!isNum(ms)) { return null; }
+        if (ms < 1000) { return Math.round(ms) + ' ms'; }
+        return (Math.round(ms / 100) / 10).toFixed(1) + ' s';
+    }
+    function fmtCls(value) { return isNum(value) ? value.toFixed(2) : null; }
+    function fmtBytes(bytes) {
+        if (!isNum(bytes)) { return 'Unknown'; }
+        if (bytes >= 1048576) { return (Math.round(bytes / 104857.6) / 10) + ' MB'; }
+        if (bytes >= 1024) { return Math.round(bytes / 1024) + ' KB'; }
+        return bytes + ' B';
+    }
+
+    // ---------- Web vitals ----------
+
+    // Google's thresholds: at or under "good" is good, over "poor" is poor, anything between needs improvement.
+    var VITAL_DEFS = [
+        { key: 'lcp_ms', prop: '$lcp_ms', label: 'LCP', name: 'Largest contentful paint', good: 2500, poor: 4000, fmt: fmtMs },
+        { key: 'cls', prop: '$cls', label: 'CLS', name: 'Cumulative layout shift', good: 0.1, poor: 0.25, fmt: fmtCls },
+        { key: 'inp_ms', prop: '$inp_ms', label: 'INP', name: 'Interaction to next paint', good: 200, poor: 500, fmt: fmtMs },
+        { key: 'fcp_ms', prop: '$fcp_ms', label: 'FCP', name: 'First contentful paint', good: 1800, poor: 3000, fmt: fmtMs },
+        { key: 'ttfb_ms', prop: '$ttfb_ms', label: 'TTFB', name: 'Time to first byte', good: 800, poor: 1800, fmt: fmtMs }
+    ];
+    var CORE_VITALS = VITAL_DEFS.slice(0, 3);
+    var RATING_LABEL = { good: 'Good', needs: 'Needs improvement', poor: 'Poor' };
+
+    function vitalRating(def, value) {
+        if (!isNum(value)) { return null; }
+        if (value <= def.good) { return 'good'; }
+        if (value <= def.poor) { return 'needs'; }
+        return 'poor';
+    }
+
+    function vitalsSummary(p) {
+        var parts = [];
+        VITAL_DEFS.forEach(function (def) {
+            var text = def.fmt(p[def.prop]);
+            if (text !== null) { parts.push(def.label + ' ' + text); }
+        });
+        return parts.length ? parts.join(', ') : 'no values';
+    }
+
+    function vitalCell(def, vitals) {
+        var value = vitals ? vitals[def.key] : null;
+        var rating = vitalRating(def, value);
+        var title = def.name + ', 75th percentile' + (vitals && vitals.samples ? ' of ' + plural(vitals.samples, 'page view', 'page views') : '');
+        return cell(isNum(value) ? def.fmt(value) : '–', 'num vital' + (rating ? ' ' + rating : ' none'), title);
+    }
+
+    function renderVitals(v) {
+        var card = $('vitalsCard');
+        clear(card);
+        v = v || {};
+        card.appendChild(el('div', { class: 'v-title' }, ['Web vitals', el('small', { text: '75th percentile in ' + scopeLabel() })]));
+        if (!v.samples) {
+            card.appendChild(el('span', { class: 'v-empty', text: 'No web vitals yet. Pages send them when a visitor leaves a page or hides the tab.' }));
+            return;
+        }
+        VITAL_DEFS.forEach(function (def) {
+            var value = v[def.key];
+            var rating = vitalRating(def, value);
+            var box = el('div', { class: 'vital', title: def.name });
+            box.appendChild(el('span', { class: 'v-label', text: def.label }));
+            box.appendChild(el('span', { class: 'v-value' + (rating ? ' ' + rating : ' muted'), text: isNum(value) ? def.fmt(value) : '–' }));
+            box.appendChild(el('span', { class: 'v-rating', text: rating ? RATING_LABEL[rating] : 'No data' }));
+            card.appendChild(box);
+        });
+        card.appendChild(el('span', { class: 'v-meta', text: 'from ' + plural(v.samples, 'page view', 'page views') }));
+    }
 
     // ---------- Icons (static markup only) ----------
 
@@ -1195,7 +1229,8 @@
         clock: svgIcon('<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>'),
         viewport: svgIcon('<path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>'),
         flag: svgIcon('<path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.33 2q2 0 3.67-1.33a1 1 0 0 1 1 1V14a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.33"/>'),
-        sparkles: svgIcon('<path d="M9.94 14.34 12 20l2.06-5.66L20 12l-5.94-2.34L12 4 9.94 9.66 4 12z"/>')
+        sparkles: svgIcon('<path d="M9.94 14.34 12 20l2.06-5.66L20 12l-5.94-2.34L12 4 9.94 9.66 4 12z"/>'),
+        gauge: svgIcon('<path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/>')
     };
 
     function icon(name, cls) {
@@ -1236,16 +1271,32 @@
         session: null,
         events: [],
         offsets: [],
+        pages: [],
+        pageMs: [],
         duration: 0,
-        index: -1,
+        player: null,
+        recording: [],
+        cursor: 0,
+        startTime: 0,
         playing: false,
+        finished: false,
+        follow: false,
+        scrubbing: false,
+        resume: false,
         speed: 1,
-        raf: 0,
+        skipInactive: true,
+        timer: 0,
+        loading: false,
+        loadSeq: 0,
+        gone: false,
+        console: [],
+        consoleMs: [],
+        network: [],
+        networkMs: [],
+        panel: 'events',
         vw: 1280,
         vh: 800,
-        scale: 1,
-        preview: false,
-        previewPath: null
+        scale: 1
     };
 
     // ---------- Networking ----------
@@ -1401,6 +1452,7 @@
         renderNotices(o.setup);
         renderNavCounts(o.metrics);
         renderKpis(o.metrics, o.activity);
+        renderVitals(o.web_vitals);
         renderFilters(o.breakdowns);
         renderSessions(o);
         renderFunnelEditor(o.funnel);
@@ -1520,6 +1572,7 @@
             el('span', { class: 'ago', text: agoFromTs(s.last_seen) })
         ]);
         var l2 = el('div', { class: 'l2' });
+        if (s.has_recording) { l2.appendChild(el('span', { class: 'chip replay', title: 'This session has a replay' }, [icon('play'), 'Replay'])); }
         var email = s.identity && s.identity.email;
         if (email && email !== s.label) { l2.appendChild(el('span', { class: 'email', text: email })); }
         if (s.entry_page) { l2.appendChild(el('span', { class: 'path', text: s.entry_page, title: s.entry_page })); }
@@ -1581,7 +1634,8 @@
         $('sessionToolbar').hidden = showEmpty === 'none';
         if (showEmpty) { return; }
 
-        $('sessionsMeta').textContent = sessions.length === m.sessions ? plural(sessions.length, 'session', 'sessions') : fmtNum(sessions.length) + ' of ' + plural(m.sessions, 'session', 'sessions');
+        var listedText = sessions.length === m.sessions ? plural(sessions.length, 'session', 'sessions') : fmtNum(sessions.length) + ' of ' + plural(m.sessions, 'session', 'sessions');
+        $('sessionsMeta').textContent = listedText + (m.sessions_with_replay ? ', ' + fmtNum(m.sessions_with_replay) + ' with replay' : '');
         syncChildren($('sessionList'), sessions,
             function (s) { return String(s.session_id); },
             function (s) {
@@ -1600,8 +1654,19 @@
         } else if (state.selectedId && state.detail && !state.detailInflight) {
             var current = null;
             sessions.forEach(function (s) { if (s.session_id === state.selectedId) { current = s; } });
+            if (current) { syncSessionSummary(current); }
             if (current && current.event_count !== state.detail.session.event_count) { loadDetail(state.selectedId, true); }
         }
+    }
+
+    // The overview refreshes more often than the detail, so it keeps the live chip and recording flag current.
+    function syncSessionSummary(row) {
+        var s = replay.session;
+        if (!s || s.session_id !== row.session_id) { return; }
+        s.status = row.status;
+        if (isNum(row.seconds_ago)) { s.seconds_ago = row.seconds_ago; }
+        if (row.has_recording) { s.has_recording = true; }
+        $('liveChip').hidden = !isLive(s);
     }
 
     function markSelectedRow() {
@@ -1614,11 +1679,13 @@
         if (state.selectedId === id && state.detail) { return; }
         state.selectedId = id;
         state.detail = null;
+        if (replay.session && replay.session.session_id !== id) { teardownPlayer(); replay.session = null; }
         markSelectedRow();
         loadDetail(id, false);
     }
 
     function showPaneMessage(title, text) {
+        pausePlayback();
         var pane = $('detailEmpty');
         clear(pane);
         pane.appendChild(el('div', { class: 'pane-msg' }, [el('h3', { text: title }), text]));
@@ -1633,7 +1700,7 @@
         api('/hotspot/api/sessions/' + encodeURIComponent(id) + '/').then(function (data) {
             if (state.selectedId !== id) { return; }
             state.detail = data;
-            renderDetail(data, keepPosition);
+            renderDetail(data);
         }).catch(function (err) {
             if (err.unauthorized || state.selectedId !== id) { return; }
             if (err.status === 404) { showPaneMessage('Session not found', 'This session has expired or was removed. Pick another one from the list.'); }
@@ -1694,13 +1761,23 @@
         $('detailEmpty').hidden = true;
     }
 
-    function renderDetail(data, keepPosition) {
+    function renderDetail(data) {
         renderDetailHead(data.session);
         $('replayCard').hidden = false;
-        setupReplay(data, keepPosition);
+        setupReplay(data);
+        fitFrame();
     }
 
     // ---------- Replay ----------
+
+    var RRWEB_FULL_SNAPSHOT = 2;
+    var RRWEB_META = 4;
+    var RRWEB_CUSTOM = 5;
+    var MAX_META_SIZE = 10000;
+    var PANELS = ['events', 'console', 'network'];
+    var SPEEDS = [1, 2, 4, 8];
+    var CONSOLE_LEVELS = ['log', 'info', 'warn', 'error', 'debug'];
+    var MARKER_KINDS = { pv: 'Page view', click: 'Click', dead: 'Dead click', rage: 'Rage click', form: 'Form submit', err: 'Error' };
 
     function eventKind(e) {
         var p = e.properties || {};
@@ -1712,12 +1789,13 @@
             case '$form_submit': return 'form';
             case '$exception': return 'err';
             case '$identify': case '$set': return 'ident';
+            case '$web_vitals': return 'vitals';
             default: return 'custom';
         }
     }
 
-    var KIND_ICON = { pv: 'eye', leave: 'leave', click: 'pointer', dead: 'ban', rage: 'flame', form: 'send', err: 'alert', ident: 'user', custom: 'tag' };
-    var KIND_LABEL = { pv: 'Page view', leave: 'Page leave', click: 'Click', dead: 'Dead click', rage: 'Rage click', form: 'Form submit', err: 'Error', ident: 'Identify', custom: 'Event' };
+    var KIND_ICON = { pv: 'eye', leave: 'leave', click: 'pointer', dead: 'ban', rage: 'flame', form: 'send', err: 'alert', ident: 'user', vitals: 'gauge', custom: 'tag' };
+    var KIND_LABEL = { pv: 'Page view', leave: 'Page leave', click: 'Click', dead: 'Dead click', rage: 'Rage click', form: 'Form submit', err: 'Error', ident: 'Identify', vitals: 'Web vitals', custom: 'Event' };
 
     function eventLabel(e) {
         var kind = eventKind(e);
@@ -1746,6 +1824,7 @@
                 var set = p.$set || {};
                 return { text: set.email || set.name || p.$identified_id || '', mono: false };
             }
+            case 'vitals': return { text: vitalsSummary(p), mono: false };
             default: {
                 var pairs = [];
                 Object.keys(p).forEach(function (key) {
@@ -1758,59 +1837,346 @@
         }
     }
 
-    function setupReplay(data, keepPosition) {
-        var previousIndex = replay.index;
-        var wasPlaying = replay.playing;
-        if (!keepPosition || replay.session === null || replay.session.session_id !== data.session.session_id) {
-            pausePlayback();
-            previousIndex = 0;
-            wasPlaying = false;
-            replay.previewPath = null;
-            $('preview').removeAttribute('src');
+    function replayEnabled() {
+        var setup = state.overview && state.overview.setup;
+        if (setup && typeof setup.replay_enabled === 'boolean') { return setup.replay_enabled; }
+        return CONFIG.replayEnabled;
+    }
+
+    // The API ranks converted, rage and error above active, so recency decides whether the visitor is still there.
+    function isLive(session) {
+        if (!session) { return false; }
+        if (session.status === 'active') { return true; }
+        return isNum(session.seconds_ago) && session.seconds_ago < ACTIVE_WINDOW_SECONDS;
+    }
+
+    function validSize(value) { return isNum(value) && value > 0 && value <= MAX_META_SIZE; }
+
+    function sessionViewport(session) {
+        var w = session ? session.viewport_width : null;
+        var h = session ? session.viewport_height : null;
+        return validSize(w) && validSize(h) ? { w: w, h: h } : { w: 1280, h: 800 };
+    }
+
+    // A page snapshotted in a tab the browser had not rendered yet reports a 0 width or height, so the session's viewport stands in.
+    function patchMeta(e) {
+        if (!e || e.type !== RRWEB_META || !e.data) { return e; }
+        if (validSize(e.data.width) && validSize(e.data.height)) { return e; }
+        var fallback = sessionViewport(replay.session);
+        if (!validSize(e.data.width)) { e.data.width = fallback.w; }
+        if (!validSize(e.data.height)) { e.data.height = fallback.h; }
+        return e;
+    }
+
+    function eventRank(e) { return e.type === RRWEB_META ? 0 : e.type === RRWEB_FULL_SNAPSHOT ? 1 : 2; }
+
+    // Chunks can reach the server out of order when a large snapshot uploads slower than the small chunk after it.
+    function sortRecording(events) {
+        var decorated = events.map(function (e, i) { return { e: e, i: i }; });
+        decorated.sort(function (a, b) {
+            var diff = (Number(a.e.timestamp) || 0) - (Number(b.e.timestamp) || 0);
+            if (diff !== 0) { return diff; }
+            var rank = eventRank(a.e) - eventRank(b.e);
+            return rank !== 0 ? rank : a.i - b.i;
+        });
+        return decorated.map(function (d) { return d.e; });
+    }
+
+    function hasSnapshot(events) {
+        var meta = false, full = false;
+        events.forEach(function (e) {
+            if (e.type === RRWEB_META) { meta = true; }
+            if (e.type === RRWEB_FULL_SNAPSHOT) { full = true; }
+        });
+        return meta && full;
+    }
+
+    function lastIndexAtOrBefore(values, ms) {
+        var low = 0, high = values.length - 1, found = -1;
+        while (low <= high) {
+            var mid = (low + high) >> 1;
+            if (values[mid] <= ms) { found = mid; low = mid + 1; } else { high = mid - 1; }
         }
-        replay.session = data.session;
+        return found;
+    }
+
+    function byMs(a, b) { return a.ms - b.ms; }
+    function msOf(entry) { return entry.ms; }
+
+    function pathOf(url) {
+        try {
+            var parsed = new URL(url);
+            return parsed.pathname + parsed.search;
+        } catch (err) { return url; }
+    }
+
+    // Same-origin requests show as paths so the column stays readable; the full URL sits in the title.
+    function displayUrl(url) {
+        var entry = replay.session && typeof replay.session.entry_url === 'string' ? replay.session.entry_url : '';
+        try {
+            var parsed = new URL(url);
+            if (entry && new URL(entry).origin === parsed.origin) { return parsed.pathname + parsed.search; }
+        } catch (err) { return url; }
+        return url;
+    }
+
+    function setupReplay(data) {
+        var session = data.session;
+        var same = replay.session !== null && replay.session.session_id === session.session_id;
+        if (!same) { teardownPlayer(); }
+        replay.session = session;
         replay.events = data.events || [];
-        var t0 = replay.events.length ? Number(replay.events[0].timestamp) || 0 : 0;
-        replay.offsets = replay.events.map(function (e) { return Math.max(0, (Number(e.timestamp) || 0) - t0); });
-        var last = replay.offsets.length ? replay.offsets[replay.offsets.length - 1] : 0;
-        replay.duration = Math.max(last, Number(data.session.duration_seconds) || 0);
-        $('scrub').max = String(Math.max(1, Math.round(replay.duration * 10)));
-        buildFrame(data.session);
-        buildTimeline();
-        updatePreviewControls();
-        if (!replay.events.length) {
-            replay.index = -1;
-            $('clock').textContent = '0:00 / ' + fmtClock(replay.duration);
-            return;
-        }
-        goTo(clamp(previousIndex, 0, replay.events.length - 1), false);
-        if (wasPlaying) { playPlayback(); }
+        if (!same) { buildFrame(session); }
+        $('liveChip').hidden = !isLive(session);
+        $('truncNote').hidden = !session.recording_truncated;
+        showReplayEmpty(!session.has_recording && !replay.player);
+        if (!replay.player && session.has_recording) { loadRecording(session.session_id, replay.cursor); }
+        rebuildLists();
         updatePlayButton();
     }
 
-    function buildFrame(session) {
-        var vw = session.viewport_width, vh = session.viewport_height;
-        var known = isNum(vw) && isNum(vh) && vw > 0 && vh > 0;
-        if (!known) { vw = 1280; vh = 800; }
-        replay.vw = vw;
-        replay.vh = vh;
-        var kind = session.device_type === 'mobile' ? 'phone' : session.device_type === 'tablet' ? 'tablet' : 'desktop';
-        var device = $('device');
-        device.className = 'device ' + kind;
+    function teardownPlayer() {
+        stopTicking();
+        replay.loadSeq += 1;
+        if (replay.player) {
+            try { replay.player.destroy(); } catch (err) { /* a player that failed half way has nothing left to remove */ }
+            replay.player = null;
+        }
+        clear($('viewport'));
+        replay.recording = [];
+        replay.cursor = 0;
+        replay.startTime = 0;
+        replay.duration = 0;
+        replay.playing = false;
+        replay.finished = false;
+        replay.follow = false;
+        replay.scrubbing = false;
+        replay.loading = false;
+        replay.gone = false;
+        replay.console = [];
+        replay.consoleMs = [];
+        replay.network = [];
+        replay.networkMs = [];
+        replay.pages = [];
+        replay.pageMs = [];
+        $('stageMsg').hidden = true;
+        $('skipChip').hidden = true;
+        setScrub(0);
+    }
+
+    function showReplayEmpty(show) {
+        $('replayEmpty').hidden = !show;
+        $('stage').hidden = show;
+        $('controls').hidden = show;
+        $('skipToggleLabel').hidden = show;
+        if (show) {
+            $('truncNote').hidden = true;
+            $('replayEmptyText').textContent = replayEnabled()
+                ? 'Pages send a recording when the Hotspot script runs with replay on, which is the default from version 3.1. Older sessions and pages with data-replay="false" only have the event timeline.'
+                : 'Session replay is turned off on this server (HOTSPOT_REPLAY_ENABLED), so sessions only have the event timeline.';
+        }
+    }
+
+    function showStageMessage(text) {
+        var box = $('stageMsg');
+        box.textContent = text;
+        box.hidden = false;
+    }
+
+    function loadRecording(id, from) {
+        if (replay.loading) { return; }
+        replay.loading = true;
+        replay.loadSeq += 1;
+        var seq = replay.loadSeq;
+        var first = !replay.player;
+        if (first && replay.session && replay.session.has_recording) { showStageMessage('Loading the recording'); }
+        api('/hotspot/api/sessions/' + encodeURIComponent(id) + '/recording/', { from: String(from) }).then(function (data) {
+            if (seq !== replay.loadSeq || state.selectedId !== id || !replay.session) { return; }
+            if (isNum(data.next)) { replay.cursor = data.next; }
+            if (data.truncated) { $('truncNote').hidden = false; }
+            var incoming = sortRecording((data.events || []).map(patchMeta));
+            if (!incoming.length) { return; }
+            if (replay.player) { appendRecording(incoming); } else { startRecording(incoming); }
+        }).catch(function (err) {
+            if (err.unauthorized || seq !== replay.loadSeq || state.selectedId !== id) { return; }
+            if (err.status === 404) { replay.gone = true; }
+            if (!replay.player) { showStageMessage(err.status === 404 ? 'This recording is no longer available.' : "Couldn't load the recording. The dashboard retries in a few seconds."); }
+        }).then(function () {
+            if (seq === replay.loadSeq) { replay.loading = false; }
+        });
+    }
+
+    function pollRecording() {
+        var s = replay.session;
+        if (!s || replay.loading || replay.gone || state.tab !== 'sessions' || document.hidden || $('replayCard').hidden) { return; }
+        if (state.selectedId !== s.session_id) { return; }
+        var live = isLive(s) && replayEnabled();
+        var retry = s.has_recording && !replay.player;
+        if (live || retry) { loadRecording(s.session_id, replay.cursor); }
+    }
+
+    function createPlayer() {
+        var lib = window.rrwebReplay;
+        if (!lib || typeof lib.Replayer !== 'function') {
+            showStageMessage("The replay player didn't load. Reload the dashboard to try again.");
+            return false;
+        }
         var viewport = $('viewport');
-        viewport.style.width = vw + 'px';
-        viewport.style.height = vh + 'px';
-        $('frameLabel').textContent = known ? vw + ' × ' + vh : 'viewport unknown, showing 1280 × 800';
+        clear(viewport);
+        var player;
+        try {
+            player = new lib.Replayer(replay.recording, {
+                root: viewport,
+                skipInactive: replay.skipInactive,
+                inactivePeriodThreshold: 10000,
+                speed: replay.speed,
+                showWarning: false,
+                showDebug: false,
+                mouseTail: false,
+                UNSAFE_replayCanvas: false,
+                insertStyleRules: []
+            });
+        } catch (err) {
+            clear(viewport);
+            showStageMessage("Couldn't build the replay from this recording.");
+            return false;
+        }
+        replay.player = player;
+        player.on('resize', function (size) { if (size) { resizeViewport(size.width, size.height); } });
+        player.on('finish', onFinish);
+        player.on('skip-start', function () { $('skipChip').hidden = false; });
+        player.on('skip-end', function () { $('skipChip').hidden = true; });
+        $('stageMsg').hidden = true;
+        player.pause(0);
+        return true;
+    }
+
+    function startRecording(events) {
+        replay.recording = sortRecording(replay.recording.concat(events));
+        if (!hasSnapshot(replay.recording)) { showStageMessage('Waiting for the first snapshot of the page.'); return; }
+        replay.session.has_recording = true;
+        showReplayEmpty(false);
+        refreshBounds();
+        if (!createPlayer()) { return; }
+        rebuildLists();
+        setScrub(0);
+        updatePlayButton();
+    }
+
+    function appendRecording(events) {
+        events.forEach(function (e) { replay.player.addEvent(e); });
+        replay.recording = sortRecording(replay.recording.concat(events));
+        // addEvent hands events to the player on a microtask, so the bookkeeping waits for them to land.
+        setTimeout(function () {
+            if (!replay.player) { return; }
+            refreshBounds();
+            rebuildLists();
+            if (replay.follow && replay.finished && !replay.playing) { playPlayback(false); }
+            else if (!replay.playing) { setScrub(currentMs()); }
+        }, 0);
+    }
+
+    function refreshBounds() {
+        var rec = replay.recording;
+        if (!rec.length) { return; }
+        replay.startTime = Number(rec[0].timestamp) || 0;
+        replay.duration = Math.max(0, (Number(rec[rec.length - 1].timestamp) || 0) - replay.startTime);
+        $('scrub').max = String(Math.max(100, Math.round(replay.duration)));
+        var consoleEntries = [];
+        var networkEntries = [];
+        rec.forEach(function (e) {
+            if (e.type !== RRWEB_CUSTOM || !e.data || !e.data.payload) { return; }
+            var payload = e.data.payload;
+            var at = isNum(payload.t) ? payload.t : (Number(e.timestamp) || 0);
+            var ms = clamp(at - replay.startTime, 0, replay.duration);
+            if (e.data.tag === 'console') {
+                var level = CONSOLE_LEVELS.indexOf(payload.level) >= 0 ? payload.level : 'log';
+                var message = payload.message === undefined || payload.message === null ? '' : String(payload.message);
+                consoleEntries.push({ ms: ms, level: level, message: message });
+            } else if (e.data.tag === 'network') {
+                networkEntries.push({
+                    ms: ms,
+                    method: typeof payload.method === 'string' ? payload.method : 'GET',
+                    url: typeof payload.url === 'string' ? payload.url : '',
+                    status: isNum(payload.status) ? payload.status : 0,
+                    duration: isNum(payload.duration_ms) ? payload.duration_ms : null
+                });
+            }
+        });
+        consoleEntries.sort(byMs);
+        networkEntries.sort(byMs);
+        replay.console = consoleEntries;
+        replay.consoleMs = consoleEntries.map(msOf);
+        replay.network = networkEntries;
+        replay.networkMs = networkEntries.map(msOf);
+    }
+
+    // Analytics events line up with the recording through their timestamps; without a recording the first event is the origin.
+    function computeOffsets() {
+        var events = replay.events;
+        if (replay.player) {
+            replay.offsets = events.map(function (e) { return clamp((Number(e.timestamp) || 0) * 1000 - replay.startTime, 0, replay.duration); });
+        } else {
+            var t0 = events.length ? Number(events[0].timestamp) || 0 : 0;
+            replay.offsets = events.map(function (e) { return Math.max(0, ((Number(e.timestamp) || 0) - t0) * 1000); });
+            var last = replay.offsets.length ? replay.offsets[replay.offsets.length - 1] : 0;
+            replay.duration = Math.max(last, (Number(replay.session && replay.session.duration_seconds) || 0) * 1000);
+        }
+        var pages = [];
+        events.forEach(function (e, i) {
+            if (e.event !== '$pageview') { return; }
+            var p = e.properties || {};
+            pages.push({ ms: replay.offsets[i], path: typeof p.$pathname === 'string' ? p.$pathname : '', title: typeof p.$title === 'string' ? p.$title : '' });
+        });
+        if (!pages.length) {
+            replay.recording.forEach(function (e) {
+                if (e.type !== RRWEB_META || !e.data || typeof e.data.href !== 'string') { return; }
+                pages.push({ ms: clamp((Number(e.timestamp) || 0) - replay.startTime, 0, replay.duration), path: pathOf(e.data.href), title: '' });
+            });
+        }
+        replay.pages = pages;
+        replay.pageMs = pages.map(msOf);
+    }
+
+    function rebuildLists() {
+        computeOffsets();
+        buildTimeline();
+        buildMarkers();
+        buildPanels();
+        syncCurrent(currentMs(), false);
+    }
+
+    function buildFrame(session) {
+        var kind = session.device_type === 'mobile' ? 'phone' : session.device_type === 'tablet' ? 'tablet' : 'desktop';
+        $('device').className = 'device ' + kind;
         var deviceBits = [session.device_type, session.browser ? session.browser + (session.browser_version ? ' ' + session.browser_version : '') : null, session.os].filter(Boolean);
         $('frameDevice').textContent = deviceBits.length ? deviceBits.join(', ') : '';
         setIcon($('frameIcon'), kind === 'phone' ? 'phone' : kind === 'tablet' ? 'tablet' : 'monitor');
+        $('barPath').textContent = '';
+        $('barTitle').textContent = '';
+        var size = sessionViewport(session);
+        resizeViewport(size.w, size.h);
+    }
+
+    function resizeViewport(width, height) {
+        if (!validSize(width) || !validSize(height)) {
+            var fallback = sessionViewport(replay.session);
+            width = fallback.w;
+            height = fallback.h;
+        }
+        replay.vw = width;
+        replay.vh = height;
+        var viewport = $('viewport');
+        viewport.style.width = width + 'px';
+        viewport.style.height = height + 'px';
+        $('frameLabel').textContent = width + ' × ' + height;
         fitFrame();
     }
 
     function fitFrame() {
         var stage = $('stage');
         var device = $('device');
-        if ($('replayCard').hidden || state.tab !== 'sessions' || !stage.clientWidth) { return; }
+        if ($('replayCard').hidden || stage.hidden || state.tab !== 'sessions' || !stage.clientWidth) { return; }
         var isPhone = device.classList.contains('phone');
         var isTablet = device.classList.contains('tablet');
         var padX = isPhone ? 12 : isTablet ? 18 : 0;
@@ -1828,167 +2194,116 @@
         wrap.style.height = Math.round(device.offsetHeight * scale) + 'px';
     }
 
+    function timelineRow(e, i) {
+        var kind = eventKind(e);
+        var row = el('button', { class: 'trow ' + kind, type: 'button', 'data-action': 'seek-ms', 'data-ms': String(Math.round(replay.offsets[i])) });
+        row.appendChild(el('span', { class: 't', text: fmtOffset(replay.offsets[i] / 1000) }));
+        row.appendChild(icon(KIND_ICON[kind] || 'tag'));
+        var desc = el('span', { class: 'd' });
+        desc.appendChild(el('span', { class: 'n', text: eventLabel(e) }));
+        if (kind === 'custom') { desc.appendChild(el('span', { class: 'mono', text: ' ' + e.event })); }
+        var target = eventTarget(e);
+        if (target.text) {
+            desc.appendChild(document.createTextNode(' '));
+            desc.appendChild(el('span', { class: target.mono ? 'mono' : '', text: target.text, title: target.text }));
+        }
+        row.appendChild(desc);
+        return row;
+    }
+
     function buildTimeline() {
-        var list = $('timeline');
-        clear(list);
+        var items = replay.events.map(function (e, i) { return { e: e, i: i }; });
+        syncChildren($('timeline'), items,
+            function (item) { return item.i + ':' + item.e.timestamp + ':' + item.e.event; },
+            function (item) { return el('li', null, timelineRow(item.e, item.i)); },
+            function (li, item) {
+                var row = li.firstChild;
+                row.setAttribute('data-ms', String(Math.round(replay.offsets[item.i])));
+                row.querySelector('.t').textContent = fmtOffset(replay.offsets[item.i] / 1000);
+            });
+        $('countEvents').textContent = replay.events.length ? fmtNum(replay.events.length) : '';
+        $('timelineMeta').textContent = replay.player ? fmtDuration(replay.duration / 1000) + ' recorded' : '';
+    }
+
+    function buildMarkers() {
+        var box = $('scrubMarks');
+        clear(box);
+        if (!replay.player || replay.duration <= 0) { return; }
         replay.events.forEach(function (e, i) {
             var kind = eventKind(e);
-            var row = el('button', { class: 'trow ' + kind, type: 'button', 'data-action': 'seek', 'data-index': String(i) });
-            row.appendChild(el('span', { class: 't', text: fmtOffset(replay.offsets[i]) }));
-            row.appendChild(icon(KIND_ICON[kind] || 'tag'));
-            var desc = el('span', { class: 'd' });
-            desc.appendChild(el('span', { class: 'n', text: eventLabel(e) }));
-            if (kind === 'custom') { desc.appendChild(el('span', { class: 'mono', text: ' ' + e.event })); }
-            var target = eventTarget(e);
-            if (target.text) {
-                desc.appendChild(document.createTextNode(' '));
-                desc.appendChild(el('span', { class: target.mono ? 'mono' : '', text: target.text, title: target.text }));
-            }
-            row.appendChild(desc);
-            list.appendChild(el('li', null, row));
+            if (!MARKER_KINDS[kind]) { return; }
+            var ms = replay.offsets[i];
+            var target = eventTarget(e).text;
+            var label = MARKER_KINDS[kind] + (target ? ': ' + target : '') + ' at ' + fmtClock(ms / 1000);
+            var mark = el('button', { class: kind, type: 'button', 'data-action': 'seek-ms', 'data-ms': String(Math.round(ms)), title: label, 'aria-label': label });
+            mark.style.left = (ms / replay.duration * 100) + '%';
+            box.appendChild(mark);
         });
-        $('timelineMeta').textContent = plural(replay.events.length, 'event', 'events') + ', ' + fmtDuration(replay.duration);
     }
 
-    function clickPosition(p) {
-        var x = p.$client_x, y = p.$client_y;
-        if (!isNum(x) || !isNum(y)) {
-            if (isNum(p.$x_ratio) && isNum(p.$y_ratio)) { x = p.$x_ratio * replay.vw; y = p.$y_ratio * replay.vh; }
-            else { return null; }
-        }
-        return { x: clamp(x, 0, replay.vw), y: clamp(y, 0, replay.vh) };
+    function consoleRow(entry) {
+        var row = el('button', { class: 'trow crow-c ' + entry.level, type: 'button', 'data-action': 'seek-ms', 'data-ms': String(Math.round(entry.ms)) });
+        row.appendChild(el('span', { class: 't', text: fmtOffset(entry.ms / 1000) }));
+        row.appendChild(el('span', { class: 'lvl', text: entry.level }));
+        row.appendChild(el('span', { class: 'd mono', text: entry.message, title: entry.message }));
+        return row;
     }
 
-    // The frame state is derived from every event up to the index, so seeking anywhere is exact.
-    function frameStateAt(index) {
-        var st = { page: null, cursor: null, scroll: null, error: null };
-        for (var j = 0; j <= index; j++) {
-            var e = replay.events[j];
-            var p = e.properties || {};
-            switch (e.event) {
-                case '$pageview':
-                    st.page = { pathname: typeof p.$pathname === 'string' ? p.$pathname : '', title: typeof p.$title === 'string' ? p.$title : '' };
-                    st.scroll = null;
-                    st.error = null;
-                    break;
-                case '$autocapture': case '$rageclick': {
-                    var pos = clickPosition(p);
-                    if (pos) { st.cursor = pos; }
-                    break;
-                }
-                case '$pageleave':
-                    if (isNum(p.$scroll_depth_percent)) { st.scroll = clamp(Math.round(p.$scroll_depth_percent), 0, 100); }
-                    break;
-                case '$exception':
-                    st.error = { message: typeof p.$exception_message === 'string' ? p.$exception_message : 'Unknown error', type: typeof p.$exception_type === 'string' ? p.$exception_type : '' };
-                    break;
-                default: break;
-            }
-        }
-        return st;
+    function networkRow(entry) {
+        var failed = entry.status === 0 || entry.status >= 400;
+        var row = el('button', { class: 'trow crow-n' + (failed ? ' failed' : ''), type: 'button', 'data-action': 'seek-ms', 'data-ms': String(Math.round(entry.ms)) });
+        row.appendChild(el('span', { class: 't', text: fmtOffset(entry.ms / 1000) }));
+        row.appendChild(el('span', { class: 'method', text: entry.method }));
+        row.appendChild(el('span', { class: 'status', text: entry.status ? String(entry.status) : 'failed', title: entry.status ? null : 'No response arrived' }));
+        row.appendChild(el('span', { class: 'd mono', text: displayUrl(entry.url), title: entry.url }));
+        row.appendChild(el('span', { class: 'dur', text: isNum(entry.duration) ? fmtMs(entry.duration) : '' }));
+        return row;
     }
 
-    function marker(cls, pos) {
-        var node = el('div', { class: 'mk ' + cls });
-        node.style.left = pos.x + 'px';
-        node.style.top = pos.y + 'px';
-        return node;
+    function fillPanel(list, entries, build, emptyText) {
+        var items = entries.length ? entries.map(function (entry, i) { return { entry: entry, i: i }; }) : [{ empty: true }];
+        syncChildren(list, items,
+            function (item) { return item.empty ? 'empty' : item.i + ':' + Math.round(item.entry.ms) + ':' + (item.entry.message || item.entry.url || ''); },
+            function (item) { return item.empty ? el('li', { class: 'panel-empty', text: emptyText }) : el('li', null, build(item.entry)); },
+            function (li, item) { if (item.empty) { li.textContent = emptyText; } });
     }
 
-    function markerLabel(text, cls, pos) {
-        var node = el('div', { class: 'mk-label ' + cls, text: text });
-        node.style.left = pos.x + 'px';
-        node.style.top = pos.y + 'px';
-        return node;
+    function buildPanels() {
+        var recorded = !!replay.player;
+        fillPanel($('consoleList'), replay.console, consoleRow, recorded ? 'No console output in this recording.' : 'Console output comes with the recording, and this session has none.');
+        fillPanel($('networkList'), replay.network, networkRow, recorded ? 'No network requests in this recording.' : 'Network requests come with the recording, and this session has none.');
+        var errors = replay.console.filter(function (entry) { return entry.level === 'error'; }).length;
+        var consoleCount = $('countConsole');
+        consoleCount.textContent = replay.console.length ? fmtNum(replay.console.length) : '';
+        consoleCount.classList.toggle('danger', errors > 0);
+        var failed = replay.network.filter(function (entry) { return entry.status === 0 || entry.status >= 400; }).length;
+        var networkCount = $('countNetwork');
+        networkCount.textContent = replay.network.length ? fmtNum(replay.network.length) : '';
+        networkCount.classList.toggle('danger', failed > 0);
     }
 
-    function renderFrame(index, animate) {
-        var st = frameStateAt(index);
-        var e = replay.events[index];
-        var p = e.properties || {};
-        $('barPath').textContent = st.page ? (st.page.pathname || '/') : 'No page view yet';
-        $('barTitle').textContent = st.page ? st.page.title : '';
-
-        var markers = $('markers');
-        clear(markers);
-
-        var cursor = $('cursor');
-        if (st.cursor) {
-            cursor.classList.toggle('still', !animate);
-            cursor.hidden = false;
-            cursor.style.left = st.cursor.x + 'px';
-            cursor.style.top = st.cursor.y + 'px';
-        } else {
-            cursor.hidden = true;
-        }
-
-        var rail = $('srail');
-        if (st.scroll !== null) {
-            rail.hidden = false;
-            $('srailFill').style.height = st.scroll + '%';
-            $('srailLabel').textContent = st.scroll + '%';
-            $('srailLabel').style.top = st.scroll + '%';
-        } else {
-            rail.hidden = true;
-            $('srailFill').style.height = '0%';
-        }
-
-        var strip = $('estrip');
-        if (st.error) {
-            clear(strip);
-            strip.appendChild(el('b', { text: st.error.type || 'Error' }));
-            strip.appendChild(document.createTextNode(st.error.message));
-            strip.hidden = false;
-        } else {
-            strip.hidden = true;
-        }
-
-        var kind = eventKind(e);
-        var pos = (kind === 'click' || kind === 'dead' || kind === 'rage') ? clickPosition(p) : null;
-        if (kind === 'click' && pos) {
-            markers.appendChild(marker('mk-ripple', pos));
-            markers.appendChild(marker('mk-click', pos));
-            if (p.$el_text) { markers.appendChild(markerLabel(p.$el_text, '', pos)); }
-        } else if (kind === 'dead' && pos) {
-            markers.appendChild(marker('mk-dead', pos));
-            markers.appendChild(markerLabel('Dead click' + (p.$el_text ? ': ' + p.$el_text : ''), 'dead', pos));
-        } else if (kind === 'rage' && pos) {
-            markers.appendChild(marker('mk-rage', pos));
-            markers.appendChild(marker('mk-rage d2', pos));
-            markers.appendChild(marker('mk-rage d3', pos));
-            markers.appendChild(marker('mk-rage-core', pos));
-            markers.appendChild(markerLabel('Rage click' + (p.$el_text ? ': ' + p.$el_text : ''), 'rage', pos));
-        } else if (kind === 'pv') {
-            markers.appendChild(el('div', { class: 'pflash' }));
-        } else if (kind === 'form') {
-            markers.appendChild(el('div', { class: 'fbadge', text: 'Form submitted' + (p.$form_id ? ': ' + p.$form_id : '') }));
-        } else if (kind === 'ident') {
-            var set = p.$set || {};
-            markers.appendChild(el('div', { class: 'echip', text: (e.event === '$set' ? 'Set properties' : 'Identified') + (set.email ? ': ' + set.email : '') }));
-        } else if (kind === 'custom') {
-            markers.appendChild(el('div', { class: 'echip', text: e.event }));
-        }
-
-        if (replay.preview) { syncPreview(st, e); }
+    function setPanel(name) {
+        if (PANELS.indexOf(name) < 0) { name = 'events'; }
+        replay.panel = name;
+        PANELS.forEach(function (key) {
+            var active = key === name;
+            $('ptab-' + key).classList.toggle('active', active);
+            $('ptab-' + key).setAttribute('aria-selected', active ? 'true' : 'false');
+            $('panel-' + key).classList.toggle('active', active);
+        });
+        syncCurrent(currentMs(), true);
     }
 
-    function goTo(index, animate) {
-        if (!replay.events.length) { return; }
-        index = clamp(index, 0, replay.events.length - 1);
-        replay.index = index;
-        renderFrame(index, animate);
-        highlightRow(index);
-        setScrub(replay.offsets[index]);
-    }
-
-    function highlightRow(index) {
-        var list = $('timeline');
+    function highlightList(list, offsets, ms, follow) {
+        var index = lastIndexAtOrBefore(offsets, ms);
+        var li = index >= 0 ? list.children[index] : null;
+        var row = li && li.firstChild && li.firstChild.classList ? li.firstChild : null;
         var current = list.querySelector('.trow.current');
+        if (current === row) { return; }
         if (current) { current.classList.remove('current'); }
-        var li = list.children[index];
-        if (!li) { return; }
-        var row = li.firstChild;
+        if (!row) { return; }
         row.classList.add('current');
+        if (!follow) { return; }
         var top = li.offsetTop;
         var bottom = top + li.offsetHeight;
         if (top < list.scrollTop || bottom > list.scrollTop + list.clientHeight) {
@@ -1996,9 +2311,42 @@
         }
     }
 
-    function setScrub(offset) {
-        $('scrub').value = String(Math.round(offset * 10));
-        $('clock').textContent = fmtClock(offset) + ' / ' + fmtClock(replay.duration);
+    function markRow(row) {
+        var list = row.closest('.timeline');
+        if (!list) { return; }
+        var current = list.querySelector('.trow.current');
+        if (current && current !== row) { current.classList.remove('current'); }
+        row.classList.add('current');
+    }
+
+    function updatePageBar(ms) {
+        var index = lastIndexAtOrBefore(replay.pageMs, ms);
+        var page = index >= 0 ? replay.pages[index] : (replay.pages.length ? replay.pages[0] : null);
+        var path = page ? (page.path || '/') : '';
+        var title = page ? page.title : '';
+        var pathNode = $('barPath');
+        var titleNode = $('barTitle');
+        if (pathNode.textContent !== path) { pathNode.textContent = path; }
+        if (titleNode.textContent !== title) { titleNode.textContent = title; }
+    }
+
+    function syncCurrent(ms, follow) {
+        highlightList($('timeline'), replay.offsets, ms, follow && replay.panel === 'events');
+        highlightList($('consoleList'), replay.consoleMs, ms, follow && replay.panel === 'console');
+        highlightList($('networkList'), replay.networkMs, ms, follow && replay.panel === 'network');
+        updatePageBar(ms);
+    }
+
+    function currentMs() {
+        if (!replay.player) { return 0; }
+        var ms = 0;
+        try { ms = replay.player.getCurrentTime(); } catch (err) { ms = 0; }
+        return clamp(isNum(ms) ? ms : 0, 0, replay.duration);
+    }
+
+    function setScrub(ms) {
+        $('scrub').value = String(Math.round(ms));
+        $('clock').textContent = fmtClock(ms / 1000) + ' / ' + fmtClock(replay.duration / 1000);
     }
 
     function updatePlayButton() {
@@ -2006,132 +2354,107 @@
         setIcon($('playIcon'), replay.playing ? 'pause' : 'play');
         button.setAttribute('aria-label', replay.playing ? 'Pause' : 'Play');
         button.title = (replay.playing ? 'Pause' : 'Play') + ' (space)';
-        button.disabled = replay.events.length < 2;
+        button.disabled = !replay.player;
     }
 
-    function playPlayback() {
-        if (replay.events.length < 2) { return; }
-        if (replay.index >= replay.events.length - 1) { goTo(0, false); }
+    function startTicking() {
+        stopTicking();
+        replay.timer = setInterval(tick, 100);
+    }
+
+    function stopTicking() {
+        if (replay.timer) { clearInterval(replay.timer); replay.timer = 0; }
+    }
+
+    function tick() {
+        if (!replay.player || !replay.playing) { stopTicking(); return; }
+        var ms = currentMs();
+        setScrub(ms);
+        syncCurrent(ms, true);
+    }
+
+    function playPlayback(fromStart) {
+        if (!replay.player) { return; }
+        var ms = fromStart ? 0 : currentMs();
+        replay.finished = false;
+        replay.player.play(ms);
         replay.playing = true;
+        replay.follow = true;
         updatePlayButton();
-        scheduleNext();
+        startTicking();
     }
 
     function pausePlayback() {
+        if (replay.player && replay.playing) {
+            try { replay.player.pause(); } catch (err) { /* pausing a player that already stopped is harmless */ }
+        }
         replay.playing = false;
-        if (replay.raf) { cancelAnimationFrame(replay.raf); replay.raf = 0; }
+        replay.follow = false;
+        stopTicking();
+        updatePlayButton();
+        if (replay.player) { setScrub(currentMs()); }
+    }
+
+    function togglePlayback() {
+        if (!replay.player) { return; }
+        if (replay.playing) { pausePlayback(); return; }
+        playPlayback(replay.finished || currentMs() >= replay.duration);
+    }
+
+    function onFinish() {
+        replay.playing = false;
+        replay.finished = true;
+        stopTicking();
+        setScrub(replay.duration);
+        syncCurrent(replay.duration, true);
         updatePlayButton();
     }
 
-    function togglePlayback() { if (replay.playing) { pausePlayback(); } else { playPlayback(); } }
+    function seekMs(ms) {
+        if (!replay.player) { return; }
+        ms = clamp(ms, 0, replay.duration);
+        replay.finished = false;
+        if (replay.playing) { replay.player.play(ms); } else { replay.player.pause(ms); }
+        setScrub(ms);
+        syncCurrent(ms, true);
+    }
 
-    // Waits for the real gap between events, capped so a long pause never stalls the replay.
-    function scheduleNext() {
-        if (replay.raf) { cancelAnimationFrame(replay.raf); replay.raf = 0; }
-        var i = replay.index;
-        if (i >= replay.events.length - 1) { pausePlayback(); return; }
-        var from = replay.offsets[i];
-        var to = replay.offsets[i + 1];
-        var wait = Math.min(MAX_GAP_MS, (to - from) * 1000) / replay.speed;
-        var start = performance.now();
-        function tick(now) {
-            if (!replay.playing) { return; }
-            var progress = wait > 0 ? Math.min(1, (now - start) / wait) : 1;
-            setScrub(from + (to - from) * progress);
-            if (progress >= 1) {
-                goTo(i + 1, true);
-                scheduleNext();
-            } else {
-                replay.raf = requestAnimationFrame(tick);
-            }
+    // Dragging the scrubber previews frames while paused; playback resumes where the drag ends.
+    function scrubTo(ms) {
+        if (!replay.player) { return; }
+        ms = clamp(ms, 0, replay.duration);
+        if (!replay.scrubbing) {
+            replay.scrubbing = true;
+            replay.resume = replay.playing;
+            if (replay.playing) { pausePlayback(); }
         }
-        replay.raf = requestAnimationFrame(tick);
+        replay.finished = false;
+        replay.player.pause(ms);
+        setScrub(ms);
+        syncCurrent(ms, true);
+    }
+
+    function scrubEnd() {
+        if (!replay.scrubbing) { return; }
+        replay.scrubbing = false;
+        if (replay.resume && !replay.finished) { playPlayback(false); }
     }
 
     function setSpeed(speed) {
         replay.speed = speed;
+        store('replay.speed', String(speed));
         Array.prototype.forEach.call($('speedSeg').children, function (button) {
             button.classList.toggle('active', Number(button.getAttribute('data-speed')) === speed);
         });
-        if (replay.playing) { scheduleNext(); }
+        if (replay.player) { replay.player.setConfig({ speed: speed }); }
     }
 
-    function seekToOffset(offset) {
-        var index = 0;
-        for (var k = 0; k < replay.offsets.length; k++) { if (replay.offsets[k] <= offset) { index = k; } }
-        goTo(index, false);
-        setScrub(offset);
-        if (replay.playing) { scheduleNext(); }
-    }
-
-    function previewOrigin() {
-        if (!replay.session || typeof replay.session.entry_url !== 'string') { return null; }
-        try {
-            var url = new URL(replay.session.entry_url);
-            if (url.protocol !== 'http:' && url.protocol !== 'https:') { return null; }
-            return url.origin;
-        } catch (err) { return null; }
-    }
-
-    function updatePreviewControls() {
-        var toggle = $('previewToggle');
-        var origin = previewOrigin();
-        var note = $('previewNote');
-        toggle.disabled = !origin;
-        $('previewToggleLabel').title = origin ? 'Load the real page in a frame' : 'This session has no page URL to preview';
-        if (!origin) {
-            toggle.checked = false;
-            replay.preview = false;
-            $('preview').hidden = true;
-            note.hidden = true;
-            return;
-        }
-        replay.preview = toggle.checked;
-        $('preview').hidden = !replay.preview;
-        if (replay.preview) {
-            clear(note);
-            note.appendChild(document.createTextNode('Pages load from '));
-            note.appendChild(el('code', { text: origin }));
-            note.appendChild(document.createTextNode(' with hotspot_replay=1, so the script does not record them. Previews only work for pages that allow framing; other pages stay blank.'));
-            note.hidden = false;
-        } else {
-            note.hidden = true;
-        }
-    }
-
-    function syncPreview(st, e) {
-        var frame = $('preview');
-        var origin = previewOrigin();
-        if (!origin || !st.page) { return; }
-        var path = st.page.pathname || '/';
-        if (path.charAt(0) !== '/') { path = '/' + path; }
-        if (replay.previewPath !== path) {
-            replay.previewPath = path;
-            // A page from this server is trusted and must stay scriptable so it can be scrolled; any other origin is sandboxed.
-            if (origin === window.location.origin) { frame.removeAttribute('sandbox'); }
-            else { frame.setAttribute('sandbox', 'allow-scripts'); }
-            frame.src = origin + path + (path.indexOf('?') >= 0 ? '&' : '?') + 'hotspot_replay=1';
-        }
-        if (e.event === '$pageview') { scrollPreview(0); }
-        else if (st.scroll !== null) { scrollPreview(st.scroll); }
-    }
-
-    function scrollPreview(percent) {
-        try {
-            var win = $('preview').contentWindow;
-            var root = win.document.documentElement;
-            var max = Math.max(0, root.scrollHeight - root.clientHeight);
-            win.scrollTo({ top: max * percent / 100, behavior: 'smooth' });
-        } catch (err) {
-            // A page from another origin cannot be scrolled from here.
-        }
-    }
-
-    function togglePreview() {
-        updatePreviewControls();
-        replay.previewPath = null;
-        if (!replay.preview) { $('preview').removeAttribute('src'); return; }
-        if (replay.index >= 0) { renderFrame(replay.index, false); }
+    function setSkipInactive(on) {
+        replay.skipInactive = on;
+        store('replay.skip', on ? '1' : '0');
+        $('skipToggle').checked = on;
+        if (!on) { $('skipChip').hidden = true; }
+        if (replay.player) { replay.player.setConfig({ skipInactive: on }); }
     }
 
     // ---------- Funnel tab ----------
@@ -2328,7 +2651,7 @@
         pages = pages || [];
         referrers = referrers || {};
         $('pagesMeta').textContent = pages.length ? plural(pages.length, 'page', 'pages') : '';
-        fillTable($('pagesTable'), pages, 7, 'No page views in ' + scopeLabel() + ' yet.', function (row) {
+        fillTable($('pagesTable'), pages, 10, 'No page views in ' + scopeLabel() + ' yet.', function (row) {
             return el('tr', null, [
                 cell(row.pathname, 'mono trunc', row.pathname),
                 cell(fmtNum(row.views), 'num'),
@@ -2336,7 +2659,8 @@
                 cell(isNum(row.avg_seconds) ? fmtDuration(row.avg_seconds) : 'No data', 'num' + (isNum(row.avg_seconds) ? '' : ' muted')),
                 cell(isNum(row.avg_scroll_depth) ? Math.round(row.avg_scroll_depth) + '%' : 'No data', 'num' + (isNum(row.avg_scroll_depth) ? '' : ' muted')),
                 cell(fmtNum(row.exits), 'num'),
-                cell(fmtPct(row.exit_rate), 'num')
+                cell(fmtPct(row.exit_rate), 'num'),
+                CORE_VITALS.map(function (def) { return vitalCell(def, row.vitals); })
             ]);
         });
         fillTable($('referrersTable'), referrers.sources, 5, 'No sessions in ' + scopeLabel() + ' yet.', function (row) {
@@ -2472,6 +2796,8 @@
         row('Conversion events', (setup.conversion_events || []).length ? (setup.conversion_events || []).map(function (name) { return el('code', { text: name }); }).reduce(function (acc, node, i) { if (i) { acc.push(' '); } acc.push(node); return acc; }, []) : 'None');
         row('Session retention', fmtDays(setup.session_ttl_seconds));
         row('Sample site', setup.demo_enabled ? el('a', { href: '/demo/', target: '_blank', rel: 'noopener', text: '/demo/' }) : 'Disabled');
+        row('Session replay', setup.replay_enabled ? 'On' : 'Off (HOTSPOT_REPLAY_ENABLED)');
+        row('Recording size limit', fmtBytes(setup.max_recording_bytes) + ' per session');
 
         var checks = $('setupChecks');
         clear(checks);
@@ -2484,6 +2810,8 @@
             setup.dashboard_protected ? 'Visitors need the HOTSPOT_DASHBOARD_PASSWORD value to open this dashboard and the API.' : 'This dashboard is open to anyone who can reach this server. Set HOTSPOT_DASHBOARD_PASSWORD to protect it.');
         check(setup.storage === 'redis', setup.storage === 'redis' ? 'Sessions are stored in Redis' : 'Sessions are stored in memory',
             setup.storage === 'redis' ? 'Data survives restarts and is shared between workers.' : 'Sessions disappear when the server restarts. Set REDIS_URL to keep them.');
+        check(!!setup.replay_enabled, setup.replay_enabled ? 'Session replay is on' : 'Session replay is off',
+            setup.replay_enabled ? 'Pages with the script send a recording of each session, up to ' + fmtBytes(setup.max_recording_bytes) + ' each.' : 'HOTSPOT_REPLAY_ENABLED is off, so sessions only have the event timeline.');
     }
 
     // ---------- Tabs and navigation ----------
@@ -2607,11 +2935,17 @@
             case 'play':
                 togglePlayback();
                 break;
-            case 'speed':
-                setSpeed(Number(trigger.getAttribute('data-speed')) || 1);
+            case 'speed': {
+                var speed = Number(trigger.getAttribute('data-speed'));
+                setSpeed(SPEEDS.indexOf(speed) >= 0 ? speed : 1);
                 break;
-            case 'seek':
-                goTo(Number(trigger.getAttribute('data-index')) || 0, true);
+            }
+            case 'seek-ms':
+                seekMs(Number(trigger.getAttribute('data-ms')) || 0);
+                if (trigger.classList.contains('trow')) { markRow(trigger); }
+                break;
+            case 'panel':
+                setPanel(trigger.getAttribute('data-panel'));
                 break;
             case 'copy': {
                 var source = $(trigger.getAttribute('data-target'));
@@ -2678,8 +3012,10 @@
         } else if (target.id === 'fOs') {
             state.os = target.value || 'all';
             reloadForFilters();
-        } else if (target.id === 'previewToggle') {
-            togglePreview();
+        } else if (target.id === 'skipToggle') {
+            setSkipInactive(!!target.checked);
+        } else if (target.id === 'scrub') {
+            scrubEnd();
         } else if (target.closest && target.closest('#funnelSteps')) {
             funnelEditor.dirty = true;
         }
@@ -2697,7 +3033,7 @@
                 reloadForFilters();
             }, 300);
         } else if (target.id === 'scrub') {
-            seekToOffset(Number(target.value) / 10);
+            scrubTo(Number(target.value) || 0);
         } else if (target.closest && target.closest('#funnelSteps')) {
             funnelEditor.dirty = true;
         }
@@ -2707,7 +3043,7 @@
         if (event.code !== 'Space' || event.defaultPrevented) { return; }
         var tag = (event.target.tagName || '').toLowerCase();
         if (tag === 'input' || tag === 'textarea' || tag === 'select' || tag === 'button' || tag === 'a' || event.target.isContentEditable) { return; }
-        if (state.tab !== 'sessions' || $('replayCard').hidden) { return; }
+        if (state.tab !== 'sessions' || $('replayCard').hidden || !replay.player) { return; }
         event.preventDefault();
         togglePlayback();
     });
@@ -2733,12 +3069,6 @@
         resizeTimer = setTimeout(fitFrame, 80);
     });
 
-    $('preview').addEventListener('load', function () {
-        if (!replay.preview || replay.index < 0) { return; }
-        var st = frameStateAt(replay.index);
-        if (st.scroll !== null) { scrollPreview(st.scroll); }
-    });
-
     // ---------- Boot ----------
 
     function boot() {
@@ -2752,6 +3082,11 @@
         $('signoutForm').hidden = !CONFIG.isProtected;
         $('footVersion').textContent = CONFIG.version ? 'v' + CONFIG.version : '';
         setSidebar(store('sidebar') === '1');
+        var storedSpeed = Number(store('replay.speed'));
+        setSpeed(SPEEDS.indexOf(storedSpeed) >= 0 ? storedSpeed : 1);
+        setSkipInactive(store('replay.skip') !== '0');
+        setPanel('events');
+        updatePlayButton();
 
         var storedHours = store('hours');
         state.hours = storedHours !== null && HOURS_VALUES.indexOf(Number(storedHours)) >= 0 ? Number(storedHours) : 24;
@@ -2771,6 +3106,7 @@
         loadOverview();
         setInterval(function () { if (!document.hidden) { loadOverview(); } }, REFRESH_MS);
         setInterval(pollLive, LIVE_POLL_MS);
+        setInterval(pollRecording, RECORDING_POLL_MS);
         setInterval(renderUpdated, 1000);
     }
 

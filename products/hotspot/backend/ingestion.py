@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import json
+import zlib
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -18,10 +19,13 @@ MAX_STRING_LENGTH = 4000
 MAX_PROPERTY_COUNT = 200
 MAX_LIST_LENGTH = 100
 MAX_DEPTH = 4
+MAX_RECORDING_EVENTS = 5000
 # Events older than this are kept at their own timestamp only if they fall inside the window;
 # anything older is almost always a clock problem on the visitor's machine.
 MAX_EVENT_AGE_SECONDS = 30 * 24 * 3600
 MAX_FUTURE_SKEW_SECONDS = 120
+# rrweb event types: DomContentLoaded, Load, FullSnapshot, IncrementalSnapshot, Meta, Custom, Plugin.
+RECORDING_EVENT_TYPES = frozenset(range(7))
 
 _ID_SAFE = re.compile(r"[^A-Za-z0-9_.:@-]")
 _RESERVED_PROPERTY_KEYS = frozenset({"token", "api_key", "project_id", "distinct_id"})
@@ -74,21 +78,44 @@ class CapturedEvent:
         }
 
 
-def parse_batch(body: bytes, context: RequestContext, config: HotspotConfig, now: float) -> list[CapturedEvent]:
-    if len(body) > config.max_body_bytes:
-        raise IngestionError("Request body is too large", status=413)
-    try:
-        payload = json.loads(body.decode("utf-8")) if body else {}
-    except (UnicodeDecodeError, ValueError) as error:
-        raise IngestionError("Body is not valid JSON") from error
-    if not isinstance(payload, dict):
-        raise IngestionError("Body must be a JSON object")
+@dataclass(frozen=True, kw_only=True)
+class RecordingChunk:
+    """One slice of a session's DOM recording: rrweb events, kept as the browser serialized them."""
 
-    api_key = _clean_id(payload.get("api_key"))
-    if not api_key:
-        raise IngestionError("api_key is required", status=401)
-    if config.api_keys and api_key not in config.api_keys:
-        raise IngestionError("Unknown api_key", status=401)
+    session_id: str
+    distinct_id: str
+    project_id: str
+    events: list[dict[str, Any]]
+    first_timestamp: float
+    last_timestamp: float
+    received_at: float
+
+    @property
+    def event_count(self) -> int:
+        return len(self.events)
+
+
+def decode_body(body: bytes, compression: str | None, limit: int) -> bytes:
+    """Inflates a gzip body under a hard cap, so a small request cannot expand into a huge one."""
+    if not compression:
+        if len(body) > limit:
+            raise IngestionError("Request body is too large", status=413)
+        return body
+    if compression != "gzip":
+        raise IngestionError("Unsupported compression")
+    inflater = zlib.decompressobj(wbits=31)
+    try:
+        data = inflater.decompress(body, limit + 1)
+    except zlib.error as error:
+        raise IngestionError("Body is not valid gzip") from error
+    if len(data) > limit or inflater.unconsumed_tail:
+        raise IngestionError("Request body is too large", status=413)
+    return data
+
+
+def parse_batch(body: bytes, context: RequestContext, config: HotspotConfig, now: float) -> list[CapturedEvent]:
+    payload = _load_object(decode_body(body, None, config.max_body_bytes))
+    api_key = _check_api_key(payload, config)
 
     raw_items = payload.get("batch")
     if raw_items is None:
@@ -117,6 +144,67 @@ def parse_batch(body: bytes, context: RequestContext, config: HotspotConfig, now
         if event is not None:
             events.append(event)
     return events
+
+
+def parse_recording(body: bytes, compression: str | None, config: HotspotConfig, now: float) -> RecordingChunk:
+    payload = _load_object(decode_body(body, compression, config.max_recording_body_bytes))
+    api_key = _check_api_key(payload, config)
+    session_id = _clean_id(payload.get("session_id"))
+    if not session_id:
+        raise IngestionError("session_id is required")
+    raw_events = payload.get("events")
+    if not isinstance(raw_events, list):
+        raise IngestionError("events must be a list")
+    if len(raw_events) > MAX_RECORDING_EVENTS:
+        raise IngestionError(f"events holds more than {MAX_RECORDING_EVENTS} items", status=413)
+    events = [item for item in raw_events if _is_recording_event(item)]
+    if not events:
+        raise IngestionError("events holds no recording events")
+    # rrweb stamps events in milliseconds; the rest of Hotspot works in seconds.
+    timestamps = [float(item["timestamp"]) / 1000 for item in events]
+    first, last = min(timestamps), max(timestamps)
+    if first < now - MAX_EVENT_AGE_SECONDS or last > now + MAX_FUTURE_SKEW_SECONDS:
+        raise IngestionError("Recording timestamps are out of range")
+    return RecordingChunk(
+        session_id=session_id,
+        distinct_id=_clean_id(payload.get("distinct_id")) or "anonymous",
+        project_id=api_key,
+        events=events,
+        first_timestamp=first,
+        last_timestamp=last,
+        received_at=now,
+    )
+
+
+def _is_recording_event(item: Any) -> bool:
+    if not isinstance(item, dict):
+        return False
+    kind = item.get("type")
+    stamp = item.get("timestamp")
+    if isinstance(kind, bool) or not isinstance(kind, int) or kind not in RECORDING_EVENT_TYPES:
+        return False
+    if isinstance(stamp, bool) or not isinstance(stamp, (int, float)):
+        return False
+    return stamp == stamp and abs(stamp) != float("inf")
+
+
+def _load_object(body: bytes) -> dict[str, Any]:
+    try:
+        payload = json.loads(body.decode("utf-8")) if body else {}
+    except (UnicodeDecodeError, ValueError) as error:
+        raise IngestionError("Body is not valid JSON") from error
+    if not isinstance(payload, dict):
+        raise IngestionError("Body must be a JSON object")
+    return payload
+
+
+def _check_api_key(payload: Mapping[str, Any], config: HotspotConfig) -> str:
+    api_key = _clean_id(payload.get("api_key"))
+    if not api_key:
+        raise IngestionError("api_key is required", status=401)
+    if config.api_keys and api_key not in config.api_keys:
+        raise IngestionError("Unknown api_key", status=401)
+    return api_key
 
 
 def _parse_item(item: Any, api_key: str, server_properties: dict[str, Any], now: float) -> CapturedEvent | None:

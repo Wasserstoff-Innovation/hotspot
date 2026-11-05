@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import gzip
 import json
+import time
 from collections.abc import Iterator
+from typing import Any
 
 import pytest
 
@@ -81,3 +84,37 @@ def test_capture_endpoint_records_events_and_answers_cors(protected_service: Hot
         factory.post("/hotspot/batch/", data=batch_body([], api_key="other"), content_type="text/plain")
     )
     assert refused.status_code == 401
+
+
+def test_recording_endpoint_splices_stored_chunks_into_one_json_document(protected_service: HotspotService) -> None:
+    factory = RequestFactory()
+    # The view reads the real clock, and a recording older than the ingestion window is refused.
+    start = int(time.time()) * 1000
+    meta = {"type": 4, "timestamp": start, "data": {"href": "https://example.com/", "width": 1280, "height": 800}}
+    snapshot = {"type": 2, "timestamp": start + 1, "data": {"node": {"type": 0, "childNodes": [], "id": 1}}}
+    mutation = {"type": 3, "timestamp": start + 500, "data": {"source": 1, "positions": [{"x": 1, "y": 2, "id": 1}]}}
+
+    def post(events: list[dict[str, Any]], compressed: bool = False) -> dict[str, Any]:
+        raw = json.dumps({"api_key": "hs_test", "session_id": "sess-1", "events": events}).encode()
+        path = "/hotspot/replay/?compression=gzip" if compressed else "/hotspot/replay/"
+        request = factory.post(path, data=gzip.compress(raw) if compressed else raw, content_type="text/plain")
+        return json.loads(views.capture_recording(request).content)
+
+    assert post([meta, snapshot], compressed=True) == {"status": 1, "received": 2, "stored": True}
+    assert post([mutation])["received"] == 1
+
+    auth = {"Authorization": "Bearer open-sesame"}
+    assert views.session_recording(factory.get("/r"), "sess-1").status_code == 401
+    assert views.session_recording(factory.get("/r", headers=auth), "missing").status_code == 404
+    whole = json.loads(views.session_recording(factory.get("/r", headers=auth), "sess-1").content)
+    assert whole["events"] == [meta, snapshot, mutation]
+    assert (whole["from"], whole["next"], whole["truncated"], whole["started_at"]) == (0, 2, False, start / 1000)
+    tail = json.loads(views.session_recording(factory.get("/r?from=1", headers=auth), "sess-1").content)
+    assert tail["events"] == [mutation] and tail["next"] == 2
+    detail = json.loads(views.session_detail(factory.get("/d", headers=auth), "sess-1").content)
+    assert detail["session"]["has_recording"] is True and detail["session"]["recording_events"] == 3
+
+    recorder = views.asset(factory.get("/hotspot/assets/recorder.js"), "recorder.js")
+    assert (recorder.status_code, recorder["Access-Control-Allow-Origin"]) == (200, "*")
+    assert recorder["Content-Type"].startswith("application/javascript")
+    assert views.asset(factory.get("/hotspot/assets/other.js"), "other.js").status_code == 404

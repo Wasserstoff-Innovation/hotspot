@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import time
+import zlib
 import logging
 import threading
 from collections import deque
@@ -17,12 +18,13 @@ from typing import Any, Protocol
 from urllib.parse import urlsplit
 
 from products.hotspot.backend.config import HotspotConfig
-from products.hotspot.backend.ingestion import CapturedEvent
+from products.hotspot.backend.ingestion import CapturedEvent, RecordingChunk
 
 logger = logging.getLogger(__name__)
 
 KEY_PREFIX = "hotspot:v1:"
 MAX_PAGES_PER_SESSION = 200
+RECORDING_COMPRESSION_LEVEL = 6
 _IDENTITY_KEYS = {
     "email": ("email", "$email"),
     "name": ("name", "$name", "full_name"),
@@ -49,12 +51,19 @@ class StorageBackend(Protocol):
     name: str
 
     def update_session(
-        self, session_id: str, mutate: SessionMutator, events_json: list[str], last_seen: float
+        self,
+        session_id: str,
+        mutate: SessionMutator,
+        events_json: list[str],
+        last_seen: float,
+        recording_chunk: bytes | None = None,
     ) -> dict[str, Any]: ...
 
     def get_sessions(self, session_ids: list[str]) -> list[dict[str, Any] | None]: ...
 
     def get_session_events(self, session_id: str) -> list[dict[str, Any]]: ...
+
+    def get_recording(self, session_id: str, start: int) -> list[bytes]: ...
 
     def session_ids(self) -> list[str]: ...
 
@@ -75,18 +84,26 @@ class MemoryBackend:
         self._lock = threading.Lock()
         self._sessions: dict[str, dict[str, Any]] = {}
         self._session_events: dict[str, deque[str]] = {}
+        self._recordings: dict[str, list[bytes]] = {}
         self._last_seen: dict[str, float] = {}
         self._events: deque[str] = deque(maxlen=config.max_events)
 
     def update_session(
-        self, session_id: str, mutate: SessionMutator, events_json: list[str], last_seen: float
+        self,
+        session_id: str,
+        mutate: SessionMutator,
+        events_json: list[str],
+        last_seen: float,
+        recording_chunk: bytes | None = None,
     ) -> dict[str, Any]:
         with self._lock:
             updated = mutate(self._sessions.get(session_id))
             self._sessions[session_id] = updated
-            self._last_seen[session_id] = last_seen
+            self._last_seen[session_id] = float(updated.get("last_seen") or last_seen)
             bucket = self._session_events.setdefault(session_id, deque(maxlen=self._config.max_session_events))
             bucket.extend(events_json)
+            if recording_chunk is not None:
+                self._recordings.setdefault(session_id, []).append(recording_chunk)
             return updated
 
     def get_sessions(self, session_ids: list[str]) -> list[dict[str, Any] | None]:
@@ -96,6 +113,10 @@ class MemoryBackend:
     def get_session_events(self, session_id: str) -> list[dict[str, Any]]:
         with self._lock:
             return [json.loads(raw) for raw in self._session_events.get(session_id, ())]
+
+    def get_recording(self, session_id: str, start: int) -> list[bytes]:
+        with self._lock:
+            return list(self._recordings.get(session_id, [])[start:])
 
     def session_ids(self) -> list[str]:
         with self._lock:
@@ -115,12 +136,14 @@ class MemoryBackend:
             for session_id in [sid for sid, seen in self._last_seen.items() if seen < before]:
                 self._sessions.pop(session_id, None)
                 self._session_events.pop(session_id, None)
+                self._recordings.pop(session_id, None)
                 self._last_seen.pop(session_id, None)
 
     def clear(self) -> None:
         with self._lock:
             self._sessions.clear()
             self._session_events.clear()
+            self._recordings.clear()
             self._last_seen.clear()
             self._events.clear()
 
@@ -141,8 +164,16 @@ class RedisBackend:
     def _events_key_for(self, session_id: str) -> str:
         return f"{self._prefix}s:{session_id}:events"
 
+    def _recording_key_for(self, session_id: str) -> str:
+        return f"{self._prefix}s:{session_id}:rec"
+
     def update_session(
-        self, session_id: str, mutate: SessionMutator, events_json: list[str], last_seen: float
+        self,
+        session_id: str,
+        mutate: SessionMutator,
+        events_json: list[str],
+        last_seen: float,
+        recording_chunk: bytes | None = None,
     ) -> dict[str, Any]:
         key = self._session_key(session_id)
         ttl = self._config.session_ttl_seconds
@@ -152,12 +183,16 @@ class RedisBackend:
             updated = mutate(json.loads(_text(raw)) if raw else None)
             pipe.multi()
             pipe.set(key, json.dumps(updated, separators=(",", ":")), ex=ttl)
-            pipe.zadd(self._index_key, {session_id: last_seen})
+            pipe.zadd(self._index_key, {session_id: float(updated.get("last_seen") or last_seen)})
             if events_json:
                 events_key = self._events_key_for(session_id)
                 pipe.rpush(events_key, *events_json)
                 pipe.ltrim(events_key, -self._config.max_session_events, -1)
                 pipe.expire(events_key, ttl)
+            if recording_chunk is not None:
+                recording_key = self._recording_key_for(session_id)
+                pipe.rpush(recording_key, recording_chunk)
+                pipe.expire(recording_key, ttl)
             return updated
 
         result: dict[str, Any] = self._client.transaction(transaction, key, value_from_callable=True)
@@ -172,6 +207,9 @@ class RedisBackend:
     def get_session_events(self, session_id: str) -> list[dict[str, Any]]:
         raws = self._client.lrange(self._events_key_for(session_id), 0, -1)
         return [json.loads(_text(raw)) for raw in raws]
+
+    def get_recording(self, session_id: str, start: int) -> list[bytes]:
+        return [_binary(raw) for raw in self._client.lrange(self._recording_key_for(session_id), start, -1)]
 
     def session_ids(self) -> list[str]:
         return [_text(raw) for raw in self._client.zrevrange(self._index_key, 0, -1)]
@@ -201,6 +239,14 @@ def _text(value: Any) -> str:
     if isinstance(value, bytes):
         return value.decode("utf-8")
     return str(value)
+
+
+def _binary(value: Any) -> bytes:
+    if isinstance(value, bytes):
+        return value
+    if isinstance(value, (bytearray, memoryview)):
+        return bytes(value)
+    raise TypeError("Recording chunks need a Redis client that returns bytes, not decoded strings")
 
 
 class SessionStore:
@@ -247,6 +293,27 @@ class SessionStore:
     def session_events(self, session_id: str) -> list[dict[str, Any]]:
         return self._backend.get_session_events(session_id)
 
+    def summary(self, session_id: str) -> dict[str, Any] | None:
+        return self._backend.get_sessions([session_id])[0]
+
+    def record_recording(self, chunk: RecordingChunk, now: float | None = None) -> bool:
+        """Stores one slice of a DOM recording; returns False once the session has used its byte budget."""
+        moment = time.time() if now is None else now
+        blob = zlib.compress(
+            json.dumps(chunk.events, separators=(",", ":")).encode("utf-8"), RECORDING_COMPRESSION_LEVEL
+        )
+        used = int((self.summary(chunk.session_id) or {}).get("recording_bytes") or 0)
+        fits = used + len(blob) <= self._config.max_recording_bytes
+        mutator = _recording_mutator(chunk, len(blob) if fits else None)
+        self._backend.update_session(
+            chunk.session_id, mutator, [], chunk.last_timestamp, recording_chunk=blob if fits else None
+        )
+        self._backend.prune(moment - self._config.session_ttl_seconds)
+        return fits
+
+    def recording_chunks(self, session_id: str, start: int = 0) -> list[bytes]:
+        return self._backend.get_recording(session_id, max(0, start))
+
     def recent_events(self, limit: int = 100, since: float | None = None) -> list[dict[str, Any]]:
         events = self._backend.recent_events(limit)
         if since is not None:
@@ -258,8 +325,14 @@ class SessionStore:
 
 
 def _build_mutator(events: list[CapturedEvent], config: HotspotConfig) -> SessionMutator:
+    first = events[0]
+
     def mutate(current: dict[str, Any] | None) -> dict[str, Any]:
-        summary = dict(current) if current else new_session_summary(events[0])
+        summary = (
+            dict(current)
+            if current
+            else new_session_summary(first.session_id, first.distinct_id, first.project_id, first.timestamp)
+        )
         for event in events:
             apply_event(summary, event, config)
         return summary
@@ -267,13 +340,44 @@ def _build_mutator(events: list[CapturedEvent], config: HotspotConfig) -> Sessio
     return mutate
 
 
-def new_session_summary(first: CapturedEvent) -> dict[str, Any]:
+def _extend_span(summary: dict[str, Any], first: float, last: float) -> None:
+    summary["first_seen"] = min(summary["first_seen"], first)
+    summary["last_seen"] = max(summary["last_seen"], last)
+    summary["duration_seconds"] = max(0, int(round(summary["last_seen"] - summary["first_seen"])))
+
+
+def _recording_mutator(chunk: RecordingChunk, stored_bytes: int | None) -> SessionMutator:
+    """Folds a recording chunk into the summary; a chunk over budget only marks the recording as cut short."""
+
+    def mutate(current: dict[str, Any] | None) -> dict[str, Any]:
+        summary = (
+            dict(current)
+            if current
+            else new_session_summary(chunk.session_id, chunk.distinct_id, chunk.project_id, chunk.first_timestamp)
+        )
+        _extend_span(summary, chunk.first_timestamp, chunk.last_timestamp)
+        if stored_bytes is None:
+            summary["recording_truncated"] = True
+            return summary
+        summary["recording_bytes"] = int(summary.get("recording_bytes") or 0) + stored_bytes
+        summary["recording_events"] = int(summary.get("recording_events") or 0) + chunk.event_count
+        summary["recording_chunks"] = int(summary.get("recording_chunks") or 0) + 1
+        started = summary.get("recording_started_at")
+        summary["recording_started_at"] = (
+            chunk.first_timestamp if started is None else min(float(started), chunk.first_timestamp)
+        )
+        return summary
+
+    return mutate
+
+
+def new_session_summary(session_id: str, distinct_id: str, project_id: str, timestamp: float) -> dict[str, Any]:
     return {
-        "session_id": first.session_id,
-        "distinct_id": first.distinct_id,
-        "project_id": first.project_id,
-        "first_seen": first.timestamp,
-        "last_seen": first.timestamp,
+        "session_id": session_id,
+        "distinct_id": distinct_id,
+        "project_id": project_id,
+        "first_seen": timestamp,
+        "last_seen": timestamp,
         "duration_seconds": 0,
         "event_count": 0,
         "pageview_count": 0,
@@ -311,6 +415,11 @@ def new_session_summary(first: CapturedEvent) -> dict[str, Any]:
         "conversion_event": None,
         "converted_at": None,
         "last_event": None,
+        "recording_bytes": 0,
+        "recording_events": 0,
+        "recording_chunks": 0,
+        "recording_started_at": None,
+        "recording_truncated": False,
     }
 
 
@@ -318,9 +427,7 @@ def apply_event(summary: dict[str, Any], event: CapturedEvent, config: HotspotCo
     props = event.properties
     name = event.event
 
-    summary["first_seen"] = min(summary["first_seen"], event.timestamp)
-    summary["last_seen"] = max(summary["last_seen"], event.timestamp)
-    summary["duration_seconds"] = max(0, int(round(summary["last_seen"] - summary["first_seen"])))
+    _extend_span(summary, event.timestamp, event.timestamp)
     summary["event_count"] += 1
     summary["last_event"] = name
 

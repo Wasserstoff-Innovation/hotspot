@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import statistics
 from collections import Counter, defaultdict
 from collections.abc import Iterable, Mapping, Sequence
@@ -18,6 +19,15 @@ MAX_LIST_ROWS = 25
 STATUS_FILTERS = frozenset({"all", "converted", "rage", "error", "bounced", "engaged", "active", "identified", "dead"})
 STEP_KINDS = frozenset({"path", "event", "click", "text"})
 CLICK_EVENTS = frozenset({"$autocapture", "$rageclick"})
+# Each web vital with the $web_vitals property it arrives in and the decimals it is reported with.
+# CLS is a unitless score around 0.1, so it keeps three decimals; the rest are milliseconds.
+WEB_VITALS: tuple[tuple[str, str, int], ...] = (
+    ("lcp_ms", "$lcp_ms", 0),
+    ("cls", "$cls", 3),
+    ("inp_ms", "$inp_ms", 0),
+    ("fcp_ms", "$fcp_ms", 0),
+    ("ttfb_ms", "$ttfb_ms", 0),
+)
 
 
 @dataclass(frozen=True)
@@ -138,6 +148,10 @@ def format_session(summary: Mapping[str, Any], now: float) -> dict[str, Any]:
         "converted": bool(summary.get("converted")),
         "conversion_event": summary.get("conversion_event"),
         "last_event": summary.get("last_event"),
+        "has_recording": int(summary.get("recording_chunks") or 0) > 0,
+        "recording_events": int(summary.get("recording_events") or 0),
+        "recording_started_at": summary.get("recording_started_at"),
+        "recording_truncated": bool(summary.get("recording_truncated")),
     }
 
 
@@ -358,8 +372,45 @@ def _finish_friction(bucket: Mapping[tuple[str, str, str], dict[str, Any]]) -> l
     return rows[:MAX_LIST_ROWS]
 
 
+def compute_web_vitals(
+    sessions: Iterable[tuple[Mapping[str, Any], Sequence[Mapping[str, Any]]]],
+) -> dict[str, Any]:
+    """The 75th percentile of each vital, site-wide and per page, which is how Google scores them."""
+    site: dict[str, list[float]] = defaultdict(list)
+    per_page: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
+    for _summary, events in sessions:
+        for event in events:
+            if event.get("event") != "$web_vitals":
+                continue
+            props = event.get("properties") or {}
+            pathname = props.get("$pathname")
+            for field, key, _digits in WEB_VITALS:
+                value = props.get(key)
+                if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
+                    continue
+                site[field].append(float(value))
+                if isinstance(pathname, str) and pathname:
+                    per_page[pathname][field].append(float(value))
+    return {"site": _vitals_row(site), "pages": {path: _vitals_row(values) for path, values in per_page.items()}}
+
+
+def _vitals_row(samples: Mapping[str, Sequence[float]]) -> dict[str, Any]:
+    row: dict[str, Any] = {field: _p75(samples.get(field, ()), digits) for field, _key, digits in WEB_VITALS}
+    row["samples"] = max((len(values) for values in samples.values()), default=0)
+    return row
+
+
+def _p75(values: Sequence[float], digits: int) -> float | int | None:
+    if not values:
+        return None
+    ordered = sorted(values)
+    value = ordered[max(0, math.ceil(0.75 * len(ordered)) - 1)]
+    return round(value, digits) if digits else int(round(value))
+
+
 def compute_pages(
     sessions: Iterable[tuple[Mapping[str, Any], Sequence[Mapping[str, Any]]]],
+    page_vitals: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     views: Counter[str] = Counter()
     sessions_by_page: dict[str, set[str]] = defaultdict(set)
@@ -404,6 +455,7 @@ def compute_pages(
                 "avg_scroll_depth": round(statistics.mean(page_depths)) if page_depths else None,
                 "exits": exits[pathname],
                 "exit_rate": _share(exits[pathname], session_count),
+                "vitals": dict((page_vitals or {}).get(pathname) or {}) or None,
             }
         )
     return rows
@@ -509,6 +561,7 @@ def build_overview(store: SessionStore, query: OverviewQuery, config: HotspotCon
 
     with_events = [(summary, store.session_events(str(summary.get("session_id")))) for summary in summaries]
     visible = [summary for summary in summaries if _matches_session_filter(summary, query, now)]
+    vitals = compute_web_vitals(with_events)
 
     steps = parse_funnel_steps(query.funnel, config)
     if query.conversion_event:
@@ -540,6 +593,7 @@ def build_overview(store: SessionStore, query: OverviewQuery, config: HotspotCon
         else 0.0,
         "avg_scroll_depth": round(statistics.mean(depths)) if depths else None,
         "ai_referral_sessions": sum(1 for summary in summaries if summary.get("is_ai_referral")),
+        "sessions_with_replay": sum(1 for summary in summaries if int(summary.get("recording_chunks") or 0) > 0),
     }
 
     return {
@@ -562,7 +616,8 @@ def build_overview(store: SessionStore, query: OverviewQuery, config: HotspotCon
         "funnel": funnel,
         "paths": compute_paths(summaries),
         "friction": compute_friction(with_events),
-        "pages": compute_pages(with_events),
+        "pages": compute_pages(with_events, vitals["pages"]),
+        "web_vitals": vitals["site"],
         "referrers": compute_referrers(summaries),
         "errors": compute_errors(with_events),
         "activity": compute_activity(store.recent_events(limit=config.max_events), summaries, now),
@@ -585,6 +640,8 @@ def setup_info(store: SessionStore, config: HotspotConfig) -> dict[str, Any]:
         "storage": store.backend_name,
         "conversion_events": sorted(config.conversion_events),
         "session_ttl_seconds": config.session_ttl_seconds,
+        "replay_enabled": config.replay_enabled,
+        "max_recording_bytes": config.max_recording_bytes,
     }
 
 

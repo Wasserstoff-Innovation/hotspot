@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import time
+import zlib
 import logging
 from collections.abc import Mapping
 from pathlib import Path
@@ -12,13 +14,22 @@ from products.hotspot import __version__
 from products.hotspot.backend.analytics import OverviewQuery, build_overview, format_session, setup_info
 from products.hotspot.backend.auth import make_dashboard_token, password_matches, verify_dashboard_token
 from products.hotspot.backend.config import HotspotConfig, load_config
-from products.hotspot.backend.ingestion import IngestionError, RequestContext, parse_batch
+from products.hotspot.backend.ingestion import IngestionError, RequestContext, parse_batch, parse_recording
 from products.hotspot.backend.store import SessionStore, build_store
 
 logger = logging.getLogger(__name__)
 
-SDK_PATH = Path(__file__).resolve().parent.parent / "sdk" / "hotspot.js"
+PRODUCT_PATH = Path(__file__).resolve().parent.parent
+SDK_PATH = PRODUCT_PATH / "sdk" / "hotspot.js"
+# The files served under /hotspot/assets/: the rrweb recorder the script loads on visitors' pages and
+# the player the dashboard uses. This allowlist is the only way a request reaches the vendor directory.
+ASSETS: dict[str, tuple[Path, str]] = {
+    "recorder.js": (PRODUCT_PATH / "vendor" / "rrweb-record.js", "application/javascript; charset=utf-8"),
+    "replay.js": (PRODUCT_PATH / "vendor" / "rrweb-replay.js", "application/javascript; charset=utf-8"),
+    "replay.css": (PRODUCT_PATH / "vendor" / "rrweb-replay.css", "text/css; charset=utf-8"),
+}
 MAX_FEED_EVENTS = 500
+MAX_RECORDING_CURSOR = 1_000_000
 FAVICON_SVG = (
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">'
     '<circle cx="16" cy="16" r="14" stroke="#2563EB" stroke-width="2" stroke-dasharray="3 3" opacity="0.45"/>'
@@ -38,6 +49,7 @@ class HotspotService:
     def __init__(self, config: HotspotConfig, store: SessionStore) -> None:
         self.config = config
         self.store = store
+        self._assets: dict[str, str] = {}
         if not config.dashboard_protected:
             logger.warning("HOTSPOT_DASHBOARD_PASSWORD is not set: the Hotspot dashboard is open to anyone")
         if not config.api_keys:
@@ -56,6 +68,19 @@ class HotspotService:
             return error.status, {"status": 0, "error": str(error)}
         received = self.store.record(events, now=moment)
         return 200, {"status": 1, "received": received}
+
+    def capture_recording(
+        self, body: bytes, params: Mapping[str, str], now: float | None = None
+    ) -> tuple[int, dict[str, Any]]:
+        moment = time.time() if now is None else now
+        if not self.config.replay_enabled:
+            return 403, {"status": 0, "error": "Session replay is turned off on this server"}
+        try:
+            chunk = parse_recording(body, params.get("compression") or None, self.config, moment)
+        except IngestionError as error:
+            return error.status, {"status": 0, "error": str(error)}
+        stored = self.store.record_recording(chunk, now=moment)
+        return 200, {"status": 1, "received": chunk.event_count, "stored": stored}
 
     def overview(self, params: Mapping[str, str], now: float | None = None) -> dict[str, Any]:
         moment = time.time() if now is None else now
@@ -79,6 +104,31 @@ class HotspotService:
                 for event in events
             ],
         }
+
+    def recording(self, session_id: str, params: Mapping[str, str]) -> str | None:
+        """The recording as JSON text. Chunks are spliced in as stored, so megabytes of events are not re-parsed."""
+        summary = self.store.summary(session_id)
+        if summary is None:
+            return None
+        start = _int_param(params.get("from"), default=0, low=0, high=MAX_RECORDING_CURSOR)
+        chunks = self.store.recording_chunks(session_id, start)
+        parts = []
+        for chunk in chunks:
+            inner = zlib.decompress(chunk).decode("utf-8").strip()[1:-1]
+            if inner:
+                parts.append(inner)
+        head = json.dumps(
+            {
+                "status": 1,
+                "session_id": session_id,
+                "from": start,
+                "next": start + len(chunks),
+                "truncated": bool(summary.get("recording_truncated")),
+                "started_at": summary.get("recording_started_at"),
+            },
+            separators=(",", ":"),
+        )
+        return f'{head[:-1]},"events":[{",".join(parts)}]}}'
 
     def events_feed(self, params: Mapping[str, str], now: float | None = None) -> dict[str, Any]:
         moment = time.time() if now is None else now
@@ -125,6 +175,7 @@ class HotspotService:
             "version": __version__,
             "dashboard_protected": "1" if self.config.dashboard_protected else "",
             "demo_enabled": "1" if self.config.demo_enabled else "",
+            "replay_enabled": "1" if self.config.replay_enabled else "",
             "storage": self.store.backend_name,
         }
         context.update(extra)
@@ -136,16 +187,27 @@ class HotspotService:
     def sdk_source(self) -> str:
         return SDK_PATH.read_text(encoding="utf-8")
 
+    def asset(self, name: str) -> tuple[str, str] | None:
+        entry = ASSETS.get(name)
+        if entry is None:
+            return None
+        path, content_type = entry
+        if name not in self._assets:
+            self._assets[name] = path.read_text(encoding="utf-8")
+        return self._assets[name], content_type
+
     def llms_txt(self) -> str:
         return (
             "# Hotspot\n"
             "> Self-hosted product telemetry: one script tag captures page views, clicks, rage clicks, "
-            "dead clicks, scroll depth, form submits and JavaScript errors. The dashboard shows sessions, "
-            "a replay timeline, funnels, paths and friction.\n\n"
+            "dead clicks, scroll depth, form submits, JavaScript errors, web vitals and a DOM recording of "
+            "each session. The dashboard replays sessions with console and network activity, and shows "
+            "funnels, paths, friction, pages, referrers and errors.\n\n"
             f"- Dashboard: {self.config.site_url}/dashboard/\n"
             f"- Sample site: {self.config.site_url}/demo/\n"
             f"- Script: {self.config.sdk_url}\n"
             f"- Capture endpoint: {self.config.site_url}/hotspot/batch/\n"
+            f"- Recording endpoint: {self.config.site_url}/hotspot/replay/\n"
         )
 
 

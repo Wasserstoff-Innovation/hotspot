@@ -29,6 +29,12 @@ def _int(value: str | None, default: int, minimum: int = 1) -> int:
         return default
 
 
+def _flag(value: str | None, default: bool) -> bool:
+    if value is None or not value.strip():
+        return default
+    return value.strip().lower() not in ("0", "false", "no", "off")
+
+
 @dataclass(frozen=True)
 class HotspotConfig:
     """Every operator-facing setting, with the environment variable that sets it."""
@@ -45,6 +51,9 @@ class HotspotConfig:
     session_ttl_seconds: int
     max_batch_size: int
     max_body_bytes: int
+    replay_enabled: bool
+    max_recording_bytes: int
+    max_recording_body_bytes: int
 
     @property
     def api_key_for_pages(self) -> str:
@@ -77,10 +86,14 @@ def load_config(env: Mapping[str, str] | None = None) -> HotspotConfig:
         secret_key=secret_key,
         redis_url=source.get("REDIS_URL") or None,
         conversion_events=frozenset(conversion_events),
-        demo_enabled=(source.get("HOTSPOT_DEMO_ENABLED") or "1").lower() not in ("0", "false", "no"),
+        demo_enabled=_flag(source.get("HOTSPOT_DEMO_ENABLED"), default=True),
         max_events=_int(source.get("HOTSPOT_MAX_EVENTS"), 5000),
         max_session_events=_int(source.get("HOTSPOT_MAX_SESSION_EVENTS"), 2000),
         session_ttl_seconds=_int(source.get("HOTSPOT_SESSION_TTL_SECONDS"), 7 * 24 * 3600, minimum=60),
         max_batch_size=_int(source.get("HOTSPOT_MAX_BATCH_SIZE"), 500),
         max_body_bytes=_int(source.get("HOTSPOT_MAX_BODY_BYTES"), 1024 * 1024, minimum=1024),
+        replay_enabled=_flag(source.get("HOTSPOT_REPLAY_ENABLED"), default=True),
+        # Compressed bytes of DOM recording kept per session; a typical minute of browsing is well under 1 MiB.
+        max_recording_bytes=_int(source.get("HOTSPOT_MAX_RECORDING_BYTES"), 10 * 1024 * 1024, minimum=1024),
+        max_recording_body_bytes=_int(source.get("HOTSPOT_MAX_RECORDING_BODY_BYTES"), 8 * 1024 * 1024, minimum=1024),
     )

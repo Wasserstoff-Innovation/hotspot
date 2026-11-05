@@ -1,15 +1,17 @@
 from __future__ import annotations
 
+import gzip
 import json
 
 import pytest
 
 from parameterized import parameterized
 
-from products.hotspot.backend.ingestion import IngestionError, RequestContext, parse_batch
+from products.hotspot.backend.ingestion import IngestionError, RequestContext, parse_batch, parse_recording
 from products.hotspot.backend.test.helpers import CHROME_MAC, SAFARI_IPHONE, batch_body, event_item, make_config
 
 NOW = 1_700_000_000.0
+NOW_MS = 1_700_000_000_000
 
 
 class TestApiKeys:
@@ -83,3 +85,30 @@ class TestNormalization:
         items = [{"properties": {}}, "junk", event_item("$pageview", "s", NOW)]
         events = parse_batch(batch_body(items), RequestContext(), make_config(), NOW)
         assert [event.event for event in events] == ["$pageview"]
+
+
+class TestRecordings:
+    def test_recording_bodies_are_inflated_under_a_cap_and_validated(self) -> None:
+        config = make_config(HOTSPOT_MAX_RECORDING_BODY_BYTES="4096")
+        events = [
+            {"type": 4, "timestamp": NOW_MS, "data": {"href": "https://example.com/", "width": 1280, "height": 800}},
+            {"type": 2, "timestamp": NOW_MS + 5000, "data": {"node": {}}},
+            {"type": "3", "timestamp": NOW_MS + 6000},
+            {"type": 3, "timestamp": "soon"},
+            "not an event",
+        ]
+        payload = {"api_key": "hs_test", "session_id": "sess-1", "distinct_id": "v-1", "events": events}
+        chunk = parse_recording(gzip.compress(json.dumps(payload).encode()), "gzip", config, NOW)
+        assert [event["type"] for event in chunk.events] == [4, 2]
+        assert (chunk.first_timestamp, chunk.last_timestamp) == (NOW, NOW + 5)
+        assert (chunk.session_id, chunk.distinct_id, chunk.project_id) == ("sess-1", "v-1", "hs_test")
+
+        bomb = gzip.compress(b'{"api_key":"hs_test","session_id":"s","events":[' + b"0," * 100_000 + b"0]}")
+        assert len(bomb) < 4096
+        with pytest.raises(IngestionError) as refused:
+            parse_recording(bomb, "gzip", config, NOW)
+        assert refused.value.status == 413
+
+        stale = {**payload, "events": [{"type": 4, "timestamp": 1000, "data": {}}]}
+        with pytest.raises(IngestionError, match="out of range"):
+            parse_recording(json.dumps(stale).encode(), None, config, NOW)

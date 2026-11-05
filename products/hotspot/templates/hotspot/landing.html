@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ page_title }}</title>
-    <meta name="description" content="Hotspot is self-hosted product telemetry. One script tag records page views, clicks, rage clicks, dead clicks, scroll depth, form submits and JavaScript errors. Your server stores the data and a dashboard shows sessions, a replay timeline, funnels, paths and friction.">
+    <meta name="description" content="Hotspot is self-hosted product telemetry. One script tag records page views, clicks, rage clicks, dead clicks, scroll depth, form submits, JavaScript errors, web vitals and the page itself. Your server stores the data and a dashboard replays each session as the visitor saw it, next to funnels, paths and friction.">
     <meta name="theme-color" content="#2563EB">
     <link rel="canonical" href="{{ site_url }}/">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='none' stroke='%232563EB' stroke-width='3.5'/%3E%3Ccircle cx='16' cy='16' r='7.5' fill='none' stroke='%233B82F6' stroke-width='1.75' stroke-dasharray='3 2'/%3E%3Ccircle cx='16' cy='16' r='4.5' fill='%2310B981'/%3E%3Ccircle cx='16' cy='16' r='1.8' fill='%23FFFFFF'/%3E%3C/svg%3E">
@@ -1379,7 +1379,7 @@
 
         .install-grid {
             display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
+            grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 1.25rem;
             margin-top: 1.25rem;
         }
@@ -1496,18 +1496,24 @@
             background: var(--success);
         }
 
-        .status-chip.is-memory::before {
+        .status-chip.is-memory::before,
+        .status-chip.is-off::before {
             background: var(--warning);
         }
 
         body[data-storage="redis"] .storage-memory,
-        body:not([data-storage="redis"]) .storage-redis {
+        body:not([data-storage="redis"]) .storage-redis,
+        body[data-replay-enabled="1"] .replay-off {
             display: none;
         }
 
         @media (max-width: 1023px) {
             .config-grid {
                 grid-template-columns: 1fr;
+            }
+
+            .install-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
             }
         }
 
@@ -1723,7 +1729,7 @@
         }
     </style>
 </head>
-<body data-demo-enabled="{{ demo_enabled }}" data-storage="{{ storage }}">
+<body data-demo-enabled="{{ demo_enabled }}" data-storage="{{ storage }}" data-replay-enabled="{{ replay_enabled }}">
     <a class="skip-link" href="#main">Skip to content</a>
 
     <header class="site-header" id="site-header">
@@ -1791,7 +1797,7 @@
                 <div class="hero-copy">
                     <p class="eyebrow">Self-hosted product telemetry</p>
                     <h1>See where users get stuck on your site.</h1>
-                    <p class="hero-sub">Hotspot records what visitors do with one script tag and stores it on your own server. The dashboard shows sessions, a replay timeline, funnels, paths and the clicks that go nowhere.</p>
+                    <p class="hero-sub">Hotspot records what visitors do with one script tag and stores it on your own server. The dashboard replays each session as the visitor saw it, and shows funnels, paths and the clicks that go nowhere.</p>
 
                     <div class="code">
                         <div class="code-head">
@@ -1813,7 +1819,7 @@
                     </div>
 
                     <ul class="facts">
-                        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4 4 10-10"/></svg>8.8 KB gzipped, no dependencies</li>
+                        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4 4 10-10"/></svg>14 KB gzipped, plus a 24 KB recorder when replay is on</li>
                         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4 4 10-10"/></svg>No third-party cookies</li>
                         <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4 4 10-10"/></svg>No IP addresses stored</li>
                     </ul>
@@ -1864,7 +1870,7 @@
                 <div class="section-head" data-reveal>
                     <p class="eyebrow">Events</p>
                     <h2>What the script records</h2>
-                    <p class="lead">Page views, clicks, scroll depth, form submits and errors are captured on their own. Identify and custom events are calls you add.</p>
+                    <p class="lead">Page views, clicks, scroll depth, form submits, errors, web vitals and a recording of the page are captured on their own. Identify and custom events are calls you add.</p>
                 </div>
 
                 <div class="records-grid">
@@ -1919,7 +1925,7 @@
                             <code class="event-name">$form_submit</code>
                         </div>
                         <h3>Form submits</h3>
-                        <p>The form's id, name, action and method. What the visitor typed is never recorded.</p>
+                        <p>The form's id, name, action and method, not what the visitor typed. Typed values appear in the session replay unless the field is masked.</p>
                     </article>
 
                     <article class="card record" data-reveal>
@@ -1947,6 +1953,33 @@
                         </div>
                         <h3>Identify and custom events</h3>
                         <p>Call <code class="inline-code">hotspot.identify()</code> after sign-in to attach an email or name to a visitor, and <code class="inline-code">hotspot.capture()</code> for events of your own.</p>
+                    </article>
+
+                    <article class="card record" data-reveal>
+                        <div class="record-top">
+                            <span class="icon-tile"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M3 9h18"/><path d="M10.5 12v5l4.5-2.5z"/></svg></span>
+                            <code class="event-name">rrweb</code>
+                        </div>
+                        <h3>Session replay</h3>
+                        <p>One snapshot of the page's DOM, then every change, input, scroll and mouse movement, so the dashboard can play the session back as the visitor saw it. Password and payment fields are masked in the browser; <code class="inline-code">data-hotspot-mask</code> masks anything else.</p>
+                    </article>
+
+                    <article class="card record d1" data-reveal>
+                        <div class="record-top">
+                            <span class="icon-tile"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M7 9.5l3 2.5-3 2.5"/><path d="M12 14.5h5"/></svg></span>
+                            <code class="event-name">console, network</code>
+                        </div>
+                        <h3>Console output and network requests</h3>
+                        <p>Console output at the log, info, warn, error and debug levels, and fetch and XHR requests with their method, URL, status and duration. Bodies and headers are never recorded. Both play back next to the replay.</p>
+                    </article>
+
+                    <article class="card record d2" data-reveal>
+                        <div class="record-top">
+                            <span class="icon-tile"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17a8 8 0 0 1 16 0"/><path d="M12 17l4-5.5"/><circle cx="12" cy="17" r="1.5"/></svg></span>
+                            <code class="event-name">$web_vitals</code>
+                        </div>
+                        <h3>Web vitals</h3>
+                        <p>LCP, FCP, TTFB, CLS and INP, sent once per page when the visitor leaves or hides it. The dashboard reports the 75th percentile per page and for the whole site.</p>
                     </article>
                 </div>
 
@@ -2003,8 +2036,8 @@
                             </svg>
                         </div>
                         <div class="dash-body">
-                            <h3>Replay timeline</h3>
-                            <p>A session's events in order: page views, clicks with their position, scroll depth, form submits and errors, next to a preview of the page. It is a timeline, not a video.</p>
+                            <h3>Session replay</h3>
+                            <p>The page as the visitor saw it, played back from the DOM recording, with the session's events, console output and network requests next to the player. Masked fields stay masked.</p>
                         </div>
                     </article>
 
@@ -2084,7 +2117,7 @@
                         </div>
                         <div class="dash-body">
                             <h3>Pages and referrers</h3>
-                            <p>Views, sessions, average time, average scroll depth and exit rate per page. Sessions and conversion rate per referrer.</p>
+                            <p>Views, sessions, average time, average scroll depth, exit rate and web vitals at the 75th percentile per page, plus a site-wide web vitals card. Sessions and conversion rate per referrer.</p>
                         </div>
                     </article>
 
@@ -2135,33 +2168,37 @@
                     <div class="step" data-reveal>
                         <span class="step-num">01</span>
                         <h3>Add the script tag</h3>
-                        <p>Put one tag in the head of your site or in the root layout of your app. The script is 8.8 KB gzipped, has no dependencies and loads with <code class="inline-code">defer</code>, so it does not block rendering.</p>
+                        <p>Put one tag in the head of your site or in the root layout of your app. The script is 14 KB gzipped and loads with <code class="inline-code">defer</code>, so it does not block rendering. When replay is on, it loads the recorder (24 KB gzipped) as a separate file.</p>
                     </div>
                     <div class="step d1" data-reveal>
                         <span class="step-num">02</span>
                         <h3>Events batch to your server</h3>
-                        <p>The script queues events and posts them to your Hotspot server every 2.5 seconds, or sooner when ten are waiting. Sessions are kept in Redis, or in process memory when no Redis is configured.</p>
+                        <p>The script queues events and posts them to your Hotspot server every 2.5 seconds, or sooner when ten are waiting. The recording goes out in chunks every 5 seconds. Sessions and recordings are kept in Redis, or in process memory when no Redis is configured.</p>
                     </div>
                     <div class="step d2" data-reveal>
                         <span class="step-num">03</span>
                         <h3>Open the dashboard</h3>
-                        <p>Sign in with the dashboard password you set and look at sessions, the replay timeline, funnels, paths, friction, pages, referrers, errors and the live feed.</p>
+                        <p>Sign in with the dashboard password you set and look at sessions, session replays, funnels, paths, friction, pages, web vitals, referrers, errors and the live feed.</p>
                     </div>
                 </div>
 
                 <div class="not-panel" data-reveal>
                     <div class="not-intro">
                         <h3>What it does not do</h3>
-                        <p>Hotspot records events, not screens.</p>
+                        <p>Some things are never recorded. Others are masked in the browser before they are sent.</p>
                     </div>
                     <ul class="not-list">
                         <li>
-                            <strong><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg>No video recording</strong>
-                            The replay is a timeline of events with click positions and scroll depth, next to a preview of the page.
+                            <strong><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg>No video or screenshots</strong>
+                            The replay is rebuilt from a snapshot of the page's DOM and the changes that followed. Hotspot does not capture pixels.
                         </li>
                         <li>
-                            <strong><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg>No form values</strong>
-                            Input and textarea values are never recorded. A form submit carries only the form's id, name, action and method.
+                            <strong><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg>No passwords or card numbers</strong>
+                            Password fields, payment fields and one-time codes are masked in the browser. Add <code class="inline-code">data-hotspot-mask</code> to mask other fields, or <code class="inline-code">data-mask-inputs="all"</code> on the script tag to mask every input. A form submit event carries only the form's id, name, action and method.
+                        </li>
+                        <li>
+                            <strong><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg>No request bodies or headers</strong>
+                            A network request is recorded as its method, URL, status and duration, and nothing else.
                         </li>
                         <li>
                             <strong><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg>No IP addresses</strong>
@@ -2212,6 +2249,18 @@
                             <dd>Turn off automatic page views and page leaves.</dd>
                             <dt>data-capture-errors="false"</dt>
                             <dd>Turn off error capture.</dd>
+                            <dt>data-capture-web-vitals="false"</dt>
+                            <dd>Turn off web vitals.</dd>
+                            <dt>data-replay="false"</dt>
+                            <dd>Turn off session replay. The recorder file is not loaded, and console and network capture stop with it.</dd>
+                            <dt>data-mask-inputs="all"</dt>
+                            <dd>Mask every input value in the replay. Password fields, payment fields and one-time codes are masked either way.</dd>
+                            <dt>data-mask-text="true"</dt>
+                            <dd>Mask all text on the page in the replay.</dd>
+                            <dt>data-capture-console="false"</dt>
+                            <dd>Leave console output out of the replay.</dd>
+                            <dt>data-capture-network="false"</dt>
+                            <dd>Leave network requests out of the replay.</dd>
                             <dt>data-debug="true"</dt>
                             <dd>Log every captured event to the browser console.</dd>
                             <dt>data-debug-hud="true"</dt>
@@ -2220,6 +2269,19 @@
                     </article>
 
                     <article class="card ref d1" data-reveal>
+                        <h3>Masking in your markup</h3>
+                        <dl>
+                            <dt>data-hotspot-mask</dt>
+                            <dd>Masks the text and input values of the element and everything inside it.</dd>
+                            <dt>data-hotspot-block</dt>
+                            <dd>Replaces the element with an empty box of the same size in the replay.</dd>
+                            <dt>data-hotspot-ignore</dt>
+                            <dd>Skips the element's input events, so changes to its value are not recorded.</dd>
+                        </dl>
+                        <p class="more">Password fields, payment fields (<code>autocomplete="cc-*"</code>) and one-time codes are always masked. Masking happens in the browser, so masked values never reach the server. The classes <code>hs-mask</code> and <code>hs-block</code> work like the first two attributes.</p>
+                    </article>
+
+                    <article class="card ref d2" data-reveal>
                         <h3>JavaScript API</h3>
                         <dl>
                             <dt>hotspot.capture(name, props)</dt>
@@ -2249,7 +2311,7 @@
                                 <span class="copy-label">Copy</span>
                             </button>
                         </div>
-                        <pre><code id="snippet-assistant">Add <span class="tk-mono">&lt;script src="{{ sdk_url }}" data-api-key="{{ api_key }}" defer&gt;&lt;/script&gt;</span> to the <span class="tk-mono">&lt;head&gt;</span> of the root layout (Next.js <span class="tk-mono">app/layout.tsx</span>, Vite <span class="tk-mono">index.html</span>, SvelteKit <span class="tk-mono">app.html</span>, Astro layout). Do not add other analytics tags. Call <span class="tk-mono">window.hotspot.identify(userId, { email, name })</span> after sign-in.</code></pre>
+                        <pre><code id="snippet-assistant">Add <span class="tk-mono">&lt;script src="{{ sdk_url }}" data-api-key="{{ api_key }}" defer&gt;&lt;/script&gt;</span> to the <span class="tk-mono">&lt;head&gt;</span> of the root layout (Next.js <span class="tk-mono">app/layout.tsx</span>, Vite <span class="tk-mono">index.html</span>, SvelteKit <span class="tk-mono">app.html</span>, Astro layout). Do not add other analytics tags. Call <span class="tk-mono">window.hotspot.identify(userId, { email, name })</span> after sign-in. Add <span class="tk-mono">data-hotspot-mask</span> to elements that show personal data so the session replay masks them.</code></pre>
                     </div>
                 </div>
 
@@ -2268,11 +2330,24 @@
                             <code>REDIS_URL</code>
                             Keeps data across restarts and shares it between workers. Unset keeps data in process memory.
                         </div>
+                        <div>
+                            <code>HOTSPOT_REPLAY_ENABLED</code>
+                            Set to 0 to turn session replay off for every site. The server refuses recordings and the script stops sending them.
+                        </div>
+                        <div>
+                            <code>HOTSPOT_MAX_RECORDING_BYTES</code>
+                            The compressed size a session's recording can reach, 10 MiB by default. The dashboard says when a session hit it.
+                        </div>
+                        <div>
+                            <code>HOTSPOT_SESSION_TTL_SECONDS</code>
+                            How long a session and its recording are kept, 7 days by default.
+                        </div>
                     </div>
                     <div class="config-foot">
-                        <span>Every variable, including session retention and request limits, is listed in the README in the repository.</span>
+                        <span>Every variable, including request limits, is listed in the README in the repository.</span>
                         <span class="status-chip storage-redis">This instance stores data in Redis</span>
                         <span class="status-chip is-memory storage-memory">This instance stores data in memory, so it is lost on restart</span>
+                        <span class="status-chip is-off replay-off">Session replay is turned off on this instance</span>
                     </div>
                 </article>
             </div>
@@ -2296,10 +2371,11 @@
                         </div>
                     </li>
                     <li class="faq-item">
-                        <h3><button class="faq-trigger" type="button" id="faq-q2" aria-expanded="false" aria-controls="faq-a2">Does it record video?<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></h3>
+                        <h3><button class="faq-trigger" type="button" id="faq-q2" aria-expanded="false" aria-controls="faq-a2">Does it record the visitor's screen?<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></h3>
                         <div class="faq-panel" id="faq-a2" role="region" aria-labelledby="faq-q2">
                             <div class="faq-panel-inner">
-                                <p>No. The replay is a timeline of the events in a session: page views, clicks with their position on the page, scroll depth, form submits and errors. The dashboard can show a preview of the page next to the timeline, but it never captures what was on the visitor's screen.</p>
+                                <p>Not as video or screenshots. The script records the page's DOM with rrweb: one snapshot, then every change, input, scroll and mouse movement. The dashboard rebuilds the page from that, so you see what the visitor saw, with the visitor's console output and network requests next to it.</p>
+                                <p>Password fields, payment fields and one-time codes are masked in the browser before anything is sent. Add <code class="inline-code">data-hotspot-mask</code> or <code class="inline-code">data-hotspot-block</code> to elements that show personal data, or set <code class="inline-code">data-mask-inputs="all"</code> on the script tag. <code class="inline-code">data-replay="false"</code> on the script tag turns replay off for one site, and <code class="inline-code">HOTSPOT_REPLAY_ENABLED=0</code> turns it off on the server.</p>
                             </div>
                         </div>
                     </li>
@@ -2307,7 +2383,7 @@
                         <h3><button class="faq-trigger" type="button" id="faq-q3" aria-expanded="false" aria-controls="faq-a3">Where is the data stored, and for how long?<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></h3>
                         <div class="faq-panel" id="faq-a3" role="region" aria-labelledby="faq-q3">
                             <div class="faq-panel-inner">
-                                <p>On your server. Events go to Redis when <code class="inline-code">REDIS_URL</code> is set, otherwise they stay in process memory and are lost on restart. Sessions expire after 7 days by default; <code class="inline-code">HOTSPOT_SESSION_TTL_SECONDS</code> changes that. Up to 2,000 events are kept per session for the replay, and the live feed keeps the last 5,000. Nothing is sent to anyone else.</p>
+                                <p>On your server. Events and recordings go to Redis when <code class="inline-code">REDIS_URL</code> is set, otherwise they stay in process memory and are lost on restart. Sessions expire after 7 days by default, and their recordings with them; <code class="inline-code">HOTSPOT_SESSION_TTL_SECONDS</code> changes that. Up to 2,000 events are kept per session. A recording is kept compressed, up to 10 MiB per session (<code class="inline-code">HOTSPOT_MAX_RECORDING_BYTES</code>), and the dashboard says when a session hit that limit. The live feed keeps the last 5,000 events. Nothing is sent to anyone else.</p>
                             </div>
                         </div>
                     </li>
@@ -2323,7 +2399,7 @@
                         <h3><button class="faq-trigger" type="button" id="faq-q5" aria-expanded="false" aria-controls="faq-a5">Does it slow down my site?<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></h3>
                         <div class="faq-panel" id="faq-a5" role="region" aria-labelledby="faq-q5">
                             <div class="faq-panel-inner">
-                                <p>The script is 8.8 KB gzipped, has no dependencies and loads with <code class="inline-code">defer</code>, so it does not block rendering. Events are queued and sent in batches every 2.5 seconds. When the visitor leaves a page, the last batch goes out with <code class="inline-code">sendBeacon</code>, which does not delay the navigation.</p>
+                                <p>The script is 14 KB gzipped and loads with <code class="inline-code">defer</code>, so it does not block rendering. When replay is on, it loads the recorder (24 KB gzipped) as a separate file. Events are queued and sent in batches every 2.5 seconds, and the recording goes out in chunks every 5 seconds. When the visitor leaves a page, the last batch goes out with <code class="inline-code">sendBeacon</code>, which does not delay the navigation.</p>
                             </div>
                         </div>
                     </li>

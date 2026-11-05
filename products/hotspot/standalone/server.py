@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import os
 import sys
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from starlette.applications import Starlette
 from starlette.requests import Request
@@ -33,6 +35,7 @@ from products.hotspot.backend.templating import render_template  # noqa: E402
 
 DASHBOARD_PATH = "/dashboard/"
 LOGIN_PATH = "/dashboard/login/"
+ASSET_CACHE_CONTROL = "public, max-age=86400"
 
 
 def _service() -> HotspotService:
@@ -43,19 +46,22 @@ def _authorized(request: Request) -> bool:
     return _service().is_authorized(request.cookies.get(DASHBOARD_COOKIE), request.headers.get("authorization"))
 
 
-def _page(request: Request, page: str, allow_page_frames: bool = False, status: int = 200, **extra: str) -> Response:
+def _page(request: Request, page: str, replay: bool = False, status: int = 200, **extra: str) -> Response:
     nonce = generate_nonce()
     html = render_template(f"{page}.html", _service().page_context(page, nonce, **extra))
     response = HTMLResponse(html, status_code=status)
-    response.headers["Content-Security-Policy"] = page_csp(nonce, allow_page_frames=allow_page_frames)
+    response.headers["Content-Security-Policy"] = page_csp(nonce, replay=replay)
+    return response
+
+
+def _api_response(response: Response) -> Response:
+    response.headers.update(NO_STORE_HEADERS)
+    response.headers["Content-Security-Policy"] = API_CSP
     return response
 
 
 def _json(payload: dict[str, object], status: int = 200) -> Response:
-    response = JSONResponse(payload, status_code=status)
-    response.headers.update(NO_STORE_HEADERS)
-    response.headers["Content-Security-Policy"] = API_CSP
-    return response
+    return _api_response(JSONResponse(payload, status_code=status))
 
 
 async def landing(request: Request) -> Response:
@@ -71,7 +77,7 @@ async def demo(request: Request) -> Response:
 async def dashboard(request: Request) -> Response:
     if not _authorized(request):
         return RedirectResponse(LOGIN_PATH, status_code=302)
-    response = _page(request, "dashboard", allow_page_frames=True)
+    response = _page(request, "dashboard", replay=True)
     response.headers.update(NO_STORE_HEADERS)
     return response
 
@@ -120,27 +126,46 @@ async def sdk(request: Request) -> Response:
     return response
 
 
+async def asset(request: Request) -> Response:
+    found = _service().asset(request.path_params["name"])
+    if found is None:
+        return PlainTextResponse("Not found", status_code=404)
+    body, content_type = found
+    response = Response(body, media_type=content_type)
+    response.headers["Cache-Control"] = ASSET_CACHE_CONTROL
+    response.headers.update(CAPTURE_CORS_HEADERS)
+    return response
+
+
 async def llms_txt(request: Request) -> Response:
     response = PlainTextResponse(_service().llms_txt())
-    response.headers["Cache-Control"] = "public, max-age=86400"
+    response.headers["Cache-Control"] = ASSET_CACHE_CONTROL
     return response
 
 
 async def favicon(request: Request) -> Response:
     response = Response(FAVICON_SVG, media_type="image/svg+xml")
-    response.headers["Cache-Control"] = "public, max-age=86400"
+    response.headers["Cache-Control"] = ASSET_CACHE_CONTROL
     return response
 
 
-async def capture(request: Request) -> Response:
+async def _capture(request: Request, handle: Callable[[bytes], tuple[int, dict[str, Any]]]) -> Response:
     if request.method == "OPTIONS":
         response: Response = Response(status_code=204)
     else:
-        status, payload = _service().capture(await request.body(), request.headers)
+        status, payload = handle(await request.body())
         response = JSONResponse(payload, status_code=status)
     response.headers.update(CAPTURE_CORS_HEADERS)
     response.headers["Content-Security-Policy"] = API_CSP
     return response
+
+
+async def capture(request: Request) -> Response:
+    return await _capture(request, lambda body: _service().capture(body, request.headers))
+
+
+async def capture_recording(request: Request) -> Response:
+    return await _capture(request, lambda body: _service().capture_recording(body, dict(request.query_params)))
 
 
 async def overview(request: Request) -> Response:
@@ -156,6 +181,15 @@ async def session_detail(request: Request) -> Response:
     if detail is None:
         return _json({"status": 0, "error": "Session not found"}, status=404)
     return _json(detail)
+
+
+async def session_recording(request: Request) -> Response:
+    if not _authorized(request):
+        return _unauthorized()
+    body = _service().recording(request.path_params["session_id"], dict(request.query_params))
+    if body is None:
+        return _json({"status": 0, "error": "Session not found"}, status=404)
+    return _api_response(Response(body, media_type="application/json"))
 
 
 async def events_feed(request: Request) -> Response:
@@ -178,12 +212,16 @@ routes = [
     Route("/dashboard/logout/", logout, methods=["POST"]),
     Route("/app/", app_redirect),
     Route("/hotspot.js", sdk),
+    Route("/hotspot/assets/{name}", asset),
     Route("/llms.txt", llms_txt),
     Route("/favicon.ico", favicon),
     Route("/hotspot/batch/", capture, methods=["POST", "OPTIONS"]),
     Route("/hotspot/batch", capture, methods=["POST", "OPTIONS"]),
+    Route("/hotspot/replay/", capture_recording, methods=["POST", "OPTIONS"]),
+    Route("/hotspot/replay", capture_recording, methods=["POST", "OPTIONS"]),
     Route("/hotspot/api/overview/", overview),
     Route("/hotspot/api/sessions/{session_id}/", session_detail),
+    Route("/hotspot/api/sessions/{session_id}/recording/", session_recording),
     Route("/hotspot/api/events/", events_feed),
 ]
 

@@ -32,6 +32,12 @@ def _populated_store() -> SessionStore:
                     old + 45,
                     **{"$pathname": "/pricing", "$duration_seconds": 5, "$scroll_depth_percent": 80},
                 ),
+                event_item(
+                    "$web_vitals",
+                    "converted",
+                    old + 46,
+                    **{"$pathname": "/pricing", "$lcp_ms": 1200, "$cls": 0.02, "$inp_ms": 80},
+                ),
             ],
             NOW,
         ),
@@ -69,6 +75,13 @@ def _populated_store() -> SessionStore:
                     old + 13,
                     "visitor-2",
                     **{"$el_selector": "#plan-enterprise", "$pathname": "/pricing", "$el_text": "Enterprise"},
+                ),
+                event_item(
+                    "$web_vitals",
+                    "rager",
+                    old + 14,
+                    "visitor-2",
+                    **{"$pathname": "/pricing", "$lcp_ms": 3600, "$cls": 0.31, "$inp_ms": 420, "$ttfb_ms": 900},
                 ),
             ],
             NOW,
@@ -114,6 +127,17 @@ def test_overview_counts_only_what_really_happened() -> None:
         15.0,
         80,
     )
+    # Web vitals are reported at the 75th percentile, so two samples report the slower one.
+    assert pricing["vitals"] == {
+        "lcp_ms": 3600,
+        "cls": 0.31,
+        "inp_ms": 420,
+        "fcp_ms": None,
+        "ttfb_ms": 900,
+        "samples": 2,
+    }
+    assert (overview["web_vitals"]["lcp_ms"], overview["web_vitals"]["samples"]) == (3600, 2)
+    assert next(row for row in overview["pages"] if row["pathname"] == "/")["vitals"] is None
     assert overview["setup"]["ingestion_keys_configured"] is False
 
 

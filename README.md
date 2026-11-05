@@ -11,8 +11,8 @@
 <p align="center"><strong>Self-hosted product telemetry from one script tag.</strong></p>
 
 Hotspot records what visitors do on your site and shows you where they get stuck.
-One script captures page views, clicks, rage clicks, dead clicks, scroll depth, form submits, JavaScript errors and single-page-app route changes.
-Your own server stores the events, and the dashboard shows sessions, a replay timeline, funnels you define, paths, friction by element, pages, referrers and errors.
+One script captures page views, clicks, rage clicks, dead clicks, scroll depth, form submits, web vitals, JavaScript errors and single-page-app route changes, and records the page itself so a session can be replayed as the visitor saw it, with console output and network requests next to it.
+Your own server stores everything, and the dashboard shows sessions with replay, funnels you define, paths, friction by element, pages, referrers and errors.
 No data leaves your infrastructure.
 
 The product lives in [`products/hotspot/`](products/hotspot/README.md).
@@ -31,8 +31,9 @@ window.hotspot.register({ app_version: '3.0.0' })
 window.hotspot.optOut()
 ```
 
-The script has no dependencies and is under 10 KB gzipped.
-It stores a visitor id and a session id in `localStorage`, sets no third-party cookies, and never records form input values.
+The script is about 14 KB gzipped and loads the recorder (about 24 KB gzipped) only when replay is on.
+It stores a visitor id and a session id in `localStorage` and sets no third-party cookies.
+Password and payment fields are always masked in replays; `data-hotspot-mask` masks anything else, and `data-replay="false"` turns recording off.
 All events and options are documented in [the product README](products/hotspot/README.md).
 
 ## Run it

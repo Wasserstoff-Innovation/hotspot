@@ -2,14 +2,23 @@
  * Hotspot web script
  *
  * One script tag records page views, clicks (with rage click and dead click detection), form
- * submits, scroll depth, time on page, JavaScript errors and single-page-app route changes, and
- * sends them in batches to your own Hotspot server.
+ * submits, scroll depth, time on page, web vitals, JavaScript errors and single-page-app route
+ * changes, and sends them in batches to your own Hotspot server. It also records the page itself
+ * (the DOM, inputs, scrolling, mouse movement, console output and network requests) so the
+ * dashboard can replay a session exactly as the visitor saw it.
  *
  *   <script src="https://your-hotspot-host/hotspot.js" data-api-key="YOUR_API_KEY" defer></script>
  *
  * Optional attributes: data-api-host (defaults to the host the script was loaded from),
  * data-autocapture="false", data-capture-errors="false", data-capture-pageview="false",
- * data-debug="true" (console logging), data-debug-hud="true" (on-page click overlay, Alt+H).
+ * data-replay="false" (no DOM recording), data-mask-inputs="all" (mask every input value),
+ * data-mask-text="true" (mask every text node), data-capture-console="false",
+ * data-capture-network="false", data-capture-web-vitals="false", data-debug="true" (console
+ * logging), data-debug-hud="true" (on-page click overlay, Alt+H).
+ *
+ * Markup: data-hotspot-mask on an element masks its text and input values, data-hotspot-block
+ * replaces it with an empty box of the same size, data-hotspot-ignore skips its input events.
+ * Password fields and payment fields (autocomplete="cc-*") are always masked.
  *
  * The visitor id and session id live in localStorage (cookie fallback). No third-party cookies.
  */
@@ -20,18 +29,9 @@
         return
     }
 
-    // Pages framed by the dashboard replayer must not record a second time.
-    try {
-        if (window.location.search.indexOf('hotspot_replay=1') !== -1 || window.self !== window.top) {
-            return
-        }
-    } catch (e) {
-        return
-    }
-
     window.__hotspot_loaded = true
 
-    var VERSION = '3.0.0'
+    var VERSION = '3.1.0'
     var STORAGE_PREFIX = '__hotspot_'
     var DISTINCT_ID_KEY = STORAGE_PREFIX + 'distinct_id'
     var SESSION_ID_KEY = STORAGE_PREFIX + 'session_id'
@@ -59,7 +59,12 @@
         debug: false,
         debug_hud: false,
         persistence: 'localStorage',
-        sanitize_inputs: true,
+        session_replay: true,
+        mask_all_inputs: false,
+        mask_all_text: false,
+        capture_console: true,
+        capture_network: true,
+        capture_web_vitals: true,
     }
 
     // ----- Script tag configuration -------------------------------------------------------------
@@ -92,6 +97,12 @@
         if (isFalse(attribute('data-autocapture'))) config.autocapture = false
         if (isFalse(attribute('data-capture-errors'))) config.capture_errors = false
         if (isFalse(attribute('data-capture-pageview'))) config.capture_pageview = false
+        if (isFalse(attribute('data-replay'))) config.session_replay = false
+        if (attribute('data-mask-inputs') === 'all') config.mask_all_inputs = true
+        if (attribute('data-mask-text') === 'true') config.mask_all_text = true
+        if (isFalse(attribute('data-capture-console'))) config.capture_console = false
+        if (isFalse(attribute('data-capture-network'))) config.capture_network = false
+        if (isFalse(attribute('data-capture-web-vitals'))) config.capture_web_vitals = false
         if (attribute('data-debug') === 'true') config.debug = true
         if (attribute('data-debug-hud') === 'true') config.debug_hud = true
         if (!config.api_host && currentScript.src) {
@@ -519,6 +530,7 @@
         if (!final && segmentSeconds < 1) return
         updateScrollDepth()
         leaveSent = true
+        vitals.report(currentPath)
         record('$pageleave', {
             $pathname: currentPath,
             $duration_seconds: segmentSeconds,
@@ -534,6 +546,7 @@
     function routeChanged() {
         if (window.location.pathname === currentPath) return
         capturePageleave(false)
+        vitals.reset()
         capturePageview()
     }
 
@@ -560,24 +573,573 @@
     function setupErrorCapture() {
         if (!config.capture_errors) return
         window.addEventListener('error', function (event) {
+            var type = event.error && event.error.name ? event.error.name : 'Error'
+            var message = event.message || 'Unknown error'
             record('$exception', {
-                $exception_message: event.message || 'Unknown error',
+                $exception_message: message,
                 $exception_filename: event.filename || '',
                 $exception_lineno: event.lineno || 0,
                 $exception_colno: event.colno || 0,
-                $exception_type: event.error && event.error.name ? event.error.name : 'Error',
+                $exception_type: type,
                 $exception_stack: event.error && event.error.stack ? String(event.error.stack).substring(0, MAX_STACK_LENGTH) : '',
             })
+            replay.addCustom('console', { level: 'error', message: 'Uncaught ' + type + ': ' + message, t: Date.now() })
         })
         window.addEventListener('unhandledrejection', function (event) {
             var reason = event.reason || {}
+            var message = reason.message || String(reason)
             record('$exception', {
-                $exception_message: reason.message || String(reason),
+                $exception_message: message,
                 $exception_type: 'UnhandledPromiseRejection',
                 $exception_stack: reason.stack ? String(reason.stack).substring(0, MAX_STACK_LENGTH) : '',
             })
+            replay.addCustom('console', { level: 'error', message: 'Unhandled promise rejection: ' + message, t: Date.now() })
         })
     }
+
+    // ----- Console and network capture: shown next to the replay ---------------------------------
+
+    var MAX_CONSOLE_MESSAGE_LENGTH = 2000
+    var MAX_CONSOLE_ENTRIES = 500
+    var MAX_NETWORK_ENTRIES = 500
+    var MAX_URL_LENGTH = 500
+
+    function describeValue(value) {
+        if (value === null || value === undefined) return String(value)
+        if (typeof value === 'string') return value
+        if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') return String(value)
+        if (typeof value === 'function') return '[function ' + (value.name || '') + ']'
+        if (value instanceof Error) {
+            var stack = value.stack ? '\n' + String(value.stack).split('\n').slice(1, 6).join('\n') : ''
+            return (value.name || 'Error') + ': ' + value.message + stack
+        }
+        if (value.nodeType === 1 && value.tagName) return '<' + value.tagName.toLowerCase() + (value.id ? '#' + value.id : '') + '>'
+        try {
+            return JSON.stringify(value, function (key, inner) {
+                return typeof inner === 'bigint' ? String(inner) : inner
+            })
+        } catch (e) {
+            return Object.prototype.toString.call(value)
+        }
+    }
+
+    function formatConsoleArgs(args) {
+        var parts = []
+        for (var i = 0; i < args.length; i++) parts.push(describeValue(args[i]))
+        return parts.join(' ').substring(0, MAX_CONSOLE_MESSAGE_LENGTH)
+    }
+
+    function setupConsoleCapture() {
+        if (!config.capture_console || !window.console) return
+        var levels = ['log', 'info', 'warn', 'error', 'debug']
+        var count = 0
+        levels.forEach(function (level) {
+            var original = window.console[level]
+            if (typeof original !== 'function') return
+            window.console[level] = function () {
+                var args = Array.prototype.slice.call(arguments)
+                try {
+                    original.apply(window.console, args)
+                } catch (e) {}
+                if (typeof args[0] === 'string' && args[0].indexOf('[Hotspot]') === 0) return
+                if (count >= MAX_CONSOLE_ENTRIES) return
+                count++
+                var message = formatConsoleArgs(args)
+                if (count === MAX_CONSOLE_ENTRIES) {
+                    message = 'Hotspot stopped capturing console output on this page after ' + MAX_CONSOLE_ENTRIES + ' entries'
+                    level = 'warn'
+                }
+                replay.addCustom('console', { level: level, message: message, t: Date.now() })
+            }
+        })
+    }
+
+    function trimUrl(url) {
+        try {
+            var parsed = new URL(String(url), window.location.href)
+            parsed.username = ''
+            parsed.password = ''
+            return parsed.href.substring(0, MAX_URL_LENGTH)
+        } catch (e) {
+            return String(url).substring(0, MAX_URL_LENGTH)
+        }
+    }
+
+    function isHotspotRequest(url) {
+        return typeof url === 'string' && url.indexOf(config.api_host) === 0
+    }
+
+    // Only the method, URL, status and timing of each request are kept; bodies and headers never are.
+    function setupNetworkCapture() {
+        if (!config.capture_network) return
+        var count = 0
+        function note(entry) {
+            if (count >= MAX_NETWORK_ENTRIES) return
+            count++
+            replay.addCustom('network', entry)
+        }
+        if (window.fetch) {
+            var originalFetch = window.fetch
+            window.fetch = function (input, init) {
+                var url = typeof input === 'string' ? input : input && input.url ? input.url : String(input)
+                var method = String((init && init.method) || (input && input.method) || 'GET').toUpperCase()
+                var started = Date.now()
+                var result = originalFetch.apply(this, arguments)
+                if (!isHotspotRequest(url) && result && typeof result.then === 'function') {
+                    result.then(
+                        function (response) {
+                            note({ kind: 'fetch', method: method, url: trimUrl(url), status: response.status, ok: response.ok, duration_ms: Date.now() - started, t: started })
+                        },
+                        function () {
+                            note({ kind: 'fetch', method: method, url: trimUrl(url), status: 0, ok: false, duration_ms: Date.now() - started, t: started })
+                        }
+                    )
+                }
+                return result
+            }
+        }
+        if (window.XMLHttpRequest && XMLHttpRequest.prototype) {
+            var open = XMLHttpRequest.prototype.open
+            var send = XMLHttpRequest.prototype.send
+            XMLHttpRequest.prototype.open = function (method, url) {
+                this.__hotspot = { method: String(method).toUpperCase(), url: String(url) }
+                return open.apply(this, arguments)
+            }
+            XMLHttpRequest.prototype.send = function () {
+                var request = this
+                var meta = request.__hotspot
+                if (meta && !isHotspotRequest(meta.url)) {
+                    var started = Date.now()
+                    request.addEventListener('loadend', function () {
+                        note({ kind: 'xhr', method: meta.method, url: trimUrl(meta.url), status: request.status, ok: request.status >= 200 && request.status < 400, duration_ms: Date.now() - started, t: started })
+                    })
+                }
+                return send.apply(this, arguments)
+            }
+        }
+    }
+
+    // ----- Web vitals ---------------------------------------------------------------------------
+    //
+    // LCP, FCP and TTFB describe the first load of the document, so they are reported once. CLS and
+    // INP accumulate while a path is shown and start again on every route change.
+
+    var vitals = (function () {
+        var supported = typeof window.PerformanceObserver === 'function'
+        var page = null
+        var load = { lcp: null, fcp: null, ttfb: null, reported: false }
+        var hiddenSpans = []
+
+        function now() {
+            return window.performance && performance.now ? performance.now() : Date.now()
+        }
+
+        // An interaction in a hidden tab is not painted until the tab is shown again, so its duration
+        // measures the time away rather than the page's responsiveness.
+        function overlapsHiddenTab(start, end) {
+            for (var i = 0; i < hiddenSpans.length; i++) {
+                if (start < hiddenSpans[i][1] && end > hiddenSpans[i][0]) return true
+            }
+            return false
+        }
+
+        function observe(type, options, callback) {
+            try {
+                var observer = new PerformanceObserver(function (list) {
+                    callback(list.getEntries())
+                })
+                observer.observe(merge({ type: type, buffered: true }, options))
+            } catch (e) {}
+        }
+
+        function newPage() {
+            return { cls: 0, clsWindow: 0, clsWindowStart: 0, clsWindowLast: 0, interactions: {}, inp: null, sent: false }
+        }
+
+        // CLS groups shifts into windows of at most 5 s with gaps under 1 s and keeps the worst window.
+        function noteShift(entry) {
+            if (!page || entry.hadRecentInput) return
+            var start = entry.startTime
+            if (page.clsWindow && start - page.clsWindowLast < 1000 && start - page.clsWindowStart < 5000) {
+                page.clsWindow += entry.value
+            } else {
+                page.clsWindow = entry.value
+                page.clsWindowStart = start
+            }
+            page.clsWindowLast = start
+            page.cls = Math.max(page.cls, page.clsWindow)
+        }
+
+        // INP is the slowest interaction until there are 50, then a high percentile instead of the worst.
+        function noteInteraction(entry) {
+            if (!page || !entry.interactionId) return
+            if (overlapsHiddenTab(entry.startTime, entry.startTime + entry.duration)) return
+            page.interactions[entry.interactionId] = Math.max(page.interactions[entry.interactionId] || 0, entry.duration)
+            var durations = []
+            for (var key in page.interactions) {
+                if (Object.prototype.hasOwnProperty.call(page.interactions, key)) durations.push(page.interactions[key])
+            }
+            durations.sort(function (a, b) {
+                return b - a
+            })
+            page.inp = durations[Math.min(durations.length - 1, Math.floor(durations.length / 50))]
+        }
+
+        function round(value, digits) {
+            if (typeof value !== 'number' || !isFinite(value)) return null
+            var factor = Math.pow(10, digits)
+            return Math.round(value * factor) / factor
+        }
+
+        return {
+            init: function () {
+                if (!config.capture_web_vitals || !supported) return
+                page = newPage()
+                if (document.visibilityState === 'hidden') hiddenSpans.push([0, Infinity])
+                document.addEventListener('visibilitychange', function () {
+                    var moment = now()
+                    if (document.visibilityState === 'hidden') hiddenSpans.push([moment, Infinity])
+                    else if (hiddenSpans.length) hiddenSpans[hiddenSpans.length - 1][1] = moment
+                })
+                try {
+                    var navigation = performance.getEntriesByType('navigation')[0]
+                    if (navigation && navigation.responseStart > 0) load.ttfb = navigation.responseStart
+                } catch (e) {}
+                observe('paint', {}, function (entries) {
+                    for (var i = 0; i < entries.length; i++) {
+                        if (entries[i].name === 'first-contentful-paint') load.fcp = entries[i].startTime
+                    }
+                })
+                observe('largest-contentful-paint', {}, function (entries) {
+                    if (entries.length) load.lcp = entries[entries.length - 1].startTime
+                })
+                observe('layout-shift', {}, function (entries) {
+                    for (var i = 0; i < entries.length; i++) noteShift(entries[i])
+                })
+                observe('event', { durationThreshold: 40 }, function (entries) {
+                    for (var i = 0; i < entries.length; i++) noteInteraction(entries[i])
+                })
+                observe('first-input', {}, function (entries) {
+                    for (var i = 0; i < entries.length; i++) noteInteraction(entries[i])
+                })
+            },
+            // One $web_vitals event per page, sent the first time the page is left or hidden.
+            report: function (pathname) {
+                if (!page || page.sent) return
+                page.sent = true
+                var props = {
+                    $pathname: pathname,
+                    $cls: round(page.cls, 4),
+                    $inp_ms: round(page.inp, 0),
+                    $lcp_ms: null,
+                    $fcp_ms: null,
+                    $ttfb_ms: null,
+                }
+                if (!load.reported) {
+                    load.reported = true
+                    props.$lcp_ms = round(load.lcp, 0)
+                    props.$fcp_ms = round(load.fcp, 0)
+                    props.$ttfb_ms = round(load.ttfb, 0)
+                }
+                record('$web_vitals', props)
+            },
+            reset: function () {
+                if (page) page = newPage()
+            },
+        }
+    })()
+
+    // ----- Session replay: DOM recording --------------------------------------------------------
+    //
+    // rrweb takes one snapshot of the DOM and then records every mutation, input, scroll and mouse
+    // move, so the dashboard can rebuild the page as the visitor saw it. The recorder is a separate
+    // file loaded from the Hotspot host on demand, so pages with replay turned off never download
+    // it. Masking happens in the browser: masked values never leave the page.
+
+    var REPLAY_FLUSH_MS = 5000
+    var REPLAY_FLUSH_BYTES = 512 * 1024
+    var REPLAY_BEACON_LIMIT = 60000
+    var REPLAY_MAX_PENDING = 200
+    var REPLAY_CHECKOUT_MS = 10 * 60 * 1000
+    var MASK_SELECTOR = '[data-hotspot-mask], .hs-mask'
+    var BLOCK_SELECTOR = '[data-hotspot-block], .hs-block'
+    var SENSITIVE_AUTOCOMPLETE = /^(cc-|one-time-code|current-password|new-password)/
+
+    function shouldMaskInput(element) {
+        if (config.mask_all_inputs) return true
+        if (!element || typeof element.getAttribute !== 'function') return false
+        if ((element.getAttribute('type') || '').toLowerCase() === 'password') return true
+        if (SENSITIVE_AUTOCOMPLETE.test((element.getAttribute('autocomplete') || '').toLowerCase())) return true
+        return !!(element.closest && element.closest(MASK_SELECTOR))
+    }
+
+    function maskInputValue(text, element) {
+        if (!shouldMaskInput(element)) return text
+        return new Array(String(text).length + 1).join('*')
+    }
+
+    var replay = (function () {
+        var buffer = []
+        var bufferBytes = 0
+        var bufferSession = null
+        var currentSession = null
+        var lastSessionCheck = 0
+        var timer = null
+        var stopRecording = null
+        var starting = false
+        var stopped = false
+        var awaitingSnapshot = false
+        var pending = []
+        var uploads = Promise.resolve()
+        var canGzip =
+            typeof window.CompressionStream === 'function' &&
+            typeof window.Response === 'function' &&
+            typeof Blob.prototype.stream === 'function'
+
+        function endpointFor(compressed) {
+            return config.api_host + '/hotspot/replay/' + (compressed ? '?compression=gzip' : '')
+        }
+
+        function loadRecorder(callback) {
+            if (window.rrwebRecord && window.rrwebRecord.record) {
+                callback()
+                return
+            }
+            var script = document.createElement('script')
+            script.src = config.api_host + '/hotspot/assets/recorder.js'
+            script.async = true
+            script.onload = function () {
+                if (window.rrwebRecord && window.rrwebRecord.record) callback()
+                else log('The recorder loaded but did not register')
+            }
+            script.onerror = function () {
+                log('Could not load the recorder from ' + script.src)
+            }
+            ;(document.head || document.documentElement).appendChild(script)
+        }
+
+        function recorderOptions() {
+            return {
+                emit: onEvent,
+                maskAllInputs: true,
+                maskInputFn: maskInputValue,
+                maskTextSelector: config.mask_all_text ? '*' : MASK_SELECTOR,
+                blockSelector: BLOCK_SELECTOR,
+                blockClass: 'hs-block',
+                ignoreSelector: '[data-hotspot-ignore]',
+                inlineStylesheet: true,
+                collectFonts: false,
+                recordCanvas: false,
+                slimDOMOptions: 'all',
+                checkoutEveryNms: REPLAY_CHECKOUT_MS,
+                sampling: { mousemove: 50, mouseInteraction: true, scroll: 150, media: 800, input: 'last' },
+                errorHandler: function (error) {
+                    log('Recorder error', error)
+                    return true
+                },
+            }
+        }
+
+        // A session that expired while the tab stayed open gets a recording of its own, starting
+        // with a fresh snapshot, so the dashboard can replay it without the previous session.
+        function trackSession() {
+            var now = Date.now()
+            if (now - lastSessionCheck < 1000) return
+            lastSessionCheck = now
+            var sessionId = getSessionId()
+            if (currentSession === null || sessionId === currentSession) {
+                currentSession = sessionId
+                return
+            }
+            flush('timer')
+            currentSession = sessionId
+            // Mutations without a snapshot cannot be replayed, so they are dropped until the snapshot
+            // arrives. The snapshot is taken outside rrweb's own emit call so it cannot re-enter it.
+            awaitingSnapshot = true
+            setTimeout(function () {
+                try {
+                    window.rrwebRecord.record.takeFullSnapshot(true)
+                } catch (e) {}
+            }, 0)
+        }
+
+        function onEvent(event) {
+            if (stopped) return
+            trackSession()
+            if (awaitingSnapshot) {
+                if (event.type !== 4 && event.type !== 2) return
+                if (event.type === 2) awaitingSnapshot = false
+            }
+            var text
+            try {
+                text = JSON.stringify(event)
+            } catch (e) {
+                return
+            }
+            if (!buffer.length) bufferSession = currentSession
+            buffer.push(text)
+            bufferBytes += text.length
+            // A full snapshot is most of a recording; sending it at once lets the dashboard show the
+            // page while the visitor is still on it.
+            if (event.type === 2 || bufferBytes >= REPLAY_FLUSH_BYTES) {
+                flush('timer')
+            } else if (!timer) {
+                timer = setTimeout(function () {
+                    flush('timer')
+                }, REPLAY_FLUSH_MS)
+            }
+        }
+
+        // reason is 'timer' (the page is alive), 'hidden' (the tab went to the background) or
+        // 'unload' (the page is going away and has one chance to send).
+        function flush(reason) {
+            if (timer) {
+                clearTimeout(timer)
+                timer = null
+            }
+            if (!buffer.length) return
+            var events = buffer.join(',')
+            var sessionId = bufferSession || getSessionId()
+            buffer = []
+            bufferBytes = 0
+            bufferSession = null
+            if (!config.api_key) return
+            var body =
+                '{"api_key":' + JSON.stringify(config.api_key) +
+                ',"session_id":' + JSON.stringify(sessionId) +
+                ',"distinct_id":' + JSON.stringify(getDistinctId()) +
+                ',"events":[' + events + ']}'
+            var small = body.length < REPLAY_BEACON_LIMIT
+            if ((reason === 'unload' || reason === 'hidden') && small && beacon(body)) return
+            if (reason === 'unload') {
+                // Browsers cap keepalive requests at about 64 KB, so a larger tail is lost.
+                post(body, endpointFor(false), true)
+                return
+            }
+            // Uploads go out one after another so chunks reach the server in order even when a large
+            // snapshot takes longer to compress than the small chunk after it.
+            uploads = uploads
+                .then(function () {
+                    return canGzip ? compress(body).then(null, function () { return body }) : body
+                })
+                .then(function (payload) {
+                    return post(payload, endpointFor(payload !== body), false)
+                })
+                .then(null, function () {})
+        }
+
+        function beacon(body) {
+            if (!navigator.sendBeacon) return false
+            try {
+                return navigator.sendBeacon(endpointFor(false), new Blob([body], { type: 'text/plain;charset=UTF-8' }))
+            } catch (e) {
+                return false
+            }
+        }
+
+        function compress(text) {
+            var stream = new Blob([text]).stream().pipeThrough(new window.CompressionStream('gzip'))
+            return new window.Response(stream).blob()
+        }
+
+        function post(payload, target, keepalive) {
+            if (!window.fetch) return Promise.resolve()
+            var request
+            try {
+                // text/plain keeps this a simple request, so the browser sends it without a preflight.
+                request = window.fetch(target, {
+                    method: 'POST',
+                    body: payload,
+                    headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+                    mode: 'cors',
+                    credentials: 'omit',
+                    keepalive: !!keepalive,
+                })
+            } catch (e) {
+                log('Recording upload failed', e)
+                return Promise.resolve()
+            }
+            return request
+                .then(function (response) {
+                    if (response.status === 401 || response.status === 403) {
+                        log('The server refused the recording (' + response.status + '); recording stopped')
+                        stop()
+                    } else if (!response.ok) {
+                        log('Recording upload answered ' + response.status)
+                    }
+                })
+                .catch(function (error) {
+                    log('Recording upload failed', error)
+                })
+        }
+
+        function start() {
+            if (starting || stopped || stopRecording || !config.session_replay || !config.api_key) return
+            if (storage.get(OPT_OUT_KEY) === 'true') return
+            starting = true
+            loadRecorder(function () {
+                starting = false
+                if (stopped || stopRecording) return
+                try {
+                    stopRecording = window.rrwebRecord.record(recorderOptions()) || function () {}
+                } catch (error) {
+                    log('The recorder failed to start', error)
+                    return
+                }
+                log('Recording the session')
+                var queued = pending
+                pending = []
+                for (var i = 0; i < queued.length; i++) addCustom(queued[i][0], queued[i][1])
+            })
+        }
+
+        function stop() {
+            stopped = true
+            if (stopRecording) {
+                try {
+                    stopRecording()
+                } catch (e) {}
+                stopRecording = null
+            }
+            if (timer) {
+                clearTimeout(timer)
+                timer = null
+            }
+            buffer = []
+            bufferBytes = 0
+            pending = []
+        }
+
+        // Also the way a page with data-replay="false" starts recording after consent.
+        function resume() {
+            stopped = false
+            config.session_replay = true
+            start()
+        }
+
+        // Console output and network requests ride along in the recording as rrweb custom events.
+        function addCustom(tag, payload) {
+            if (stopped || !config.session_replay) return
+            if (!stopRecording) {
+                if (pending.length < REPLAY_MAX_PENDING) pending.push([tag, payload])
+                return
+            }
+            try {
+                window.rrwebRecord.record.addCustomEvent(tag, payload)
+            } catch (e) {}
+        }
+
+        return {
+            start: start,
+            stop: stop,
+            resume: resume,
+            flush: flush,
+            addCustom: addCustom,
+            isRecording: function () {
+                return !!stopRecording
+            },
+        }
+    })()
 
     // ----- Debug HUD: an on-page overlay of this visitor's clicks (Alt+H) -----------------------
 
@@ -626,11 +1188,13 @@
             if (root || !document.body) return
             canvas = document.createElement('canvas')
             canvas.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:2147483640;display:none;'
+            canvas.setAttribute('data-hotspot-block', '')
             document.body.appendChild(canvas)
             context = canvas.getContext('2d')
 
             root = document.createElement('div')
             root.id = '__hotspot_hud'
+            root.setAttribute('data-hotspot-block', '')
             root.style.cssText =
                 'position:fixed;bottom:20px;right:20px;z-index:2147483645;width:min(300px,calc(100vw - 40px));background:#111113;color:#FAFAFA;' +
                 'border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:14px;box-shadow:0 20px 50px rgba(0,0,0,.6);' +
@@ -783,6 +1347,7 @@
                 if (options.api_host) config.api_host = String(options.api_host).replace(/\/+$/, '')
             }
             if (config.capture_pageview && !pageviewSent) capturePageview()
+            replay.start()
         },
         capture: function (eventName, properties) {
             if (typeof eventName === 'string' && eventName) record(eventName, properties || {})
@@ -808,13 +1373,18 @@
         optOut: function () {
             storage.set(OPT_OUT_KEY, 'true')
             queue = []
+            replay.stop()
         },
         optIn: function () {
             storage.remove(OPT_OUT_KEY)
+            replay.resume()
         },
         hasOptedOut: function () {
             return storage.get(OPT_OUT_KEY) === 'true'
         },
+        startSessionRecording: replay.resume,
+        stopSessionRecording: replay.stop,
+        isSessionRecording: replay.isRecording,
         getDistinctId: getDistinctId,
         getSessionId: getSessionId,
         on: function (eventName, callback) {
@@ -843,13 +1413,18 @@
     setupAutocapture()
     setupHistoryListeners()
     setupErrorCapture()
+    setupConsoleCapture()
+    setupNetworkCapture()
+    vitals.init()
     window.addEventListener('scroll', updateScrollDepth, { passive: true })
     window.addEventListener('pagehide', function () {
         capturePageleave(true)
+        replay.flush('unload')
     })
     window.addEventListener('visibilitychange', function () {
         if (document.visibilityState === 'hidden') {
             capturePageleave(false)
+            replay.flush('hidden')
         } else {
             pageStartTime = Date.now()
         }
@@ -860,4 +1435,5 @@
         if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', capturePageview)
         else capturePageview()
     }
+    replay.start()
 })(window, document)

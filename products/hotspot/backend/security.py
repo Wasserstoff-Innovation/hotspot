@@ -25,18 +25,24 @@ def generate_nonce() -> str:
     return secrets.token_urlsafe(16)
 
 
-def page_csp(nonce: str, allow_page_frames: bool = False) -> str:
-    """Inline scripts carry the nonce; inline styles stay allowed because the pages set them."""
-    frame_src = "'self' https: http:" if allow_page_frames else "'self'"
+def page_csp(nonce: str, replay: bool = False) -> str:
+    """Inline scripts carry the nonce; inline styles stay allowed because the pages set them.
+
+    The dashboard rebuilds recorded pages inside a sandboxed frame that inherits this policy, so with
+    ``replay`` it may load images, stylesheets, fonts and media from the recorded sites. Scripts stay
+    nonce-only everywhere: rrweb never runs a recorded page's scripts.
+    """
+    remote = " https: http:" if replay else ""
     return "; ".join(
         [
             "default-src 'self'",
             f"script-src 'self' 'nonce-{nonce}'",
-            f"style-src 'self' 'unsafe-inline' {FONT_STYLE_ORIGIN}",
-            f"font-src 'self' data: {FONT_FILE_ORIGIN}",
-            "img-src 'self' data: blob:",
+            f"style-src 'self' 'unsafe-inline' {FONT_STYLE_ORIGIN}{remote}",
+            f"font-src 'self' data: {FONT_FILE_ORIGIN}{remote}",
+            f"img-src 'self' data: blob:{remote}",
+            f"media-src 'self' data: blob:{remote}",
             "connect-src 'self'",
-            f"frame-src {frame_src}",
+            "frame-src 'self'",
             "frame-ancestors 'self'",
             "base-uri 'self'",
             "form-action 'self'",
