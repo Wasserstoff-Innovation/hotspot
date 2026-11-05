@@ -1,0 +1,2554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ page_title }}</title>
+    <meta name="description" content="Hotspot is self-hosted product telemetry. One script tag records page views, clicks, rage clicks, dead clicks, scroll depth, form submits and JavaScript errors. Your server stores the data and a dashboard shows sessions, a replay timeline, funnels, paths and friction.">
+    <meta name="theme-color" content="#2563EB">
+    <link rel="canonical" href="{{ site_url }}/">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='none' stroke='%232563EB' stroke-width='3.5'/%3E%3Ccircle cx='16' cy='16' r='7.5' fill='none' stroke='%233B82F6' stroke-width='1.75' stroke-dasharray='3 2'/%3E%3Ccircle cx='16' cy='16' r='4.5' fill='%2310B981'/%3E%3Ccircle cx='16' cy='16' r='1.8' fill='%23FFFFFF'/%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Satisfy&display=swap" rel="stylesheet">
+    <script src="{{ sdk_url }}" data-api-key="{{ api_key }}" defer></script>
+    <script nonce="{{ csp_nonce }}">
+        // Reveal-on-scroll styles apply only when the observer that undoes them exists.
+        if ('IntersectionObserver' in window) {
+            document.documentElement.className += ' js-reveal'
+        }
+    </script>
+    <style>
+        :root {
+            --brand: #2563EB;
+            --brand-hover: #1D4ED8;
+            --brand-soft: rgba(37, 99, 235, 0.10);
+            --brand-ring: rgba(37, 99, 235, 0.22);
+            --bg: #FAF9F6;
+            --surface: #FFFFFF;
+            --surface-2: #F8FAFC;
+            --dark: #0B0F17;
+            --dark-2: #111827;
+            --text: #0F172A;
+            --text-2: #475569;
+            --muted: #94A3B8;
+            --border: #E2E8F0;
+            --border-2: #CBD5E1;
+            --success: #10B981;
+            --warning: #F59E0B;
+            --danger: #EF4444;
+            --sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+            --cursive: 'Satisfy', cursive;
+            --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+            --shadow-md: 0 4px 12px -2px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.04);
+            --shadow-lg: 0 24px 48px -16px rgba(15, 23, 42, 0.18), 0 8px 16px -8px rgba(15, 23, 42, 0.06);
+            --radius: 14px;
+            --radius-sm: 10px;
+            --header-h: 4.25rem;
+            --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+            scroll-padding-top: calc(var(--header-h) + 1rem);
+            -webkit-text-size-adjust: 100%;
+        }
+
+        body {
+            margin: 0;
+            font-family: var(--sans);
+            font-size: 1rem;
+            line-height: 1.6;
+            color: var(--text);
+            background-color: var(--bg);
+            background-image: radial-gradient(rgba(148, 163, 184, 0.18) 1px, transparent 1px);
+            background-size: 32px 32px;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        body.menu-open {
+            overflow: hidden;
+        }
+
+        h1, h2, h3, h4 {
+            margin: 0;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            line-height: 1.15;
+            text-wrap: balance;
+        }
+
+        p {
+            margin: 0;
+            text-wrap: pretty;
+        }
+
+        a {
+            color: inherit;
+        }
+
+        code, kbd, pre {
+            font-family: var(--mono);
+        }
+
+        svg {
+            display: block;
+        }
+
+        :focus-visible {
+            outline: 2px solid var(--brand);
+            outline-offset: 2px;
+            border-radius: 4px;
+        }
+
+        [hidden],
+        body:not([data-demo-enabled="1"]) [data-demo-link] {
+            display: none !important;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1180px;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+        }
+
+        .skip-link {
+            position: absolute;
+            top: -100px;
+            left: 1rem;
+            z-index: 100;
+            padding: 0.6rem 0.9rem;
+            background: var(--surface);
+            border: 1px solid var(--border-2);
+            border-radius: 8px;
+            font-weight: 600;
+            box-shadow: var(--shadow-md);
+        }
+
+        .skip-link:focus {
+            top: 0.75rem;
+        }
+
+        /* ----- Text styles ------------------------------------------------------------------ */
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.6rem;
+            margin: 0 0 1rem;
+            font-family: var(--mono);
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--brand);
+        }
+
+        .eyebrow::before {
+            content: "";
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        .section-head {
+            max-width: 42rem;
+            margin-bottom: 3rem;
+        }
+
+        .section-head h2 {
+            font-size: clamp(1.85rem, 3vw, 2.5rem);
+            letter-spacing: -0.03em;
+        }
+
+        .section-head .lead {
+            margin-top: 1rem;
+            font-size: 1.1rem;
+            color: var(--text-2);
+        }
+
+        .inline-code {
+            padding: 0.1em 0.4em;
+            border-radius: 5px;
+            background: rgba(15, 23, 42, 0.06);
+            font-size: 0.86em;
+            white-space: nowrap;
+        }
+
+        .on-dark .inline-code {
+            background: rgba(255, 255, 255, 0.10);
+            color: #E2E8F0;
+        }
+
+        /* ----- Buttons ---------------------------------------------------------------------- */
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.7rem 1.1rem;
+            border: 1px solid transparent;
+            border-radius: 10px;
+            font-family: var(--sans);
+            font-size: 0.9rem;
+            font-weight: 600;
+            line-height: 1;
+            text-decoration: none;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.2s ease, transform 0.2s var(--ease-out);
+        }
+
+        .btn svg {
+            width: 16px;
+            height: 16px;
+            flex: none;
+        }
+
+        .btn-primary {
+            background: var(--brand);
+            color: #FFFFFF;
+            box-shadow: 0 1px 2px rgba(37, 99, 235, 0.25);
+        }
+
+        .btn-primary:hover {
+            background: var(--brand-hover);
+            box-shadow: 0 8px 18px -6px rgba(37, 99, 235, 0.5);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: var(--surface);
+            color: var(--text);
+            border-color: var(--border-2);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--muted);
+            box-shadow: var(--shadow-md);
+            transform: translateY(-1px);
+        }
+
+        .btn-lg {
+            padding: 0.9rem 1.35rem;
+            border-radius: 12px;
+            font-size: 1rem;
+        }
+
+        /* ----- Logo ------------------------------------------------------------------------- */
+
+        .logo {
+            display: inline-flex;
+            align-items: center;
+            font-family: var(--cursive);
+            font-size: 1.95rem;
+            font-weight: 400;
+            line-height: 1;
+            color: var(--text);
+            text-decoration: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .logo-h {
+            font-size: 1.12em;
+            margin-right: -0.06em;
+        }
+
+        .logo-ring {
+            position: relative;
+            top: 0.08em;
+            width: 0.6em;
+            height: 0.6em;
+            margin-right: -0.02em;
+            transition: transform 0.35s var(--ease-out);
+        }
+
+        .logo-ring svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .logo:hover .logo-ring {
+            transform: rotate(45deg) scale(1.12);
+        }
+
+        .logo-on-dark {
+            color: #FFFFFF;
+        }
+
+        /* ----- Header ----------------------------------------------------------------------- */
+
+        .site-header {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            height: var(--header-h);
+            background: rgba(255, 255, 255, 0.82);
+            -webkit-backdrop-filter: blur(16px) saturate(1.4);
+            backdrop-filter: blur(16px) saturate(1.4);
+            border-bottom: 1px solid var(--border);
+            transition: box-shadow 0.2s ease;
+        }
+
+        .site-header.is-scrolled {
+            box-shadow: 0 4px 16px -8px rgba(15, 23, 42, 0.12);
+        }
+
+        .header-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1.5rem;
+            height: 100%;
+        }
+
+        .nav {
+            display: flex;
+            align-items: center;
+            gap: 1.75rem;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .nav a {
+            padding: 0.25rem 0;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text-2);
+            text-decoration: none;
+            transition: color 0.15s ease;
+        }
+
+        .nav a:hover {
+            color: var(--text);
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.625rem;
+        }
+
+        .menu-toggle {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            width: 2.5rem;
+            height: 2.5rem;
+            padding: 0;
+            border: 1px solid var(--border-2);
+            border-radius: 10px;
+            background: var(--surface);
+            color: var(--text);
+            cursor: pointer;
+        }
+
+        .menu-toggle svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .menu-toggle .icon-close,
+        .menu-toggle[aria-expanded="true"] .icon-open {
+            display: none;
+        }
+
+        .menu-toggle[aria-expanded="true"] .icon-close {
+            display: block;
+        }
+
+        .mobile-menu {
+            position: fixed;
+            top: var(--header-h);
+            left: 0;
+            right: 0;
+            z-index: 49;
+            padding: 0.75rem 1.5rem 1.5rem;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            box-shadow: var(--shadow-lg);
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-8px);
+            transition: opacity 0.2s ease, transform 0.25s var(--ease-out), visibility 0s linear 0.25s;
+        }
+
+        .mobile-menu.is-open {
+            opacity: 1;
+            visibility: visible;
+            transform: none;
+            transition-delay: 0s;
+        }
+
+        .mobile-menu ul {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .mobile-menu li a {
+            display: block;
+            padding: 0.8rem 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 1rem;
+            font-weight: 500;
+            color: var(--text);
+            text-decoration: none;
+        }
+
+        .mobile-menu-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 0.625rem;
+            margin-top: 1rem;
+        }
+
+        @media (max-width: 1023px) {
+            .nav {
+                display: none;
+            }
+
+            .menu-toggle {
+                display: inline-flex;
+            }
+
+            .header-actions .btn-secondary {
+                display: none;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .header-actions .btn-primary {
+                padding: 0.6rem 0.8rem;
+                font-size: 0.82rem;
+            }
+
+            .header-actions .btn-primary svg {
+                display: none;
+            }
+        }
+
+        /* ----- Sections --------------------------------------------------------------------- */
+
+        .section {
+            padding: 6rem 0;
+        }
+
+        .section-surface {
+            background: var(--surface);
+            border-top: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .section-dark {
+            position: relative;
+            background: var(--dark);
+            color: #E2E8F0;
+        }
+
+        .section-dark::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(96, 165, 250, 0.7), transparent);
+        }
+
+        .section-dark .eyebrow {
+            color: #60A5FA;
+        }
+
+        .section-dark h2,
+        .section-dark h3 {
+            color: #FFFFFF;
+        }
+
+        .section-dark .lead {
+            color: #94A3B8;
+        }
+
+        @media (max-width: 767px) {
+            .section {
+                padding: 4rem 0;
+            }
+
+            .section-head {
+                margin-bottom: 2rem;
+            }
+        }
+
+        /* ----- Hero ------------------------------------------------------------------------- */
+
+        .hero {
+            padding: 5rem 0 4.5rem;
+            overflow: hidden;
+        }
+
+        .hero-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+            gap: 4rem;
+            align-items: center;
+        }
+
+        .hero-copy {
+            animation: rise 0.7s var(--ease-out) both;
+        }
+
+        .hero-art {
+            animation: rise 0.8s 0.1s var(--ease-out) both;
+        }
+
+        @keyframes rise {
+            from {
+                opacity: 0;
+                transform: translateY(14px);
+            }
+            to {
+                opacity: 1;
+                transform: none;
+            }
+        }
+
+        .hero h1 {
+            font-size: clamp(2.4rem, 4.6vw, 3.6rem);
+            letter-spacing: -0.035em;
+            line-height: 1.07;
+        }
+
+        .hero-sub {
+            max-width: 34rem;
+            margin-top: 1.25rem;
+            font-size: 1.15rem;
+            color: var(--text-2);
+        }
+
+        .hero .code {
+            max-width: 36rem;
+            margin-top: 1.75rem;
+        }
+
+        .hero-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            margin-top: 1.5rem;
+        }
+
+        .facts {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem 1.5rem;
+            margin: 1.75rem 0 0;
+            padding: 0;
+            list-style: none;
+            font-size: 0.875rem;
+            color: var(--text-2);
+        }
+
+        .facts li {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+        }
+
+        .facts svg {
+            width: 16px;
+            height: 16px;
+            color: var(--success);
+        }
+
+        @media (max-width: 1023px) {
+            .hero {
+                padding: 3.5rem 0 4rem;
+            }
+
+            .hero-grid {
+                grid-template-columns: 1fr;
+                gap: 3rem;
+            }
+
+            .hero-art {
+                max-width: 560px;
+                margin: 0 auto;
+            }
+        }
+
+        /* ----- Code blocks ------------------------------------------------------------------ */
+
+        .code {
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            background: var(--dark);
+            color: #E2E8F0;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .code::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(96, 165, 250, 0.7), transparent);
+        }
+
+        .code-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 0.5rem 0.6rem 0.5rem 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+            font-family: var(--mono);
+            font-size: 0.68rem;
+            font-weight: 500;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        .code pre {
+            margin: 0;
+            padding: 1rem 1.1rem;
+            font-size: 0.85rem;
+            font-weight: 500;
+            line-height: 1.7;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+
+        .code-prose pre,
+        .code-prose code {
+            font-family: var(--sans);
+            font-weight: 400;
+            font-size: 0.95rem;
+            line-height: 1.75;
+            color: #CBD5E1;
+        }
+
+        .code-prose .tk-mono {
+            font-family: var(--mono);
+            font-size: 0.86em;
+            font-weight: 500;
+            color: #93C5FD;
+        }
+
+        .tk-p { color: #94A3B8; }
+        .tk-t { color: #93C5FD; }
+        .tk-a { color: #FDE68A; }
+        .tk-v { color: #86EFAC; }
+        .tk-c { color: #64748B; }
+
+        .copy-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.4rem 0.6rem;
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 7px;
+            background: rgba(255, 255, 255, 0.06);
+            font-family: var(--sans);
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0;
+            text-transform: none;
+            color: #E2E8F0;
+            cursor: pointer;
+            transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+        }
+
+        .copy-btn svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        .copy-btn:hover {
+            background: rgba(255, 255, 255, 0.12);
+        }
+
+        .copy-btn.is-copied {
+            color: #6EE7B7;
+            border-color: rgba(110, 231, 183, 0.45);
+        }
+
+        .copy-btn:focus-visible {
+            outline-color: #93C5FD;
+        }
+
+        /* ----- Hero sketch: a replay stage ------------------------------------------------- */
+
+        .sketch {
+            position: relative;
+        }
+
+        .sk-window {
+            position: relative;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            background: var(--surface);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .sk-titlebar {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 11px 14px;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface-2);
+        }
+
+        .sk-titlebar i {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--border);
+        }
+
+        .sk-url {
+            width: 46%;
+            height: 12px;
+            margin-left: 10px;
+            border-radius: 6px;
+            background: #EEF2F7;
+        }
+
+        .sk-page {
+            position: relative;
+            padding: 7% 9% 8% 7%;
+        }
+
+        .sk-page i,
+        .sk-page b {
+            display: block;
+        }
+
+        .sk-nav {
+            display: flex;
+            align-items: center;
+            gap: 4%;
+            margin-bottom: 9%;
+        }
+
+        .sk-logo {
+            width: 10%;
+            height: 12px;
+            border-radius: 4px;
+            background: var(--text);
+        }
+
+        .sk-link {
+            width: 7%;
+            height: 7px;
+            border-radius: 4px;
+            background: var(--border-2);
+        }
+
+        .sk-btn {
+            width: 13%;
+            height: 15px;
+            margin-left: auto;
+            border-radius: 5px;
+            background: var(--brand);
+        }
+
+        .sk-h {
+            width: 64%;
+            height: 15px;
+            margin-bottom: 7px;
+            border-radius: 6px;
+            background: var(--border-2);
+        }
+
+        .sk-h.short {
+            width: 42%;
+        }
+
+        .sk-p {
+            width: 72%;
+            height: 7px;
+            margin-top: 11px;
+            border-radius: 4px;
+            background: var(--border);
+        }
+
+        .sk-p.short {
+            width: 54%;
+            margin-top: 6px;
+        }
+
+        .sk-cta {
+            width: 22%;
+            height: 17px;
+            margin-top: 15px;
+            border-radius: 6px;
+            background: var(--brand);
+        }
+
+        .sk-cards {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 4%;
+            margin-top: 9%;
+        }
+
+        .sk-card {
+            position: relative;
+            aspect-ratio: 4 / 3;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--surface-2);
+        }
+
+        .sk-card::before,
+        .sk-card::after {
+            content: "";
+            position: absolute;
+            left: 14%;
+            height: 6px;
+            border-radius: 3px;
+            background: var(--border-2);
+        }
+
+        .sk-card::before {
+            top: 22%;
+            width: 46%;
+        }
+
+        .sk-card::after {
+            top: 48%;
+            width: 66%;
+            background: var(--border);
+        }
+
+        .sk-rail {
+            position: absolute;
+            top: 4%;
+            right: 3%;
+            bottom: 4%;
+            width: 4px;
+            border-radius: 2px;
+            background: #EEF2F7;
+        }
+
+        .sk-rail b {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 62%;
+            border-radius: 2px;
+            background: linear-gradient(180deg, #93C5FD, var(--brand));
+        }
+
+        .sk-rail b::after {
+            content: "";
+            position: absolute;
+            bottom: -5px;
+            left: 50%;
+            width: 10px;
+            height: 10px;
+            margin-left: -5px;
+            border-radius: 50%;
+            background: var(--brand);
+            box-shadow: 0 0 0 3px #FFFFFF, 0 0 0 5px var(--brand-ring);
+        }
+
+        .sk-click,
+        .sk-rage,
+        .sk-dead {
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            border: 2px solid var(--brand);
+            border-radius: 50%;
+            background: rgba(37, 99, 235, 0.14);
+            transform: translate(-50%, -50%);
+        }
+
+        .sk-click::after,
+        .sk-rage::after,
+        .sk-dead::after {
+            content: "";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 6px;
+            height: 6px;
+            margin: -3px 0 0 -3px;
+            border-radius: 50%;
+            background: var(--brand);
+        }
+
+        .sk-click.c1 { left: 84%; top: 12.5%; }
+        .sk-click.c2 { left: 19%; top: 47%; }
+        .sk-click.c3 { left: 47%; top: 86%; }
+
+        .sk-dead {
+            left: 42%;
+            top: 34%;
+            border-color: var(--warning);
+            background: rgba(245, 158, 11, 0.16);
+        }
+
+        .sk-dead::after {
+            background: var(--warning);
+        }
+
+        .sk-rage {
+            left: 80%;
+            top: 82%;
+            width: 26px;
+            height: 26px;
+            border-color: var(--danger);
+            background: rgba(239, 68, 68, 0.16);
+        }
+
+        .sk-rage::after {
+            background: var(--danger);
+        }
+
+        .sk-rage::before {
+            content: "";
+            position: absolute;
+            top: -9px;
+            left: -11px;
+            width: 22px;
+            height: 22px;
+            border: 2px solid var(--danger);
+            border-radius: 50%;
+            background: rgba(239, 68, 68, 0.12);
+        }
+
+        .sk-pulse {
+            position: absolute;
+            left: 80%;
+            top: 82%;
+            width: 26px;
+            height: 26px;
+            border: 2px solid var(--danger);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            opacity: 0;
+            animation: pulse 2.6s ease-out infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: translate(-50%, -50%) scale(0.7);
+                opacity: 0.9;
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(2.4);
+                opacity: 0;
+            }
+        }
+
+        .sk-timeline {
+            position: relative;
+            margin: 14px 10px 0;
+            padding: 16px 18px 14px;
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            border-radius: 12px;
+            background: var(--dark);
+            box-shadow: var(--shadow-md);
+        }
+
+        .sk-timeline::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(96, 165, 250, 0.7), transparent);
+        }
+
+        .sk-track {
+            position: relative;
+            height: 4px;
+            border-radius: 2px;
+            background: rgba(255, 255, 255, 0.12);
+        }
+
+        .sk-track i {
+            position: absolute;
+            top: 50%;
+            width: 8px;
+            height: 8px;
+            margin: -4px 0 0 -4px;
+            border-radius: 50%;
+            background: var(--brand);
+        }
+
+        .sk-track .pv { background: var(--success); }
+        .sk-track .dd { background: var(--warning); }
+        .sk-track .rg { background: var(--danger); }
+
+        .sk-track .t1 { left: 2%; }
+        .sk-track .t2 { left: 13%; }
+        .sk-track .t3 { left: 21%; }
+        .sk-track .t4 { left: 30%; }
+        .sk-track .t5 { left: 42%; }
+        .sk-track .t6 { left: 55%; }
+        .sk-track .t7 { left: 66%; }
+        .sk-track .t8 { left: 72%; }
+        .sk-track .t9 { left: 86%; }
+        .sk-track .t10 { left: 97%; }
+
+        .sk-playhead {
+            position: absolute;
+            top: -8px;
+            bottom: -8px;
+            left: 0;
+            width: 2px;
+            background: #FFFFFF;
+            box-shadow: 0 0 0 1px rgba(11, 15, 23, 0.8);
+            animation: play 10s linear infinite;
+        }
+
+        @keyframes play {
+            from { left: 0; }
+            to { left: 100%; }
+        }
+
+        .sk-rows {
+            display: grid;
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .sk-rows i {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sk-rows i::before {
+            content: "";
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--brand);
+        }
+
+        .sk-rows i::after {
+            content: "";
+            height: 6px;
+            width: var(--w);
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.14);
+        }
+
+        .sk-rows .r1 { --w: 38%; }
+        .sk-rows .r2 { --w: 56%; }
+        .sk-rows .r2::before { background: var(--danger); }
+        .sk-rows .r3 { --w: 27%; }
+        .sk-rows .r3::before { background: var(--success); }
+
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem 1.25rem;
+            margin: 1rem 10px 0;
+            padding: 0;
+            list-style: none;
+            font-family: var(--mono);
+            font-size: 0.7rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        .legend li {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+        }
+
+        .legend li::before {
+            content: "";
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--brand);
+        }
+
+        .legend .l-rage::before { background: var(--danger); }
+        .legend .l-dead::before { background: var(--warning); }
+        .legend .l-scroll::before { border-radius: 2px; background: linear-gradient(180deg, #93C5FD, var(--brand)); }
+
+        /* ----- Cards ------------------------------------------------------------------------ */
+
+        .card {
+            position: relative;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--surface);
+            box-shadow: var(--shadow-sm);
+            transition: border-color 0.2s ease, box-shadow 0.25s ease, transform 0.25s var(--ease-out);
+        }
+
+        .card:hover {
+            border-color: var(--border-2);
+            box-shadow: var(--shadow-md);
+        }
+
+        .card h3 {
+            font-size: 1.05rem;
+            letter-spacing: -0.01em;
+        }
+
+        .card p {
+            margin-top: 0.5rem;
+            font-size: 0.92rem;
+            color: var(--text-2);
+        }
+
+        /* ----- What the script records ------------------------------------------------------ */
+
+        .records-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 1.25rem;
+        }
+
+        .record {
+            padding: 1.5rem;
+        }
+
+        .record-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            margin-bottom: 1.1rem;
+        }
+
+        .icon-tile {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 2.5rem;
+            height: 2.5rem;
+            border: 1px solid rgba(37, 99, 235, 0.18);
+            border-radius: 10px;
+            background: var(--brand-soft);
+            color: var(--brand);
+        }
+
+        .icon-tile svg {
+            width: 20px;
+            height: 20px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 1.75;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .event-name {
+            padding: 0.2rem 0.5rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--surface-2);
+            font-family: var(--mono);
+            font-size: 0.72rem;
+            font-weight: 500;
+            color: var(--text-2);
+            white-space: nowrap;
+        }
+
+        .records-note {
+            display: flex;
+            gap: 0.75rem;
+            max-width: 52rem;
+            margin-top: 1.75rem;
+            padding: 1rem 1.25rem;
+            border: 1px dashed var(--border-2);
+            border-radius: var(--radius-sm);
+            font-size: 0.9rem;
+            color: var(--text-2);
+        }
+
+        .records-note svg {
+            flex: none;
+            width: 18px;
+            height: 18px;
+            margin-top: 0.15rem;
+            fill: none;
+            stroke: var(--brand);
+            stroke-width: 1.75;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        @media (max-width: 1023px) {
+            .records-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 639px) {
+            .records-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* ----- What you see in the dashboard ------------------------------------------------ */
+
+        .dash-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 1.25rem;
+        }
+
+        .dash {
+            overflow: hidden;
+        }
+
+        .dash-sketch {
+            border-bottom: 1px solid var(--border);
+            background: var(--surface-2);
+        }
+
+        .dash-sketch svg {
+            width: 100%;
+            height: auto;
+        }
+
+        .dash-body {
+            padding: 1.25rem 1.4rem 1.5rem;
+        }
+
+        .dash-body p {
+            font-size: 0.9rem;
+        }
+
+        .live-dot {
+            animation: blink 1.8s ease-in-out infinite;
+            transform-origin: center;
+            transform-box: fill-box;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.35; transform: scale(0.8); }
+        }
+
+        @media (max-width: 1099px) {
+            .dash-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 639px) {
+            .dash-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* ----- How it works ----------------------------------------------------------------- */
+
+        .steps {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 1.25rem;
+        }
+
+        .step {
+            padding: 1.75rem;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: var(--radius);
+            background: var(--dark-2);
+        }
+
+        .step-num {
+            display: block;
+            margin-bottom: 1.25rem;
+            font-family: var(--mono);
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.14em;
+            color: #60A5FA;
+        }
+
+        .step h3 {
+            font-size: 1.15rem;
+        }
+
+        .step p {
+            margin-top: 0.6rem;
+            font-size: 0.95rem;
+            color: #94A3B8;
+        }
+
+        .not-panel {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+            gap: 2rem 3rem;
+            margin-top: 1.25rem;
+            padding: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: var(--radius);
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .not-panel h3 {
+            font-size: 1.25rem;
+        }
+
+        .not-intro p {
+            margin-top: 0.6rem;
+            font-size: 0.95rem;
+            color: #94A3B8;
+        }
+
+        .not-list {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1.25rem 2rem;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .not-list li {
+            font-size: 0.9rem;
+            color: #94A3B8;
+        }
+
+        .not-list strong {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.35rem;
+            font-weight: 600;
+            color: #F8FAFC;
+        }
+
+        .not-list svg {
+            flex: none;
+            width: 18px;
+            height: 18px;
+            fill: none;
+            stroke: #F87171;
+            stroke-width: 1.75;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        @media (max-width: 1023px) {
+            .steps {
+                grid-template-columns: 1fr;
+            }
+
+            .not-panel {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+                padding: 1.75rem;
+            }
+        }
+
+        @media (max-width: 639px) {
+            .not-list {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* ----- Install ---------------------------------------------------------------------- */
+
+        .install-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1.25rem;
+            margin-top: 1.25rem;
+        }
+
+        .ref {
+            padding: 1.5rem;
+        }
+
+        .ref h3 {
+            margin-bottom: 1rem;
+            font-size: 1.05rem;
+        }
+
+        .ref dl {
+            margin: 0;
+        }
+
+        .ref dt {
+            font-family: var(--mono);
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text);
+            overflow-wrap: anywhere;
+        }
+
+        .ref dd {
+            margin: 0.2rem 0 0.9rem;
+            font-size: 0.88rem;
+            color: var(--text-2);
+        }
+
+        .ref dd:last-child {
+            margin-bottom: 0;
+        }
+
+        .ref .more {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+            font-size: 0.85rem;
+            color: var(--text-2);
+        }
+
+        .ref .more code {
+            font-size: 0.78rem;
+        }
+
+        .install-block {
+            margin-top: 1.25rem;
+        }
+
+        .install-block > p {
+            margin: 0 0 0.75rem;
+            font-size: 0.95rem;
+            color: var(--text-2);
+        }
+
+        .config {
+            margin-top: 1.25rem;
+            padding: 1.5rem;
+        }
+
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 1.25rem;
+            margin: 1rem 0 0;
+        }
+
+        .config-grid div {
+            font-size: 0.88rem;
+            color: var(--text-2);
+        }
+
+        .config-grid code {
+            display: block;
+            margin-bottom: 0.3rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text);
+            overflow-wrap: anywhere;
+        }
+
+        .config-foot {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem 1.5rem;
+            margin-top: 1.25rem;
+            padding-top: 1.25rem;
+            border-top: 1px solid var(--border);
+            font-size: 0.88rem;
+            color: var(--text-2);
+        }
+
+        .status-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.4rem 0.7rem;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            background: var(--surface-2);
+            font-size: 0.8rem;
+            color: var(--text-2);
+        }
+
+        .status-chip::before {
+            content: "";
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+        }
+
+        .status-chip.is-memory::before {
+            background: var(--warning);
+        }
+
+        body[data-storage="redis"] .storage-memory,
+        body:not([data-storage="redis"]) .storage-redis {
+            display: none;
+        }
+
+        @media (max-width: 1023px) {
+            .config-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 767px) {
+            .install-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* ----- FAQ -------------------------------------------------------------------------- */
+
+        .faq-list {
+            max-width: 48rem;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+            border-top: 1px solid var(--border);
+        }
+
+        .faq-item {
+            border-bottom: 1px solid var(--border);
+        }
+
+        .faq-item h3 {
+            margin: 0;
+            font-size: 1rem;
+        }
+
+        .faq-trigger {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            width: 100%;
+            padding: 1.1rem 0.25rem;
+            border: 0;
+            background: none;
+            font-family: var(--sans);
+            font-size: 1.05rem;
+            font-weight: 600;
+            text-align: left;
+            color: var(--text);
+            cursor: pointer;
+            transition: color 0.15s ease;
+        }
+
+        .faq-trigger:hover {
+            color: var(--brand);
+        }
+
+        .faq-trigger svg {
+            flex: none;
+            width: 18px;
+            height: 18px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            color: var(--muted);
+            transition: transform 0.3s var(--ease-out);
+        }
+
+        .faq-trigger[aria-expanded="true"] svg {
+            transform: rotate(180deg);
+        }
+
+        .faq-panel {
+            display: grid;
+            grid-template-rows: 0fr;
+            transition: grid-template-rows 0.3s var(--ease-out);
+        }
+
+        .faq-panel-inner {
+            overflow: hidden;
+            visibility: hidden;
+            transition: visibility 0s linear 0.3s;
+        }
+
+        .faq-item.is-open .faq-panel {
+            grid-template-rows: 1fr;
+        }
+
+        .faq-item.is-open .faq-panel-inner {
+            visibility: visible;
+            transition-delay: 0s;
+        }
+
+        .faq-panel p {
+            max-width: 44rem;
+            padding: 0 0.25rem 1.25rem;
+            font-size: 0.95rem;
+            color: var(--text-2);
+        }
+
+        .faq-panel p + p {
+            margin-top: -0.5rem;
+        }
+
+        /* ----- Footer ----------------------------------------------------------------------- */
+
+        .site-footer {
+            position: relative;
+            padding: 3.5rem 0 2.5rem;
+            background: var(--dark);
+            color: #94A3B8;
+        }
+
+        .site-footer::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(96, 165, 250, 0.7), transparent);
+        }
+
+        .footer-top {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 2rem;
+        }
+
+        .footer-desc {
+            max-width: 22rem;
+            margin-top: 0.85rem;
+            font-size: 0.92rem;
+        }
+
+        .footer-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem 1.75rem;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .footer-links a {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: #CBD5E1;
+            text-decoration: none;
+            transition: color 0.15s ease;
+        }
+
+        .footer-links a:hover {
+            color: #FFFFFF;
+        }
+
+        .footer-bottom {
+            margin-top: 2.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            font-family: var(--mono);
+            font-size: 0.78rem;
+            color: #64748B;
+        }
+
+        /* ----- Reveal on scroll ------------------------------------------------------------- */
+
+        .js-reveal [data-reveal] {
+            opacity: 0;
+            transform: translateY(16px);
+            transition: opacity 0.6s ease, transform 0.7s var(--ease-out);
+        }
+
+        .js-reveal [data-reveal].is-visible {
+            opacity: 1;
+            transform: none;
+        }
+
+        .js-reveal [data-reveal].d1 { transition-delay: 0.08s; }
+        .js-reveal [data-reveal].d2 { transition-delay: 0.16s; }
+        .js-reveal [data-reveal].d3 { transition-delay: 0.24s; }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            html {
+                scroll-behavior: auto;
+            }
+
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+                transition-delay: 0s !important;
+            }
+
+            .js-reveal [data-reveal] {
+                opacity: 1;
+                transform: none;
+            }
+
+            .sk-pulse,
+            .sk-playhead {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body data-demo-enabled="{{ demo_enabled }}" data-storage="{{ storage }}">
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="site-header" id="site-header">
+        <div class="container header-inner">
+            <a class="logo" href="/" aria-label="Hotspot home">
+                <span class="logo-h" aria-hidden="true">H</span><span class="logo-ring" aria-hidden="true">
+                    <svg viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <linearGradient id="ringGradientHeader" x1="2" y1="2" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+                                <stop stop-color="#2563EB"/>
+                                <stop offset="1" stop-color="#1D4ED8"/>
+                            </linearGradient>
+                        </defs>
+                        <circle cx="13" cy="13" r="11" stroke="url(#ringGradientHeader)" stroke-width="2.75"/>
+                        <circle cx="13" cy="13" r="6.25" stroke="#3B82F6" stroke-width="1.5" stroke-dasharray="2.5 1.5"/>
+                        <circle cx="13" cy="13" r="3.75" fill="#10B981"/>
+                        <circle cx="13" cy="13" r="1.5" fill="#FFFFFF"/>
+                    </svg>
+                </span><span aria-hidden="true">tspot</span>
+            </a>
+
+            <nav aria-label="Main">
+                <ul class="nav">
+                    <li><a href="#records">What it records</a></li>
+                    <li><a href="#dashboard">Dashboard</a></li>
+                    <li><a href="#how">How it works</a></li>
+                    <li><a href="#install">Install</a></li>
+                    <li><a href="#faq">FAQ</a></li>
+                </ul>
+            </nav>
+
+            <div class="header-actions">
+                <a class="btn btn-secondary" href="/demo/" data-demo-link>Sample site</a>
+                <a class="btn btn-primary" href="/dashboard/">
+                    Open dashboard
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                </a>
+                <button class="menu-toggle" id="menu-toggle" type="button" aria-expanded="false" aria-controls="mobile-menu" aria-label="Open menu">
+                    <svg class="icon-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+                    <svg class="icon-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+                </button>
+            </div>
+        </div>
+        <div class="mobile-menu" id="mobile-menu">
+            <nav aria-label="Main, mobile">
+                <ul>
+                    <li><a href="#records">What it records</a></li>
+                    <li><a href="#dashboard">Dashboard</a></li>
+                    <li><a href="#how">How it works</a></li>
+                    <li><a href="#install">Install</a></li>
+                    <li><a href="#faq">FAQ</a></li>
+                </ul>
+            </nav>
+            <div class="mobile-menu-actions">
+                <a class="btn btn-secondary" href="/demo/" data-demo-link>Sample site</a>
+                <a class="btn btn-primary" href="/dashboard/">Open dashboard</a>
+            </div>
+        </div>
+    </header>
+
+    <main id="main">
+        <!-- Hero -->
+        <section class="hero">
+            <div class="container hero-grid">
+                <div class="hero-copy">
+                    <p class="eyebrow">Self-hosted product telemetry</p>
+                    <h1>See where users get stuck on your site.</h1>
+                    <p class="hero-sub">Hotspot records what visitors do with one script tag and stores it on your own server. The dashboard shows sessions, a replay timeline, funnels, paths and the clicks that go nowhere.</p>
+
+                    <div class="code">
+                        <div class="code-head">
+                            <span>Install snippet</span>
+                            <button class="copy-btn" type="button" data-copy="snippet-hero">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
+                                <span class="copy-label">Copy</span>
+                            </button>
+                        </div>
+                        <pre><code id="snippet-hero"><span class="tk-p">&lt;</span><span class="tk-t">script</span> <span class="tk-a">src</span><span class="tk-p">=</span><span class="tk-v">"{{ sdk_url }}"</span> <span class="tk-a">data-api-key</span><span class="tk-p">=</span><span class="tk-v">"{{ api_key }}"</span> <span class="tk-a">defer</span><span class="tk-p">&gt;&lt;/</span><span class="tk-t">script</span><span class="tk-p">&gt;</span></code></pre>
+                    </div>
+
+                    <div class="hero-actions">
+                        <a class="btn btn-primary btn-lg" href="/dashboard/">
+                            Open dashboard
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                        </a>
+                        <a class="btn btn-secondary btn-lg" href="/demo/" data-demo-link>Try the sample site</a>
+                    </div>
+
+                    <ul class="facts">
+                        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4 4 10-10"/></svg>8.8 KB gzipped, no dependencies</li>
+                        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4 4 10-10"/></svg>No third-party cookies</li>
+                        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4 4 10-10"/></svg>No IP addresses stored</li>
+                    </ul>
+                </div>
+
+                <div class="hero-art">
+                    <div class="sketch" aria-hidden="true">
+                        <div class="sk-window">
+                            <div class="sk-titlebar"><i></i><i></i><i></i><i class="sk-url"></i></div>
+                            <div class="sk-page">
+                                <div class="sk-nav"><i class="sk-logo"></i><i class="sk-link"></i><i class="sk-link"></i><i class="sk-link"></i><i class="sk-btn"></i></div>
+                                <i class="sk-h"></i>
+                                <i class="sk-h short"></i>
+                                <i class="sk-p"></i>
+                                <i class="sk-p short"></i>
+                                <i class="sk-cta"></i>
+                                <div class="sk-cards"><i class="sk-card"></i><i class="sk-card"></i><i class="sk-card"></i></div>
+                                <i class="sk-click c1"></i>
+                                <i class="sk-click c2"></i>
+                                <i class="sk-click c3"></i>
+                                <i class="sk-dead"></i>
+                                <i class="sk-pulse"></i>
+                                <i class="sk-rage"></i>
+                                <div class="sk-rail"><b></b></div>
+                            </div>
+                        </div>
+                        <div class="sk-timeline">
+                            <div class="sk-track">
+                                <i class="t1 pv"></i><i class="t2"></i><i class="t3"></i><i class="t4"></i><i class="t5 dd"></i><i class="t6"></i><i class="t7 rg"></i><i class="t8"></i><i class="t9 pv"></i><i class="t10"></i>
+                                <i class="sk-playhead"></i>
+                            </div>
+                            <div class="sk-rows"><i class="r1"></i><i class="r2"></i><i class="r3"></i></div>
+                        </div>
+                    </div>
+                    <ul class="legend" aria-label="Legend for the replay sketch">
+                        <li>Click</li>
+                        <li class="l-rage">Rage click</li>
+                        <li class="l-dead">Dead click</li>
+                        <li class="l-scroll">Scroll depth</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- What the script records -->
+        <section class="section" id="records">
+            <div class="container">
+                <div class="section-head" data-reveal>
+                    <p class="eyebrow">Events</p>
+                    <h2>What the script records</h2>
+                    <p class="lead">Page views, clicks, scroll depth, form submits and errors are captured on their own. Identify and custom events are calls you add.</p>
+                </div>
+
+                <div class="records-grid">
+                    <article class="card record" data-reveal>
+                        <div class="record-top">
+                            <span class="icon-tile"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M3 9h18"/><circle cx="12" cy="14.75" r="3"/><path d="M12 13.25v1.5l1.1.8"/></svg></span>
+                            <code class="event-name">$pageview</code>
+                        </div>
+                        <h3>Page views and time on page</h3>
+                        <p>Recorded on load with the path, title, referrer, UTM parameters and viewport size. When the visitor leaves, the time on page goes with it.</p>
+                    </article>
+
+                    <article class="card record d1" data-reveal>
+                        <div class="record-top">
+                            <span class="icon-tile"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4l14.5 6.2-6.1 2.2-2.2 6.1z"/><path d="M13.4 13.4l5.6 5.6"/></svg></span>
+                            <code class="event-name">$autocapture</code>
+                        </div>
+                        <h3>Clicks with element and position</h3>
+                        <p>Every click, with the element's selector, text, tag and link target, plus where it landed in the viewport and on the page.</p>
+                    </article>
+
+                    <article class="card record d2" data-reveal>
+                        <div class="record-top">
+                            <span class="icon-tile"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8l12.6 5.4-5.3 1.9-1.9 5.3z"/><path d="M13 3.5l1 2.3M18.8 6l-1.9 1.6M21 11.5l-2.5.3"/></svg></span>
+                            <code class="event-name">$rageclick</code>
+                        </div>
+                        <h3>Rage clicks</h3>
+                        <p>Three or more clicks within 1.2 seconds and 40 pixels of each other. A sign that something looks clickable and does not respond.</p>
+                    </article>
+
+                    <article class="card record" data-reveal>
+                        <div class="record-top">
+                            <span class="icon-tile"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4l12.6 5.4-5.3 1.9-1.9 5.3z"/><circle cx="17.5" cy="17.5" r="3.5"/><path d="M15 15l5 5"/></svg></span>
+                            <code class="event-name">$is_dead_click</code>
+                        </div>
+                        <h3>Dead clicks</h3>
+                        <p>A click on something that is not interactive: no link, button, form control, role, handler or pointer cursor within five ancestors.</p>
+                    </article>
+
+                    <article class="card record d1" data-reveal>
+                        <div class="record-top">
+                            <span class="icon-tile"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16"/><path d="M12 8v12"/><path d="M8.5 16.5L12 20l3.5-3.5"/></svg></span>
+                            <code class="event-name">$scroll_depth_percent</code>
+                        </div>
+                        <h3>Scroll depth</h3>
+                        <p>How far down each page the visitor got, as a percentage, sent with the page leave event.</p>
+                    </article>
+
+                    <article class="card record d2" data-reveal>
+                        <div class="record-top">
+                            <span class="icon-tile"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2.5"/><path d="M8 8h8M8 12h4"/><path d="M9 16.5l2 2 4-4.5"/></svg></span>
+                            <code class="event-name">$form_submit</code>
+                        </div>
+                        <h3>Form submits</h3>
+                        <p>The form's id, name, action and method. What the visitor typed is never recorded.</p>
+                    </article>
+
+                    <article class="card record" data-reveal>
+                        <div class="record-top">
+                            <span class="icon-tile"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l9.5 16.5h-19z"/><path d="M12 10v4.5"/><path d="M12 17.5h.01"/></svg></span>
+                            <code class="event-name">$exception</code>
+                        </div>
+                        <h3>JavaScript errors</h3>
+                        <p>Uncaught errors and unhandled promise rejections, with the message, type and stack trace.</p>
+                    </article>
+
+                    <article class="card record d1" data-reveal>
+                        <div class="record-top">
+                            <span class="icon-tile"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="6" r="2.25"/><circle cx="6" cy="18" r="2.25"/><circle cx="18" cy="9" r="2.25"/><path d="M6 8.25v7.5"/><path d="M15.75 9H13a4 4 0 0 0-4 4v2.75"/></svg></span>
+                            <code class="event-name">$pageview</code>
+                        </div>
+                        <h3>Single-page-app route changes</h3>
+                        <p>A route change in a single-page app records a new page view, so client-side navigation shows up like any other page.</p>
+                    </article>
+
+                    <article class="card record d2" data-reveal>
+                        <div class="record-top">
+                            <span class="icon-tile"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20a6.5 6.5 0 0 1 13 0"/><path d="M18.5 8v6M15.5 11h6"/></svg></span>
+                            <code class="event-name">$identify</code>
+                        </div>
+                        <h3>Identify and custom events</h3>
+                        <p>Call <code class="inline-code">hotspot.identify()</code> after sign-in to attach an email or name to a visitor, and <code class="inline-code">hotspot.capture()</code> for events of your own.</p>
+                    </article>
+                </div>
+
+                <p class="records-note" data-reveal>
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M7 15h4M7 11h10"/></svg>
+                    <span>Your server adds the browser, operating system and device type from the User-Agent header, and the country when your proxy sends a country header. IP addresses are not stored.</span>
+                </p>
+            </div>
+        </section>
+
+        <!-- What you see in the dashboard -->
+        <section class="section section-surface" id="dashboard">
+            <div class="container">
+                <div class="section-head" data-reveal>
+                    <p class="eyebrow">Dashboard</p>
+                    <h2>What you see in the dashboard</h2>
+                    <p class="lead">Every section is computed from the sessions on your server, over the time range, device, browser and operating system you pick.</p>
+                </div>
+
+                <div class="dash-grid">
+                    <article class="card dash" data-reveal>
+                        <div class="dash-sketch">
+                            <svg viewBox="0 0 240 120" aria-hidden="true">
+                                <rect x="16" y="14" width="40" height="12" rx="6" fill="#E2E8F0"/>
+                                <rect x="62" y="14" width="34" height="12" rx="6" fill="#E2E8F0"/>
+                                <rect x="102" y="14" width="46" height="12" rx="6" fill="#DBEAFE" stroke="#93C5FD"/>
+                                <circle cx="22" cy="46" r="5" fill="#CBD5E1"/><rect x="34" y="42" width="86" height="8" rx="4" fill="#CBD5E1"/><rect x="128" y="42" width="40" height="8" rx="4" fill="#E2E8F0"/><rect x="192" y="40" width="32" height="12" rx="6" fill="#D1FAE5"/>
+                                <circle cx="22" cy="66" r="5" fill="#CBD5E1"/><rect x="34" y="62" width="64" height="8" rx="4" fill="#CBD5E1"/><rect x="128" y="62" width="52" height="8" rx="4" fill="#E2E8F0"/><rect x="192" y="60" width="32" height="12" rx="6" fill="#FEE2E2"/>
+                                <circle cx="22" cy="86" r="5" fill="#CBD5E1"/><rect x="34" y="82" width="74" height="8" rx="4" fill="#CBD5E1"/><rect x="128" y="82" width="34" height="8" rx="4" fill="#E2E8F0"/><rect x="192" y="80" width="32" height="12" rx="6" fill="#FEF3C7"/>
+                                <circle cx="22" cy="106" r="5" fill="#CBD5E1"/><rect x="34" y="102" width="92" height="8" rx="4" fill="#CBD5E1"/><rect x="128" y="102" width="46" height="8" rx="4" fill="#E2E8F0"/><rect x="192" y="100" width="32" height="12" rx="6" fill="#E2E8F0"/>
+                            </svg>
+                        </div>
+                        <div class="dash-body">
+                            <h3>Sessions and filters</h3>
+                            <p>Every session with its pages, clicks, device and duration. Filter by time range, device, browser and operating system, narrow the list to converted, rage, error, bounced, engaged, active, identified or dead-click sessions, or search.</p>
+                        </div>
+                    </article>
+
+                    <article class="card dash d1" data-reveal>
+                        <div class="dash-sketch">
+                            <svg viewBox="0 0 240 120" aria-hidden="true">
+                                <rect x="16" y="12" width="128" height="76" rx="6" fill="#FFFFFF" stroke="#E2E8F0"/>
+                                <rect x="28" y="24" width="56" height="8" rx="4" fill="#CBD5E1"/><rect x="28" y="38" width="80" height="6" rx="3" fill="#E2E8F0"/><rect x="28" y="50" width="30" height="10" rx="4" fill="#2563EB"/><rect x="28" y="68" width="100" height="6" rx="3" fill="#E2E8F0"/>
+                                <circle cx="43" cy="55" r="7" fill="rgba(37,99,235,0.15)" stroke="#2563EB" stroke-width="2"/><circle cx="43" cy="55" r="2" fill="#2563EB"/>
+                                <circle cx="110" cy="40" r="7" fill="rgba(245,158,11,0.15)" stroke="#F59E0B" stroke-width="2"/><circle cx="110" cy="40" r="2" fill="#F59E0B"/>
+                                <rect x="138" y="16" width="3" height="68" rx="1.5" fill="#EEF2F7"/><rect x="138" y="16" width="3" height="42" rx="1.5" fill="#2563EB"/>
+                                <circle cx="166" cy="22" r="4" fill="#10B981"/><rect x="176" y="19" width="46" height="6" rx="3" fill="#CBD5E1"/>
+                                <circle cx="166" cy="38" r="4" fill="#2563EB"/><rect x="176" y="35" width="32" height="6" rx="3" fill="#CBD5E1"/>
+                                <circle cx="166" cy="54" r="4" fill="#F59E0B"/><rect x="176" y="51" width="40" height="6" rx="3" fill="#CBD5E1"/>
+                                <circle cx="166" cy="70" r="4" fill="#2563EB"/><rect x="176" y="67" width="26" height="6" rx="3" fill="#CBD5E1"/>
+                                <rect x="16" y="102" width="208" height="4" rx="2" fill="#E2E8F0"/>
+                                <circle cx="24" cy="104" r="4" fill="#10B981"/><circle cx="60" cy="104" r="4" fill="#2563EB"/><circle cx="96" cy="104" r="4" fill="#F59E0B"/><circle cx="150" cy="104" r="4" fill="#2563EB"/><circle cx="198" cy="104" r="4" fill="#EF4444"/>
+                                <rect x="123" y="96" width="2" height="16" fill="#0F172A"/>
+                            </svg>
+                        </div>
+                        <div class="dash-body">
+                            <h3>Replay timeline</h3>
+                            <p>A session's events in order: page views, clicks with their position, scroll depth, form submits and errors, next to a preview of the page. It is a timeline, not a video.</p>
+                        </div>
+                    </article>
+
+                    <article class="card dash d2" data-reveal>
+                        <div class="dash-sketch">
+                            <svg viewBox="0 0 240 120" aria-hidden="true">
+                                <rect x="24" y="16" width="40" height="84" rx="5" fill="#2563EB"/>
+                                <rect x="76" y="38" width="40" height="62" rx="5" fill="#2563EB" opacity="0.75"/>
+                                <rect x="128" y="58" width="40" height="42" rx="5" fill="#2563EB" opacity="0.5"/>
+                                <rect x="180" y="78" width="40" height="22" rx="5" fill="#2563EB" opacity="0.3"/>
+                                <path d="M64 16 L76 38" stroke="#CBD5E1" stroke-width="1.5" stroke-dasharray="3 3"/>
+                                <path d="M116 38 L128 58" stroke="#CBD5E1" stroke-width="1.5" stroke-dasharray="3 3"/>
+                                <path d="M168 58 L180 78" stroke="#CBD5E1" stroke-width="1.5" stroke-dasharray="3 3"/>
+                                <rect x="16" y="106" width="212" height="2" rx="1" fill="#E2E8F0"/>
+                            </svg>
+                        </div>
+                        <div class="dash-body">
+                            <h3>Funnels you define</h3>
+                            <p>Steps are a path, an event, a clicked selector or clicked text. The funnel shows how many sessions reached each step, the drop-off between steps and the median time to the next one.</p>
+                        </div>
+                    </article>
+
+                    <article class="card dash d3" data-reveal>
+                        <div class="dash-sketch">
+                            <svg viewBox="0 0 240 120" aria-hidden="true">
+                                <path d="M40 60 C 80 60, 80 30, 120 30" fill="none" stroke="#2563EB" stroke-width="4" stroke-linecap="round"/>
+                                <path d="M40 60 C 80 60, 80 60, 120 60" fill="none" stroke="#CBD5E1" stroke-width="3" stroke-linecap="round"/>
+                                <path d="M40 60 C 80 60, 80 90, 120 90" fill="none" stroke="#E2E8F0" stroke-width="3" stroke-linecap="round"/>
+                                <path d="M120 30 C 160 30, 160 45, 200 45" fill="none" stroke="#2563EB" stroke-width="3" stroke-linecap="round"/>
+                                <path d="M120 60 C 160 60, 160 45, 200 45" fill="none" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round"/>
+                                <path d="M120 60 C 160 60, 160 80, 200 80" fill="none" stroke="#E2E8F0" stroke-width="2" stroke-linecap="round"/>
+                                <rect x="20" y="52" width="36" height="16" rx="8" fill="#0F172A"/>
+                                <rect x="104" y="22" width="36" height="16" rx="8" fill="#2563EB"/>
+                                <rect x="104" y="52" width="36" height="16" rx="8" fill="#CBD5E1"/>
+                                <rect x="104" y="82" width="36" height="16" rx="8" fill="#E2E8F0"/>
+                                <rect x="184" y="37" width="36" height="16" rx="8" fill="#10B981"/>
+                                <rect x="184" y="72" width="36" height="16" rx="8" fill="#E2E8F0"/>
+                            </svg>
+                        </div>
+                        <div class="dash-body">
+                            <h3>Paths</h3>
+                            <p>Entry pages, exit pages, the most common page-to-page transitions and the top full paths, with how many of them converted.</p>
+                        </div>
+                    </article>
+
+                    <article class="card dash" data-reveal>
+                        <div class="dash-sketch">
+                            <svg viewBox="0 0 240 120" aria-hidden="true">
+                                <circle cx="24" cy="22" r="5" fill="#EF4444"/><rect x="36" y="18" width="70" height="8" rx="4" fill="#CBD5E1"/><rect x="130" y="17" width="94" height="10" rx="5" fill="#FEE2E2"/><rect x="130" y="17" width="78" height="10" rx="5" fill="#EF4444"/>
+                                <circle cx="24" cy="46" r="5" fill="#EF4444"/><rect x="36" y="42" width="52" height="8" rx="4" fill="#CBD5E1"/><rect x="130" y="41" width="94" height="10" rx="5" fill="#FEE2E2"/><rect x="130" y="41" width="50" height="10" rx="5" fill="#EF4444"/>
+                                <circle cx="24" cy="70" r="5" fill="#F59E0B"/><rect x="36" y="66" width="62" height="8" rx="4" fill="#CBD5E1"/><rect x="130" y="65" width="94" height="10" rx="5" fill="#FEF3C7"/><rect x="130" y="65" width="38" height="10" rx="5" fill="#F59E0B"/>
+                                <circle cx="24" cy="94" r="5" fill="#F59E0B"/><rect x="36" y="90" width="44" height="8" rx="4" fill="#CBD5E1"/><rect x="130" y="89" width="94" height="10" rx="5" fill="#FEF3C7"/><rect x="130" y="89" width="22" height="10" rx="5" fill="#F59E0B"/>
+                            </svg>
+                        </div>
+                        <div class="dash-body">
+                            <h3>Friction tables</h3>
+                            <p>Rage clicks and dead clicks grouped by page and element, with the element's text, how many sessions hit it and when it last happened.</p>
+                        </div>
+                    </article>
+
+                    <article class="card dash d1" data-reveal>
+                        <div class="dash-sketch">
+                            <svg viewBox="0 0 240 120" aria-hidden="true">
+                                <rect x="16" y="14" width="48" height="6" rx="3" fill="#94A3B8"/>
+                                <rect x="16" y="28" width="96" height="10" rx="5" fill="#2563EB"/>
+                                <rect x="16" y="44" width="72" height="10" rx="5" fill="#2563EB" opacity="0.75"/>
+                                <rect x="16" y="60" width="54" height="10" rx="5" fill="#2563EB" opacity="0.5"/>
+                                <rect x="16" y="76" width="36" height="10" rx="5" fill="#2563EB" opacity="0.35"/>
+                                <rect x="16" y="92" width="22" height="10" rx="5" fill="#2563EB" opacity="0.2"/>
+                                <rect x="132" y="14" width="48" height="6" rx="3" fill="#94A3B8"/>
+                                <rect x="132" y="28" width="92" height="10" rx="5" fill="#CBD5E1"/>
+                                <rect x="132" y="44" width="60" height="10" rx="5" fill="#CBD5E1"/>
+                                <rect x="132" y="60" width="44" height="10" rx="5" fill="#CBD5E1"/>
+                                <rect x="132" y="76" width="30" height="10" rx="5" fill="#CBD5E1"/>
+                                <rect x="132" y="92" width="18" height="10" rx="5" fill="#CBD5E1"/>
+                            </svg>
+                        </div>
+                        <div class="dash-body">
+                            <h3>Pages and referrers</h3>
+                            <p>Views, sessions, average time, average scroll depth and exit rate per page. Sessions and conversion rate per referrer.</p>
+                        </div>
+                    </article>
+
+                    <article class="card dash d2" data-reveal>
+                        <div class="dash-sketch">
+                            <svg viewBox="0 0 240 120" aria-hidden="true">
+                                <rect x="16" y="16" width="30" height="12" rx="4" fill="#FEE2E2" stroke="#FCA5A5"/><rect x="54" y="18" width="96" height="8" rx="4" fill="#CBD5E1"/><rect x="190" y="18" width="34" height="8" rx="4" fill="#EF4444"/>
+                                <rect x="16" y="40" width="30" height="12" rx="4" fill="#FEE2E2" stroke="#FCA5A5"/><rect x="54" y="42" width="70" height="8" rx="4" fill="#CBD5E1"/><rect x="190" y="42" width="24" height="8" rx="4" fill="#EF4444" opacity="0.7"/>
+                                <rect x="16" y="64" width="30" height="12" rx="4" fill="#FEE2E2" stroke="#FCA5A5"/><rect x="54" y="66" width="112" height="8" rx="4" fill="#CBD5E1"/><rect x="190" y="66" width="16" height="8" rx="4" fill="#EF4444" opacity="0.5"/>
+                                <rect x="16" y="88" width="30" height="12" rx="4" fill="#FEE2E2" stroke="#FCA5A5"/><rect x="54" y="90" width="58" height="8" rx="4" fill="#CBD5E1"/><rect x="190" y="90" width="10" height="8" rx="4" fill="#EF4444" opacity="0.35"/>
+                            </svg>
+                        </div>
+                        <div class="dash-body">
+                            <h3>Errors</h3>
+                            <p>JavaScript errors grouped by message and type, with the count, the sessions affected, the page and when they last happened.</p>
+                        </div>
+                    </article>
+
+                    <article class="card dash d3" data-reveal>
+                        <div class="dash-sketch">
+                            <svg viewBox="0 0 240 120" aria-hidden="true">
+                                <polyline points="16,34 40,30 64,36 88,22 112,28 136,18 160,26 184,14 208,20 224,12" fill="none" stroke="#2563EB" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                <rect x="16" y="46" width="208" height="1.5" fill="#E2E8F0"/>
+                                <circle class="live-dot" cx="24" cy="62" r="5" fill="#10B981"/><rect x="36" y="58" width="92" height="8" rx="4" fill="#CBD5E1"/><rect x="180" y="58" width="44" height="8" rx="4" fill="#E2E8F0"/>
+                                <circle cx="24" cy="82" r="5" fill="#2563EB"/><rect x="36" y="78" width="66" height="8" rx="4" fill="#CBD5E1"/><rect x="180" y="78" width="44" height="8" rx="4" fill="#E2E8F0"/>
+                                <circle cx="24" cy="102" r="5" fill="#2563EB"/><rect x="36" y="98" width="110" height="8" rx="4" fill="#CBD5E1"/><rect x="180" y="98" width="44" height="8" rx="4" fill="#E2E8F0"/>
+                            </svg>
+                        </div>
+                        <div class="dash-body">
+                            <h3>Live feed</h3>
+                            <p>Events as they arrive, newest first, with events per minute and sessions per hour.</p>
+                        </div>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <!-- How it works -->
+        <section class="section section-dark on-dark" id="how">
+            <div class="container">
+                <div class="section-head" data-reveal>
+                    <p class="eyebrow">How it works</p>
+                    <h2>From script tag to dashboard</h2>
+                    <p class="lead">The script, the server and the dashboard are the whole product. Nothing is sent anywhere else.</p>
+                </div>
+
+                <div class="steps">
+                    <div class="step" data-reveal>
+                        <span class="step-num">01</span>
+                        <h3>Add the script tag</h3>
+                        <p>Put one tag in the head of your site or in the root layout of your app. The script is 8.8 KB gzipped, has no dependencies and loads with <code class="inline-code">defer</code>, so it does not block rendering.</p>
+                    </div>
+                    <div class="step d1" data-reveal>
+                        <span class="step-num">02</span>
+                        <h3>Events batch to your server</h3>
+                        <p>The script queues events and posts them to your Hotspot server every 2.5 seconds, or sooner when ten are waiting. Sessions are kept in Redis, or in process memory when no Redis is configured.</p>
+                    </div>
+                    <div class="step d2" data-reveal>
+                        <span class="step-num">03</span>
+                        <h3>Open the dashboard</h3>
+                        <p>Sign in with the dashboard password you set and look at sessions, the replay timeline, funnels, paths, friction, pages, referrers, errors and the live feed.</p>
+                    </div>
+                </div>
+
+                <div class="not-panel" data-reveal>
+                    <div class="not-intro">
+                        <h3>What it does not do</h3>
+                        <p>Hotspot records events, not screens.</p>
+                    </div>
+                    <ul class="not-list">
+                        <li>
+                            <strong><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg>No video recording</strong>
+                            The replay is a timeline of events with click positions and scroll depth, next to a preview of the page.
+                        </li>
+                        <li>
+                            <strong><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg>No form values</strong>
+                            Input and textarea values are never recorded. A form submit carries only the form's id, name, action and method.
+                        </li>
+                        <li>
+                            <strong><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg>No IP addresses</strong>
+                            They are not stored. The country comes from a header your proxy sends, when there is one.
+                        </li>
+                        <li>
+                            <strong><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg>No third-party cookies</strong>
+                            The visitor id and session id live in localStorage, with a first-party cookie as the fallback.
+                        </li>
+                        <li>
+                            <strong><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg>No data leaving your server</strong>
+                            The script posts to your Hotspot host and nowhere else.
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- Install -->
+        <section class="section" id="install">
+            <div class="container">
+                <div class="section-head" data-reveal>
+                    <p class="eyebrow">Install</p>
+                    <h2>Add the script to your site</h2>
+                    <p class="lead">One tag in the head of every page, or in the root layout of your app. It starts recording on load. The snippet below already has this server's address and key.</p>
+                </div>
+
+                <div class="code" data-reveal>
+                    <div class="code-head">
+                        <span>Install snippet</span>
+                        <button class="copy-btn" type="button" data-copy="snippet-install">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
+                            <span class="copy-label">Copy</span>
+                        </button>
+                    </div>
+                    <pre><code id="snippet-install"><span class="tk-p">&lt;</span><span class="tk-t">script</span> <span class="tk-a">src</span><span class="tk-p">=</span><span class="tk-v">"{{ sdk_url }}"</span> <span class="tk-a">data-api-key</span><span class="tk-p">=</span><span class="tk-v">"{{ api_key }}"</span> <span class="tk-a">defer</span><span class="tk-p">&gt;&lt;/</span><span class="tk-t">script</span><span class="tk-p">&gt;</span></code></pre>
+                </div>
+
+                <div class="install-grid">
+                    <article class="card ref" data-reveal>
+                        <h3>Script attributes</h3>
+                        <dl>
+                            <dt>data-api-host</dt>
+                            <dd>Where events are sent. Defaults to the host the script was loaded from.</dd>
+                            <dt>data-autocapture="false"</dt>
+                            <dd>Turn off click and form submit capture, including rage and dead clicks.</dd>
+                            <dt>data-capture-pageview="false"</dt>
+                            <dd>Turn off automatic page views and page leaves.</dd>
+                            <dt>data-capture-errors="false"</dt>
+                            <dd>Turn off error capture.</dd>
+                            <dt>data-debug="true"</dt>
+                            <dd>Log every captured event to the browser console.</dd>
+                            <dt>data-debug-hud="true"</dt>
+                            <dd>Show an overlay of your own clicks on the page while you test. Toggle it with Alt+H, or open any page with <code class="inline-code">?hotspot_debug_hud=1</code>.</dd>
+                        </dl>
+                    </article>
+
+                    <article class="card ref d1" data-reveal>
+                        <h3>JavaScript API</h3>
+                        <dl>
+                            <dt>hotspot.capture(name, props)</dt>
+                            <dd>Record an event of your own.</dd>
+                            <dt>hotspot.identify(id, { email, name, company })</dt>
+                            <dd>Attach a user id and profile to the visitor. Call it after sign-in.</dd>
+                            <dt>hotspot.setPersonProperties(props)</dt>
+                            <dd>Update the profile without changing the id.</dd>
+                            <dt>hotspot.register(props)</dt>
+                            <dd>Properties sent with every event from now on.</dd>
+                            <dt>hotspot.reset()</dt>
+                            <dd>Forget the visitor id and start a new session. Call it on sign-out.</dd>
+                            <dt>hotspot.optOut() and hotspot.optIn()</dt>
+                            <dd>Stop or resume recording in this browser.</dd>
+                        </dl>
+                        <p class="more">Also on <code>window.hotspot</code>: <code>hasOptedOut()</code>, <code>getDistinctId()</code>, <code>getSessionId()</code>, <code>on(event, callback)</code> and <code>flush()</code>.</p>
+                    </article>
+                </div>
+
+                <div class="install-block" data-reveal>
+                    <p>Using a coding assistant? Give it this instruction and it will place the tag in the right file.</p>
+                    <div class="code code-prose">
+                        <div class="code-head">
+                            <span>Instruction for your coding assistant</span>
+                            <button class="copy-btn" type="button" data-copy="snippet-assistant">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
+                                <span class="copy-label">Copy</span>
+                            </button>
+                        </div>
+                        <pre><code id="snippet-assistant">Add <span class="tk-mono">&lt;script src="{{ sdk_url }}" data-api-key="{{ api_key }}" defer&gt;&lt;/script&gt;</span> to the <span class="tk-mono">&lt;head&gt;</span> of the root layout (Next.js <span class="tk-mono">app/layout.tsx</span>, Vite <span class="tk-mono">index.html</span>, SvelteKit <span class="tk-mono">app.html</span>, Astro layout). Do not add other analytics tags. Call <span class="tk-mono">window.hotspot.identify(userId, { email, name })</span> after sign-in.</code></pre>
+                    </div>
+                </div>
+
+                <article class="card config" data-reveal>
+                    <h3>Server configuration</h3>
+                    <div class="config-grid">
+                        <div>
+                            <code>HOTSPOT_API_KEYS</code>
+                            Comma-separated keys the capture endpoint accepts. Unset accepts any key, which is fine locally and wrong in production.
+                        </div>
+                        <div>
+                            <code>HOTSPOT_DASHBOARD_PASSWORD</code>
+                            Protects the dashboard and its API. Unset leaves the dashboard open.
+                        </div>
+                        <div>
+                            <code>REDIS_URL</code>
+                            Keeps data across restarts and shares it between workers. Unset keeps data in process memory.
+                        </div>
+                    </div>
+                    <div class="config-foot">
+                        <span>Every variable, including session retention and request limits, is listed in the README in the repository.</span>
+                        <span class="status-chip storage-redis">This instance stores data in Redis</span>
+                        <span class="status-chip is-memory storage-memory">This instance stores data in memory, so it is lost on restart</span>
+                    </div>
+                </article>
+            </div>
+        </section>
+
+        <!-- FAQ -->
+        <section class="section section-surface" id="faq">
+            <div class="container">
+                <div class="section-head" data-reveal>
+                    <p class="eyebrow">FAQ</p>
+                    <h2>Questions</h2>
+                </div>
+
+                <ul class="faq-list" data-reveal>
+                    <li class="faq-item">
+                        <h3><button class="faq-trigger" type="button" id="faq-q1" aria-expanded="false" aria-controls="faq-a1">Does it work with single-page apps?<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></h3>
+                        <div class="faq-panel" id="faq-a1" role="region" aria-labelledby="faq-q1">
+                            <div class="faq-panel-inner">
+                                <p>Yes. The script records a page view on load and on every route change, so client-side navigation shows up as separate pages. Add the tag once, in the root layout, and nothing else is needed.</p>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="faq-item">
+                        <h3><button class="faq-trigger" type="button" id="faq-q2" aria-expanded="false" aria-controls="faq-a2">Does it record video?<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></h3>
+                        <div class="faq-panel" id="faq-a2" role="region" aria-labelledby="faq-q2">
+                            <div class="faq-panel-inner">
+                                <p>No. The replay is a timeline of the events in a session: page views, clicks with their position on the page, scroll depth, form submits and errors. The dashboard can show a preview of the page next to the timeline, but it never captures what was on the visitor's screen.</p>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="faq-item">
+                        <h3><button class="faq-trigger" type="button" id="faq-q3" aria-expanded="false" aria-controls="faq-a3">Where is the data stored, and for how long?<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></h3>
+                        <div class="faq-panel" id="faq-a3" role="region" aria-labelledby="faq-q3">
+                            <div class="faq-panel-inner">
+                                <p>On your server. Events go to Redis when <code class="inline-code">REDIS_URL</code> is set, otherwise they stay in process memory and are lost on restart. Sessions expire after 7 days by default; <code class="inline-code">HOTSPOT_SESSION_TTL_SECONDS</code> changes that. Up to 2,000 events are kept per session for the replay, and the live feed keeps the last 5,000. Nothing is sent to anyone else.</p>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="faq-item">
+                        <h3><button class="faq-trigger" type="button" id="faq-q4" aria-expanded="false" aria-controls="faq-a4">Can visitors opt out?<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></h3>
+                        <div class="faq-panel" id="faq-a4" role="region" aria-labelledby="faq-q4">
+                            <div class="faq-panel-inner">
+                                <p>Yes. Call <code class="inline-code">hotspot.optOut()</code> and the script stops recording in that browser. <code class="inline-code">hotspot.optIn()</code> turns it back on and <code class="inline-code">hotspot.hasOptedOut()</code> tells you the current state. The choice is stored in the visitor's browser.</p>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="faq-item">
+                        <h3><button class="faq-trigger" type="button" id="faq-q5" aria-expanded="false" aria-controls="faq-a5">Does it slow down my site?<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></h3>
+                        <div class="faq-panel" id="faq-a5" role="region" aria-labelledby="faq-q5">
+                            <div class="faq-panel-inner">
+                                <p>The script is 8.8 KB gzipped, has no dependencies and loads with <code class="inline-code">defer</code>, so it does not block rendering. Events are queued and sent in batches every 2.5 seconds. When the visitor leaves a page, the last batch goes out with <code class="inline-code">sendBeacon</code>, which does not delay the navigation.</p>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="faq-item">
+                        <h3><button class="faq-trigger" type="button" id="faq-q6" aria-expanded="false" aria-controls="faq-a6">What is a dead click? What is a rage click?<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></h3>
+                        <div class="faq-panel" id="faq-a6" role="region" aria-labelledby="faq-q6">
+                            <div class="faq-panel-inner">
+                                <p>A dead click is a click on something that is not interactive: no link, button, form control, role, handler or pointer cursor within five ancestors. It usually means something looks clickable and is not.</p>
+                                <p>A rage click is three or more clicks within 1.2 seconds and 40 pixels of each other. It usually means something is clickable and does not respond. Both show up in the friction tables with the page and the element.</p>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="faq-item">
+                        <h3><button class="faq-trigger" type="button" id="faq-q7" aria-expanded="false" aria-controls="faq-a7">Can I define my own funnel?<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button></h3>
+                        <div class="faq-panel" id="faq-a7" role="region" aria-labelledby="faq-q7">
+                            <div class="faq-panel-inner">
+                                <p>Yes. A funnel is a list of steps, and each step is a path (<code class="inline-code">path:/signup</code>), an event (<code class="inline-code">event:$form_submit</code>), a click on a selector (<code class="inline-code">click:#create-account</code>) or clicked text (<code class="inline-code">text:Buy now</code>). A trailing <code class="inline-code">*</code> on a path or selector matches a prefix. The dashboard shows how many sessions reached each step, the drop-off between steps and the median time to the next step.</p>
+                            </div>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <div class="footer-top">
+                <div>
+                    <a class="logo logo-on-dark" href="/" aria-label="Hotspot home">
+                        <span class="logo-h" aria-hidden="true">H</span><span class="logo-ring" aria-hidden="true">
+                            <svg viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <defs>
+                                    <linearGradient id="ringGradientFooter" x1="2" y1="2" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+                                        <stop stop-color="#2563EB"/>
+                                        <stop offset="1" stop-color="#1D4ED8"/>
+                                    </linearGradient>
+                                </defs>
+                                <circle cx="13" cy="13" r="11" stroke="url(#ringGradientFooter)" stroke-width="2.75"/>
+                                <circle cx="13" cy="13" r="6.25" stroke="#3B82F6" stroke-width="1.5" stroke-dasharray="2.5 1.5"/>
+                                <circle cx="13" cy="13" r="3.75" fill="#10B981"/>
+                                <circle cx="13" cy="13" r="1.5" fill="#FFFFFF"/>
+                            </svg>
+                        </span><span aria-hidden="true">tspot</span>
+                    </a>
+                    <p class="footer-desc">Self-hosted product telemetry. One script tag records what visitors do, and the data stays on your server.</p>
+                </div>
+                <ul class="footer-links">
+                    <li><a href="/dashboard/">Dashboard</a></li>
+                    <li data-demo-link><a href="/demo/">Sample site</a></li>
+                    <li><a href="/hotspot.js">Script</a></li>
+                    <li><a href="/llms.txt">llms.txt</a></li>
+                </ul>
+            </div>
+            <div class="footer-bottom">Hotspot v{{ version }}</div>
+        </div>
+    </footer>
+
+    <div class="sr-only" id="copy-status" aria-live="polite"></div>
+
+    <script nonce="{{ csp_nonce }}">
+        ;(function () {
+            'use strict'
+
+            var body = document.body
+
+            // The sample site link exists only when the server has the demo enabled.
+            if (body.getAttribute('data-demo-enabled') !== '1') {
+                var demoLinks = document.querySelectorAll('[data-demo-link]')
+                for (var i = 0; i < demoLinks.length; i++) {
+                    demoLinks[i].hidden = true
+                }
+            }
+
+            // ----- Header shadow once the page scrolls ------------------------------------------
+
+            var header = document.getElementById('site-header')
+
+            function updateHeader() {
+                header.classList.toggle('is-scrolled', window.scrollY > 4)
+            }
+
+            window.addEventListener('scroll', updateHeader, { passive: true })
+            updateHeader()
+
+            // ----- Mobile menu ------------------------------------------------------------------
+
+            var toggle = document.getElementById('menu-toggle')
+            var menu = document.getElementById('mobile-menu')
+
+            function setMenu(open) {
+                toggle.setAttribute('aria-expanded', open ? 'true' : 'false')
+                toggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu')
+                menu.classList.toggle('is-open', open)
+                body.classList.toggle('menu-open', open)
+            }
+
+            toggle.addEventListener('click', function () {
+                setMenu(toggle.getAttribute('aria-expanded') !== 'true')
+            })
+
+            menu.addEventListener('click', function (event) {
+                if (event.target.closest('a')) setMenu(false)
+            })
+
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape' && menu.classList.contains('is-open')) {
+                    setMenu(false)
+                    toggle.focus()
+                }
+            })
+
+            var desktop = window.matchMedia('(min-width: 1024px)')
+
+            function onViewportChange(query) {
+                if (query.matches) setMenu(false)
+            }
+
+            if (desktop.addEventListener) desktop.addEventListener('change', onViewportChange)
+            else if (desktop.addListener) desktop.addListener(onViewportChange)
+
+            // ----- Copy buttons -----------------------------------------------------------------
+
+            var copyStatus = document.getElementById('copy-status')
+
+            function fallbackCopy(text) {
+                var area = document.createElement('textarea')
+                area.value = text
+                area.setAttribute('readonly', '')
+                area.style.position = 'fixed'
+                area.style.top = '-1000px'
+                body.appendChild(area)
+                area.select()
+                var copied = false
+                try {
+                    copied = document.execCommand('copy')
+                } catch (error) {
+                    copied = false
+                }
+                body.removeChild(area)
+                return copied
+            }
+
+            function copyText(text) {
+                if (navigator.clipboard && window.isSecureContext) {
+                    return navigator.clipboard.writeText(text).then(
+                        function () {
+                            return true
+                        },
+                        function () {
+                            return fallbackCopy(text)
+                        }
+                    )
+                }
+                return Promise.resolve(fallbackCopy(text))
+            }
+
+            var copyButtons = document.querySelectorAll('[data-copy]')
+
+            Array.prototype.forEach.call(copyButtons, function (button) {
+                var label = button.querySelector('.copy-label')
+                var timer = null
+
+                button.addEventListener('click', function () {
+                    var source = document.getElementById(button.getAttribute('data-copy'))
+                    if (!source) return
+                    copyText(source.textContent.trim()).then(function (copied) {
+                        label.textContent = copied ? 'Copied' : 'Copy failed'
+                        button.classList.toggle('is-copied', copied)
+                        copyStatus.textContent = copied ? 'Copied to the clipboard' : 'Copy failed. Select the text and copy it.'
+                        if (timer) clearTimeout(timer)
+                        timer = setTimeout(function () {
+                            label.textContent = 'Copy'
+                            button.classList.remove('is-copied')
+                        }, 1800)
+                    })
+                })
+            })
+
+            // ----- FAQ accordion ----------------------------------------------------------------
+
+            var triggers = Array.prototype.slice.call(document.querySelectorAll('.faq-trigger'))
+
+            function setOpen(trigger, open) {
+                trigger.setAttribute('aria-expanded', open ? 'true' : 'false')
+                trigger.closest('.faq-item').classList.toggle('is-open', open)
+            }
+
+            triggers.forEach(function (trigger, index) {
+                trigger.addEventListener('click', function () {
+                    setOpen(trigger, trigger.getAttribute('aria-expanded') !== 'true')
+                })
+
+                trigger.addEventListener('keydown', function (event) {
+                    var next = null
+                    if (event.key === 'ArrowDown') next = triggers[(index + 1) % triggers.length]
+                    else if (event.key === 'ArrowUp') next = triggers[(index - 1 + triggers.length) % triggers.length]
+                    else if (event.key === 'Home') next = triggers[0]
+                    else if (event.key === 'End') next = triggers[triggers.length - 1]
+                    if (next) {
+                        event.preventDefault()
+                        next.focus()
+                    }
+                })
+            })
+
+            // ----- Reveal on scroll -------------------------------------------------------------
+
+            if ('IntersectionObserver' in window) {
+                var observer = new IntersectionObserver(
+                    function (entries) {
+                        entries.forEach(function (entry) {
+                            if (!entry.isIntersecting) return
+                            entry.target.classList.add('is-visible')
+                            observer.unobserve(entry.target)
+                        })
+                    },
+                    { rootMargin: '0px 0px -6% 0px', threshold: 0.05 }
+                )
+                var targets = document.querySelectorAll('[data-reveal]')
+                for (var j = 0; j < targets.length; j++) {
+                    observer.observe(targets[j])
+                }
+            }
+        })()
+    </script>
+</body>
+</html>

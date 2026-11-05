@@ -19,14 +19,15 @@ Commands:
     status            Check health and status of Hotspot containers
     logs [service]    View container logs (e.g. ./bin/hotspot logs web)
     migrate           Run database migrations (Postgres + ClickHouse)
-    playground        Open the live Hotspot AI playground in your browser
+    standalone        Run the lightweight standalone server (no PostHog stack)
     createsuperuser   Create a new admin superuser
     shell             Open a Django shell in the Hotspot web container
     dev               Start local native development stack using hogli
     help              Show this help message
 
-Web UI will be available at: http://localhost:8000
-Playground available at:     http://localhost:8000/playground/
+Landing page:  http://localhost:8000
+Dashboard:     http://localhost:8000/dashboard/
+Sample site:   http://localhost:8000/demo/
 EOF
 }
 
@@ -38,8 +39,8 @@ case "$COMMAND" in
         echo "🚀 Starting Hotspot standalone stack..."
         docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d "$@"
         echo "✅ Hotspot services launched!"
-        echo "🌐 Web UI available at:     http://localhost:8000"
-        echo "🎮 AI Playground at:       http://localhost:8000/playground/"
+        echo "🌐 Landing page: http://localhost:8000"
+        echo "📊 Dashboard:    http://localhost:8000/dashboard/"
         ;;
     stop|down)
         echo "🛑 Stopping Hotspot stack..."
@@ -57,9 +58,10 @@ case "$COMMAND" in
     logs)
         docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" logs -f "$@"
         ;;
-    playground)
-        echo "🎮 Opening Hotspot AI Playground..."
-        open "http://localhost:8000/playground/" || xdg-open "http://localhost:8000/playground/" || true
+    standalone)
+        echo "🚀 Starting the Hotspot standalone server on http://localhost:${PORT:-8000} ..."
+        set -a; [ -f "$ENV_FILE" ] && . "$ENV_FILE"; set +a
+        exec "$REPO_ROOT/.venv/bin/python" "$REPO_ROOT/products/hotspot/standalone/server.py" "$@"
         ;;
     migrate)
         echo "🔄 Running PostgreSQL migrations..."

@@ -1,25 +1,23 @@
-# Hotspot Standalone Architecture
+# Hotspot standalone server
 
-This directory houses the standalone, zero-PostHog deployment architecture for Hotspot.
+Runs Hotspot on its own: a Starlette app, Uvicorn, and Redis for storage. Nothing from the PostHog stack is needed. The handlers in `server.py` are thin wrappers around `products/hotspot/backend/service.py`, the same code the Django app uses, so both deployments behave the same.
 
-## Architecture
+## Run locally
 
-- **`products/hotspot/backend/`**: Pure domain logic, simulation engine, session ingestion, and dropoff analytics.
-- **`products/hotspot/sdk/hotspot.js`**: Pure resident client tracking script (0 external dependencies, 0 PostHog references).
-- **`products/hotspot/templates/`**: High-definition conversion intelligence dashboard & landing page.
-- **`products/hotspot/standalone/server.py`**: A lightweight Starlette/Uvicorn server requiring only Python and ~60MB RAM (replaces the 2GB PostHog Docker image).
+```bash
+pip install -r products/hotspot/standalone/requirements.txt
+HOTSPOT_DASHBOARD_PASSWORD=change-me HOTSPOT_API_KEYS=hs_my_site python products/hotspot/standalone/server.py
+```
 
-## Running Standalone (Without PostHog)
+Without `REDIS_URL` the server keeps sessions in memory, so they disappear on restart. From the repository root, `./bin/hotspot standalone` runs the same command with the values from `.env.hotspot`.
+
+## Run with Docker
 
 ```bash
 cd products/hotspot/standalone
-pip install starlette uvicorn
-python server.py
+HOTSPOT_DASHBOARD_PASSWORD=change-me HOTSPOT_API_KEYS=hs_my_site docker compose up -d --build
 ```
 
-Or with Docker:
+This starts the server on port 8000 and a Redis container with persistence. Set `HOTSPOT_SITE_URL` to the public origin (for example `https://hotspot.example.com`) so install snippets point at it. Put a TLS-terminating proxy in front for production.
 
-```bash
-docker build -f Dockerfile -t hotspot-standalone ../../..
-docker run -p 8000:8000 hotspot-standalone
-```
+All settings are listed in [the product README](../README.md#configuration).

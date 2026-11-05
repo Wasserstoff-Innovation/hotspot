@@ -1,189 +1,198 @@
+"""Hotspot standalone server: the same product without the PostHog stack.
+
+Runs on Starlette and Uvicorn, stores sessions in Redis when REDIS_URL is set and in
+memory otherwise. Every handler is a thin wrapper around products.hotspot.backend.service.
 """
-Hotspot Standalone Server (Zero-PostHog Engine)
-Runs Hotspot independently using Starlette / Uvicorn.
-No monorepo dependencies, no 2GB Docker image, pure standalone operation.
-"""
+
+from __future__ import annotations
 
 import os
-import json
-import time
-from typing import Dict, Any, List
+import sys
+from pathlib import Path
 
 from starlette.applications import Starlette
-from starlette.responses import HTMLResponse, JSONResponse, Response
+from starlette.requests import Request
+from starlette.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from starlette.routing import Route
-from starlette.middleware import Middleware
-from starlette.middleware.cors import CORSMiddleware
 
-# Resolve Directories
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
-SDK_DIR = os.path.join(BASE_DIR, "sdk")
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
-# Import Core Domain Logic
-import sys
-sys.path.insert(0, os.path.dirname(BASE_DIR))
-from products.hotspot.backend.engine import (
-    HOTSPOT_EVENTS,
-    HOTSPOT_SESSIONS,
-    ensure_seed_sessions,
-    simulate_cohort_flow,
+from products.hotspot.backend.auth import DASHBOARD_COOKIE, TOKEN_TTL_SECONDS  # noqa: E402
+from products.hotspot.backend.security import (  # noqa: E402
+    API_CSP,
+    CAPTURE_CORS_HEADERS,
+    NO_STORE_HEADERS,
+    generate_nonce,
+    is_same_site_form_post,
+    page_csp,
 )
+from products.hotspot.backend.service import FAVICON_SVG, HotspotService, get_service  # noqa: E402
+from products.hotspot.backend.templating import render_template  # noqa: E402
 
-# Initialize seed sessions
-ensure_seed_sessions()
-
-
-def render_template(filename: str, context: Dict[str, Any] = None) -> str:
-    path = os.path.join(TEMPLATES_DIR, filename)
-    if not os.path.exists(path):
-        return f"<h1>Template {filename} not found</h1>"
-    with open(path, "r", encoding="utf-8") as f:
-        html = f.read()
-    if context:
-        for k, v in context.items():
-            html = html.replace(f"{{{{ {k} }}}}", str(v))
-    return html
+DASHBOARD_PATH = "/dashboard/"
+LOGIN_PATH = "/dashboard/login/"
 
 
-# ─── HTTP Route Handlers ────────────────────────────────────────────────────────
-
-async def landing_page(request):
-    html = render_template("landing.html", {
-        "page_title": "Hotspot • Developer Telemetry & Conversion Corridors",
-        "site_url": "http://localhost:8000",
-        "demo_api_key": "hs_live_740bf8263397",
-    })
-    res = HTMLResponse(html)
-    res.headers["Server"] = "Hotspot/2.4"
-    res.headers["X-Powered-By"] = "Hotspot Standalone Engine"
-    return res
+def _service() -> HotspotService:
+    return get_service()
 
 
-async def dashboard_page(request):
-    html = render_template("dashboard.html", {
-        "page_title": "Hotspot • Product Analytics & Conversion Intelligence",
-        "site_url": "http://localhost:8000",
-        "demo_api_key": "hs_live_740bf8263397",
-    })
-    res = HTMLResponse(html)
-    res.headers["Server"] = "Hotspot/2.4"
-    res.headers["X-Powered-By"] = "Hotspot Standalone Engine"
-    res.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    return res
+def _authorized(request: Request) -> bool:
+    return _service().is_authorized(request.cookies.get(DASHBOARD_COOKIE), request.headers.get("authorization"))
 
 
-async def serve_sdk(request):
-    sdk_path = os.path.join(SDK_DIR, "hotspot.js")
-    with open(sdk_path, "r", encoding="utf-8") as f:
-        content = f.read()
-    res = Response(content, media_type="application/javascript; charset=utf-8")
-    res.headers["Server"] = "Hotspot/2.4"
-    res.headers["Cache-Control"] = "public, max-age=3600"
-    return res
+def _page(request: Request, page: str, allow_page_frames: bool = False, status: int = 200, **extra: str) -> Response:
+    nonce = generate_nonce()
+    html = render_template(f"{page}.html", _service().page_context(page, nonce, **extra))
+    response = HTMLResponse(html, status_code=status)
+    response.headers["Content-Security-Policy"] = page_csp(nonce, allow_page_frames=allow_page_frames)
+    return response
 
 
-async def capture_events(request):
-    try:
-        body = await request.json()
-    except Exception:
-        body = {}
-
-    batch = body.get("batch") or ([body] if body.get("event") else [])
-    now_ts = time.time()
-
-    for item in batch:
-        event_name = item.get("event") or "unknown"
-        distinct_id = item.get("distinct_id") or "anonymous"
-        props = item.get("properties") or {}
-        sess_id = props.get("$session_id") or "hs_sess_live_" + str(int(now_ts))
-
-        ev = {
-            "event": event_name,
-            "timestamp": now_ts,
-            "distinct_id": distinct_id,
-            "session_id": sess_id,
-            "properties": props,
-        }
-        HOTSPOT_EVENTS.append(ev)
-
-        if sess_id not in HOTSPOT_SESSIONS:
-            HOTSPOT_SESSIONS[sess_id] = {
-                "session_id": sess_id,
-                "distinct_id": distinct_id,
-                "user_email": props.get("$user_email") or (distinct_id if "@" in distinct_id else None),
-                "user_name": props.get("$user_name") or ("User " + sess_id[-4:]),
-                "company": props.get("$company") or "Live Visitor",
-                "browser": props.get("$browser") or "Chrome",
-                "os": props.get("$os") or "macOS",
-                "device": f"{props.get('$os', 'macOS')} • {props.get('$browser', 'Chrome')}",
-                "device_type": props.get("$device_type") or "desktop",
-                "entry_page": props.get("$pathname") or "/",
-                "referrer": props.get("$referrer") or "Direct Navigation",
-                "is_ai": bool(props.get("$is_ai")),
-                "duration": 1,
-                "has_rage": False,
-                "converted": False,
-                "status": "active",
-                "country": "US",
-                "event_count": 0,
-                "events": [],
-                "first_seen": now_ts,
-                "last_seen": now_ts,
-            }
-
-        s_entry = HOTSPOT_SESSIONS[sess_id]
-        s_entry["events"].append(ev)
-        s_entry["event_count"] = len(s_entry["events"])
-        s_entry["last_seen"] = now_ts
-        s_entry["duration"] = max(1, int(now_ts - s_entry["first_seen"]))
-
-        if event_name == "$rageclick":
-            s_entry["has_rage"] = True
-            s_entry["status"] = "rageclicks"
-        elif event_name in ["passkey_verified", "$form_submit"]:
-            s_entry["converted"] = True
-            s_entry["status"] = "converted"
-
-    return JSONResponse({"status": 1, "received": len(batch)})
+def _json(payload: dict[str, object], status: int = 200) -> Response:
+    response = JSONResponse(payload, status_code=status)
+    response.headers.update(NO_STORE_HEADERS)
+    response.headers["Content-Security-Policy"] = API_CSP
+    return response
 
 
-async def simulate_flow(request):
-    params = request.query_params
-    cohort_size = max(50, min(100000, int(params.get("cohort_size") or 1000)))
-    fix_w1 = params.get("fix_wall_1") in ["1", "true", "True"]
-    fix_w2 = params.get("fix_wall_2") in ["1", "true", "True"]
-    fix_w3 = params.get("fix_wall_3") in ["1", "true", "True"]
-
-    data = simulate_cohort_flow(cohort_size=cohort_size, fix_w1=fix_w1, fix_w2=fix_w2, fix_w3=fix_w3)
-    return JSONResponse(data)
+async def landing(request: Request) -> Response:
+    return _page(request, "landing")
 
 
-async def session_events(request):
-    sess_id = request.path_params["session_id"]
-    session = HOTSPOT_SESSIONS.get(sess_id)
-    if not session:
-        return JSONResponse({"status": 0, "error": "Session not found"}, status=404)
-    return JSONResponse({"status": 1, "session": session, "events": session.get("events", [])})
+async def demo(request: Request) -> Response:
+    if not _service().config.demo_enabled:
+        return PlainTextResponse("The sample site is disabled on this deployment.", status_code=404)
+    return _page(request, "demo")
+
+
+async def dashboard(request: Request) -> Response:
+    if not _authorized(request):
+        return RedirectResponse(LOGIN_PATH, status_code=302)
+    response = _page(request, "dashboard", allow_page_frames=True)
+    response.headers.update(NO_STORE_HEADERS)
+    return response
+
+
+async def app_redirect(request: Request) -> Response:
+    return RedirectResponse(DASHBOARD_PATH, status_code=302)
+
+
+async def login(request: Request) -> Response:
+    service = _service()
+    if not service.config.dashboard_protected or _authorized(request):
+        return RedirectResponse(DASHBOARD_PATH, status_code=302)
+    if request.method == "GET":
+        return _page(request, "login", error="")
+    if not is_same_site_form_post(request.headers):
+        return PlainTextResponse("Cross-site form posts are refused.", status_code=403)
+    form = await request.form()
+    password = form.get("password")
+    token = service.login(password if isinstance(password, str) else None)
+    if token is None:
+        return _page(request, "login", status=401, error="That password is not right. Try again.")
+    response = RedirectResponse(DASHBOARD_PATH, status_code=303)
+    response.set_cookie(
+        DASHBOARD_COOKIE,
+        token,
+        max_age=TOKEN_TTL_SECONDS,
+        httponly=True,
+        samesite="lax",
+        secure=request.url.scheme == "https",
+        path="/",
+    )
+    return response
+
+
+async def logout(request: Request) -> Response:
+    target = LOGIN_PATH if _service().config.dashboard_protected else DASHBOARD_PATH
+    response = RedirectResponse(target, status_code=303)
+    response.delete_cookie(DASHBOARD_COOKIE, path="/")
+    return response
+
+
+async def sdk(request: Request) -> Response:
+    response = Response(_service().sdk_source(), media_type="application/javascript; charset=utf-8")
+    response.headers["Cache-Control"] = "public, max-age=3600"
+    response.headers.update(CAPTURE_CORS_HEADERS)
+    return response
+
+
+async def llms_txt(request: Request) -> Response:
+    response = PlainTextResponse(_service().llms_txt())
+    response.headers["Cache-Control"] = "public, max-age=86400"
+    return response
+
+
+async def favicon(request: Request) -> Response:
+    response = Response(FAVICON_SVG, media_type="image/svg+xml")
+    response.headers["Cache-Control"] = "public, max-age=86400"
+    return response
+
+
+async def capture(request: Request) -> Response:
+    if request.method == "OPTIONS":
+        response: Response = Response(status_code=204)
+    else:
+        status, payload = _service().capture(await request.body(), request.headers)
+        response = JSONResponse(payload, status_code=status)
+    response.headers.update(CAPTURE_CORS_HEADERS)
+    response.headers["Content-Security-Policy"] = API_CSP
+    return response
+
+
+async def overview(request: Request) -> Response:
+    if not _authorized(request):
+        return _unauthorized()
+    return _json(_service().overview(dict(request.query_params)))
+
+
+async def session_detail(request: Request) -> Response:
+    if not _authorized(request):
+        return _unauthorized()
+    detail = _service().session_detail(request.path_params["session_id"])
+    if detail is None:
+        return _json({"status": 0, "error": "Session not found"}, status=404)
+    return _json(detail)
+
+
+async def events_feed(request: Request) -> Response:
+    if not _authorized(request):
+        return _unauthorized()
+    return _json(_service().events_feed(dict(request.query_params)))
+
+
+def _unauthorized() -> Response:
+    return _json({"status": 0, "error": "Sign in to the dashboard first"}, status=401)
 
 
 routes = [
-    Route("/", landing_page),
-    Route("/landing/", landing_page),
-    Route("/dashboard/", dashboard_page),
-    Route("/hotspot.js", serve_sdk),
-    Route("/api/capture", capture_events, methods=["POST", "OPTIONS"]),
-    Route("/api/simulate_flow", simulate_flow),
-    Route("/api/session/{session_id}", session_events),
+    Route("/", landing),
+    Route("/demo/", demo),
+    Route("/demo/{view}/", demo),
+    Route("/demo/{view}", demo),
+    Route("/dashboard/", dashboard),
+    Route("/dashboard/login/", login, methods=["GET", "POST"]),
+    Route("/dashboard/logout/", logout, methods=["POST"]),
+    Route("/app/", app_redirect),
+    Route("/hotspot.js", sdk),
+    Route("/llms.txt", llms_txt),
+    Route("/favicon.ico", favicon),
+    Route("/hotspot/batch/", capture, methods=["POST", "OPTIONS"]),
+    Route("/hotspot/batch", capture, methods=["POST", "OPTIONS"]),
+    Route("/hotspot/api/overview/", overview),
+    Route("/hotspot/api/sessions/{session_id}/", session_detail),
+    Route("/hotspot/api/events/", events_feed),
 ]
 
-middleware = [
-    Middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]),
-]
+app = Starlette(routes=routes)
 
-app = Starlette(debug=False, routes=routes, middleware=middleware)
 
 if __name__ == "__main__":
     import uvicorn
-    print("🚀 Starting Hotspot Standalone Server on http://0.0.0.0:8000")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+    host = os.environ.get("HOTSPOT_HOST", "0.0.0.0")
+    port = int(os.environ.get("PORT") or os.environ.get("HOTSPOT_PORT") or "8000")
+    uvicorn.run(app, host=host, port=port, log_level="info")

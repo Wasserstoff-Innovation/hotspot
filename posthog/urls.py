@@ -33,7 +33,6 @@ from posthog.api.two_factor_qrcode import CacheAwareQRGeneratorView
 from posthog.api.web_experiment import web_experiments
 from posthog.ee_urls import ee_urlpatterns
 from posthog.frontend_views import app_context, home, home_with_region_redirect
-from posthog import hotspot_views
 from posthog.ingress.github.provider import build_github_provider
 from posthog.ingress.views import build_webhook_view
 from posthog.oauth2_urls import urlpatterns as oauth2_urls
@@ -192,15 +191,8 @@ urlpatterns = [
         csrf_exempt(StreamlitBridgeView.as_view()),
         name="streamlit_bridge_query",
     ),
-    opt_slash_path("api/capture", hotspot_views.hotspot_capture, name="hotspot_api_capture"),
-    opt_slash_path("api/events", hotspot_views.hotspot_events_stream, name="hotspot_events_stream"),
-    opt_slash_path("api/analytics", hotspot_views.hotspot_analytics_summary, name="hotspot_analytics_summary"),
-    re_path(r"^api/session/(?P<session_id>[a-zA-Z0-9_\-]+)/?$", hotspot_views.hotspot_session_events, name="hotspot_session_events"),
-    opt_slash_path("api/simulate_flow", hotspot_views.hotspot_simulate_flow, name="hotspot_simulate_flow"),
-    opt_slash_path("api/simulate_visitor", hotspot_views.hotspot_simulate_visitor, name="hotspot_simulate_visitor"),
-    opt_slash_path("api/hotspot/events", hotspot_views.hotspot_events_stream, name="hotspot_api_events_stream"),
-    opt_slash_path("api/hotspot/analytics", hotspot_views.hotspot_analytics_summary, name="hotspot_api_analytics_summary"),
-    opt_slash_path("hotspot/events", hotspot_views.hotspot_events_stream, name="hotspot_events_stream_short"),
+    # Hotspot pages, capture endpoint and dashboard API (products/hotspot/backend/urls.py).
+    path("", include("products.hotspot.backend.urls")),
     path("api/", include(router.urls)),
     # Override the tf_urls QRGeneratorView to use the cache-aware version (handles session race conditions)
     path("account/two_factor/qrcode/", CacheAwareQRGeneratorView.as_view()),
@@ -414,23 +406,5 @@ urlpatterns = [
     # OAuth redirect target when logging the local frontend into a remote cloud region;
     # the SPA handles the code→token exchange client-side, so it must load without auth.
     re_path(r"^oauth/callback", home),
-    # Hotspot Single-script SDK and Ingestion Endpoints
-    path("hotspot.js", hotspot_views.hotspot_js, name="hotspot_js"),
-    path("static/hotspot.js", hotspot_views.hotspot_js, name="hotspot_js_static"),
-    path("llms.txt", hotspot_views.hotspot_llms_txt, name="hotspot_llms_txt"),
-    path("lucide.js", hotspot_views.lucide_js, name="lucide_js"),
-    path("gsap.js", hotspot_views.gsap_js, name="gsap_js"),
-    path("ScrollTrigger.js", hotspot_views.scroll_trigger_js, name="scroll_trigger_js"),
-    opt_slash_path("capture", hotspot_views.hotspot_capture, name="hotspot_capture"),
-    opt_slash_path("batch", hotspot_views.hotspot_capture, name="hotspot_batch"),
-    opt_slash_path("e", hotspot_views.hotspot_capture, name="hotspot_e"),
-    opt_slash_path("decide", hotspot_views.hotspot_decide, name="hotspot_decide"),
-    opt_slash_path("flags", hotspot_views.hotspot_decide, name="hotspot_flags"),
-    opt_slash_path("landing", hotspot_views.hotspot_landing, name="hotspot_landing"),
-    opt_slash_path("demo", hotspot_views.hotspot_demo, name="hotspot_demo"),
-    opt_slash_path("playground", hotspot_views.hotspot_playground, name="hotspot_playground"),
-    opt_slash_path("dashboard", hotspot_views.hotspot_dashboard, name="hotspot_dashboard"),
-    opt_slash_path("app", hotspot_views.hotspot_dashboard, name="hotspot_app"),
-    path("", hotspot_views.hotspot_landing, name="hotspot_root_landing"),
     re_path(r"^.*", home_with_region_redirect),
 ]

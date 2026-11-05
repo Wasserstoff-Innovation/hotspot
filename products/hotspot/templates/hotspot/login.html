@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex">
+    <title>{{ page_title }}</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='9' fill='none' stroke='%232563EB' stroke-width='2.75'/%3E%3Ccircle cx='12' cy='12' r='3' fill='%2310B981'/%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Satisfy&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --brand: #2563EB;
+            --brand-hover: #1D4ED8;
+            --bg: #FAF9F6;
+            --surface: #FFFFFF;
+            --text: #0F172A;
+            --text-secondary: #475569;
+            --border: #E2E8F0;
+            --danger: #DC2626;
+            --danger-bg: #FEF2F2;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            background: var(--bg);
+            background-image: radial-gradient(#CBD5E1 1px, transparent 1px);
+            background-size: 32px 32px;
+            font-family: Inter, system-ui, -apple-system, sans-serif;
+            color: var(--text);
+        }
+        .card {
+            width: min(400px, calc(100vw - 32px));
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 32px;
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+        }
+        .logo {
+            font-family: Satisfy, cursive;
+            font-size: 2rem;
+            color: var(--text);
+            margin: 0 0 4px;
+        }
+        .logo span { color: var(--brand); }
+        h1 { font-size: 1.1rem; margin: 0 0 20px; font-weight: 600; }
+        label { display: block; font-size: 0.85rem; font-weight: 500; margin-bottom: 6px; color: var(--text-secondary); }
+        input {
+            width: 100%;
+            padding: 11px 12px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            font: inherit;
+            font-size: 0.95rem;
+        }
+        input:focus { outline: 2px solid var(--brand); outline-offset: 1px; border-color: var(--brand); }
+        button {
+            width: 100%;
+            margin-top: 16px;
+            padding: 11px;
+            border: 0;
+            border-radius: 10px;
+            background: var(--brand);
+            color: #fff;
+            font: inherit;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        button:hover { background: var(--brand-hover); }
+        .error {
+            background: var(--danger-bg);
+            color: var(--danger);
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 0.875rem;
+            margin-bottom: 16px;
+        }
+        .error:empty { display: none; }
+        .hint { font-size: 0.8rem; color: var(--text-secondary); margin: 18px 0 0; line-height: 1.5; }
+        .hint code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.75rem; }
+        .back { display: inline-block; margin-top: 14px; font-size: 0.85rem; color: var(--brand); text-decoration: none; }
+    </style>
+</head>
+<body>
+    <main class="card">
+        <p class="logo">H<span>o</span>tspot</p>
+        <h1>Sign in to the dashboard</h1>
+        <p class="error" role="alert">{{ error }}</p>
+        <form method="post" action="/dashboard/login/">
+            <label for="password">Dashboard password</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" autofocus required>
+            <button type="submit">Sign in</button>
+        </form>
+        <p class="hint">The password is the <code>HOTSPOT_DASHBOARD_PASSWORD</code> value set on the server.</p>
+        <a class="back" href="/">Back to the site</a>
+    </main>
+</body>
+</html>

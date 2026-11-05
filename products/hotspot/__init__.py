@@ -1,7 +1,3 @@
-"""
-Hotspot — Resident In-Browser Telemetry & Conversion Intelligence Engine
-Version: 2.4.0
-https://hotspot.dev
-"""
+"""Hotspot: single-script product telemetry with session replay, funnels and friction analysis."""
 
-__version__ = "2.4.0"
+__version__ = "3.0.0"

@@ -1,13 +1,16 @@
-FROM python:3.11-alpine
+FROM python:3.12-alpine
 
 WORKDIR /app
 
-# Install minimal dependencies
-RUN pip install --no-cache-dir starlette uvicorn
+# Build context is the repository root (see docker-compose.yml), so only the product is copied.
+COPY products/hotspot/standalone/requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
 
-# Copy Hotspot module
-COPY . /app/products/hotspot
-ENV PYTHONPATH=/app
+COPY products/hotspot /app/products/hotspot
+
+ENV PYTHONPATH=/app \
+    PYTHONUNBUFFERED=1 \
+    PORT=8000
 
 EXPOSE 8000
 

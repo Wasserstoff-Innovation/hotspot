@@ -1,107 +1,76 @@
 <p align="center">
   <svg width="64" height="64" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="16" cy="16" r="14" stroke="#FF5722" stroke-width="2" stroke-dasharray="3 3" opacity="0.45" />
-    <circle cx="16" cy="16" r="9.5" stroke="#FF5722" stroke-width="2.5" opacity="0.85" />
-    <circle cx="16" cy="16" r="5.2" fill="#FF5722" />
-    <circle cx="14.8" cy="14.8" r="1.6" fill="#FFF" opacity="0.9" />
+    <circle cx="16" cy="16" r="14" stroke="#2563EB" stroke-width="2" stroke-dasharray="3 3" opacity="0.45" />
+    <circle cx="16" cy="16" r="9.5" stroke="#2563EB" stroke-width="2.5" opacity="0.85" />
+    <circle cx="16" cy="16" r="5.2" fill="#10B981" />
   </svg>
 </p>
 
 <h1 align="center">Hotspot</h1>
 
-<p align="center">
-  <strong>Unified Product Analytics, Click Heatmaps & User Journey Intelligence</strong>
-</p>
+<p align="center"><strong>Self-hosted product telemetry from one script tag.</strong></p>
 
-<p align="center">
-  <em>Self-hosted, 100% private, zero telemetry, and loaded via a single lightweight script.</em>
-</p>
+Hotspot records what visitors do on your site and shows you where they get stuck.
+One script captures page views, clicks, rage clicks, dead clicks, scroll depth, form submits, JavaScript errors and single-page-app route changes.
+Your own server stores the events, and the dashboard shows sessions, a replay timeline, funnels you define, paths, friction by element, pages, referrers and errors.
+No data leaves your infrastructure.
 
----
+The product lives in [`products/hotspot/`](products/hotspot/README.md).
+The rest of this repository is the PostHog codebase it is built on; `posthog/urls.py` includes Hotspot's routes so the Django web process serves it.
 
-## ⚡ The 1-Line Drop-in Integration
-
-Track pageviews, user interactions, click coordinates for visual heatmaps, form submissions, and errors by adding **one single line** to your website or web app:
+## Install the script
 
 ```html
-<script src="http://localhost:8000/hotspot.js" data-api-key="YOUR_PROJECT_API_KEY"></script>
+<script src="https://YOUR_HOTSPOT_HOST/hotspot.js" data-api-key="YOUR_API_KEY" defer></script>
 ```
-
-### What It Does Automatically
-- 🚀 **Autocapture**: Clicks, button interactions, links, and form submissions without manual tagging.
-- 🗺️ **Visual Click Heatmaps**: Records precise click coordinates (`$heatmap_x`, `$heatmap_y`, `$x_ratio`, `$y_ratio`) for rendering radiant heat zones and rage clicks.
-- ⏱️ **Pageview & Engagement**: Automatically calculates active duration and scroll depth percentage on page exit or tab change.
-- 🔄 **Single Page App (SPA) Support**: Automatically tracks route changes with `pushState`, `replaceState`, and `popstate`.
-- 🛡️ **Zero Telemetry**: All events stay entirely within your self-hosted infrastructure.
-
----
-
-## 💻 Developer JavaScript API
-
-The tracker attaches seamlessly to `window.hotspot`:
 
 ```javascript
-// Send custom events
-window.hotspot.capture('purchase_completed', {
-    plan: 'enterprise',
-    price: 499.00,
-    currency: 'USD'
-});
-
-// Identify user
-window.hotspot.identify('user_12345', {
-    email: 'alex@example.com',
-    company: 'Acme Corp',
-    role: 'Product Lead'
-});
-
-// Set global super properties sent with every event
-window.hotspot.register({
-    app_version: '2.4.0',
-    environment: 'production'
-});
-
-// Reset user identity on logout
-window.hotspot.reset();
+window.hotspot.capture('plan_selected', { plan: 'team' })
+window.hotspot.identify('user_123', { email: 'user@example.com', name: 'Sam' })
+window.hotspot.register({ app_version: '3.0.0' })
+window.hotspot.optOut()
 ```
 
----
+The script has no dependencies and is under 10 KB gzipped.
+It stores a visitor id and a session id in `localStorage`, sets no third-party cookies, and never records form input values.
+All events and options are documented in [the product README](products/hotspot/README.md).
 
-## 🚀 Quickstart: Running Hotspot Locally
+## Run it
 
-Hotspot comes with an all-in-one management CLI:
+Standalone, with nothing but Python and Redis:
 
 ```bash
-# 1. Start the complete standalone stack (Postgres, ClickHouse, Redis, Kafka, Web)
-./bin/hotspot start
+pip install -r products/hotspot/standalone/requirements.txt
+HOTSPOT_DASHBOARD_PASSWORD=change-me HOTSPOT_API_KEYS=hs_my_site python products/hotspot/standalone/server.py
+```
 
-# 2. Check service status
+Or as a container with persistent Redis: `cd products/hotspot/standalone && docker compose up -d --build`.
+
+Inside the full stack from this repository:
+
+```bash
+./bin/hotspot start      # Postgres, ClickHouse, Redis, Kafka, object storage and the web process
 ./bin/hotspot status
-
-# 3. View live container logs
 ./bin/hotspot logs web
-
-# 4. Stop the stack
 ./bin/hotspot stop
 ```
 
-Once started, open your browser:
-- **Hotspot Landing Page & Playground**: [http://localhost:8000](http://localhost:8000)
-- **Hotspot Web Dashboard**: [http://localhost:8000/login](http://localhost:8000/login)
-- **Single-Script Tracker SDK**: [http://localhost:8000/hotspot.js](http://localhost:8000/hotspot.js)
+Then open:
 
----
+- Landing page: http://localhost:8000
+- Dashboard: http://localhost:8000/dashboard/ (set `HOTSPOT_DASHBOARD_PASSWORD` in `.env.hotspot` to protect it)
+- Sample site for generating events: http://localhost:8000/demo/
+- Script: http://localhost:8000/hotspot.js
 
-## 🛠️ Architecture
+## How it is built
 
-- **Web & API Backend**: Django 5 + ASGI server (`granian`)
-- **Event Ingestion**: Direct HTTP ingest (`/capture/`, `/batch/`, `/e/`) with cross-origin resource sharing (CORS)
-- **Database Layer**: PostgreSQL 15 (relational models) & ClickHouse (high-speed event analytics)
-- **Queue & Storage**: Kafka (Redpanda) & SeaweedFS S3-compatible object storage
-- **Client SDK**: Zero-dependency `hotspot.js` (<12KB)
+- `products/hotspot/sdk/hotspot.js`: the script visitors load.
+- `products/hotspot/backend/`: ingestion with size limits and api key checks, session summaries in Redis (memory fallback), the analytics that feed the dashboard, and password sign-in for the dashboard. The domain code has no framework dependency.
+- `products/hotspot/backend/views.py` and `products/hotspot/standalone/server.py`: thin Django and Starlette entrypoints over the same service layer.
+- `products/hotspot/templates/hotspot/`: the landing page, dashboard, sample site and sign-in page, each a single file served with a content security policy.
 
----
+Tests: `uv run pytest products/hotspot/backend/test`.
 
-## 📄 License
+## License
 
 Apache 2.0.

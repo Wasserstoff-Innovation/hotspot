@@ -1,0 +1,7 @@
+{
+    "name": "@posthog/products-hotspot",
+    "private": true,
+    "scripts": {
+        "backend:test": "pytest backend/test"
+    }
+}

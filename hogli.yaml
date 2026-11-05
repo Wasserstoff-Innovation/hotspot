@@ -1300,3 +1300,7 @@ environment:
         bin_script: rasterize-recording-file
         description: 'Render a recording JSONL file to video with the rasterizer'
         hidden: true
+    hotspot:
+        bin_script: hotspot
+        description: 'Manage the Hotspot stack: up, down, status, logs, migrate, standalone'
+        hidden: true

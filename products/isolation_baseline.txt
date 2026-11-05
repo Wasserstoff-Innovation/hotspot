@@ -46,6 +46,7 @@ exports
 feature_flags
 field_notes
 growth
+hotspot
 links
 live_debugger
 llm_analytics

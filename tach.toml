@@ -118,6 +118,7 @@ depends_on = [
     "products.experiments",
     "products.feature_flags",
     "products.growth",
+    "products.hotspot",
     "products.legal_documents",
     "products.links",
     "products.ai_observability",
@@ -562,6 +563,11 @@ depends_on = [
     "products.signals", "products.tasks",
     "products.warehouse_sources", "products.wizard",
 ]
+layer = "modules"
+
+[[modules]]
+path = "products.hotspot"
+depends_on = []
 layer = "modules"
 
 [[modules]]

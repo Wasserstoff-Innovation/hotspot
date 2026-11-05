@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   hotspot:
     build:
@@ -8,5 +6,22 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - PORT=8000
+      HOTSPOT_SITE_URL: ${HOTSPOT_SITE_URL:-http://localhost:8000}
+      HOTSPOT_API_KEYS: ${HOTSPOT_API_KEYS:-}
+      HOTSPOT_DASHBOARD_PASSWORD: ${HOTSPOT_DASHBOARD_PASSWORD:-}
+      HOTSPOT_SECRET_KEY: ${HOTSPOT_SECRET_KEY:-}
+      HOTSPOT_CONVERSION_EVENTS: ${HOTSPOT_CONVERSION_EVENTS:-}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - redis
     restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - hotspot-redis:/data
+    restart: unless-stopped
+
+volumes:
+  hotspot-redis:
