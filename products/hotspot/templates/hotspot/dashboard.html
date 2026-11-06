@@ -375,9 +375,10 @@
 
         /* Sessions */
         .split { display: grid; grid-template-columns: minmax(340px, 400px) minmax(0, 1fr); gap: 16px; align-items: start; }
-        .split > .card { margin-top: 0; }
+        .split > .card, #detailPane > .card { margin-top: 0; }
         .split .list-card { position: sticky; top: 0; display: flex; flex-direction: column; max-height: calc(100vh - 170px); }
-        .session-list { flex: 1; min-height: 160px; overflow: auto; }
+        .session-list { flex: 1; min-height: 160px; overflow: auto; scrollbar-width: none; }
+        .session-list::-webkit-scrollbar { display: none; }
         @media (max-width: 1100px) {
             .split { grid-template-columns: minmax(0, 1fr); }
             .split .list-card { position: static; max-height: none; }
@@ -594,25 +595,32 @@
         .console-empty { padding: 28px; text-align: center; color: #64748B; font-family: var(--font); font-size: 13px; line-height: 1.6; }
 
         /* Install */
-        .steps { display: flex; flex-direction: column; gap: 14px; max-width: 980px; }
-        .step { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 0; margin-top: 0; }
-        .step .snum { display: flex; justify-content: center; padding-top: 16px; }
-        .step .snum span { width: 26px; height: 26px; border-radius: 50%; background: var(--brand); color: #fff; font-weight: 700; font-size: 12.5px; display: inline-flex; align-items: center; justify-content: center; }
-        .step.done .snum span { background: var(--success); }
-        .step .sbody { padding: 14px 18px 16px 0; min-width: 0; }
+        .wizard { max-width: 980px; }
+        .wsteps { list-style: none; margin: 0 0 14px; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+        .wsteps button { width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text-2); font-size: 12.5px; font-weight: 600; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .wsteps button .n { width: 22px; height: 22px; border-radius: 50%; background: var(--subtle); border: 1px solid var(--border); color: var(--text-2); font-size: 11.5px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .wsteps button.active { border-color: var(--brand-border); background: var(--brand-soft); color: var(--brand); }
+        .wsteps button.active .n { background: var(--brand); border-color: var(--brand); color: #fff; }
+        .wsteps button.done .n { background: var(--success); border-color: var(--success); color: #fff; }
+        .step { margin-top: 0; }
+        .step .sbody { padding: 16px 20px 18px; min-width: 0; }
         .step h2 { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
         .step .lead { color: var(--text-2); font-size: 13px; margin-top: 4px; line-height: 1.55; }
         .step .lead code, .step p code { font-family: var(--mono); font-size: 12px; background: var(--subtle); border: 1px solid var(--border); padding: 0 4px; border-radius: 4px; }
         .step .snippet { margin-top: 12px; }
         .step .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
         .step .checks { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
-        .step .arrival { display: flex; align-items: center; gap: 12px; margin-top: 12px; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--subtle); font-size: 13px; }
-        .step .arrival.ok { background: #F0FDF4; border-color: #A7F3D0; }
-        .step .arrival .ldot { width: 10px; height: 10px; border-radius: 50%; background: var(--warning); animation: blink 1.6s ease-in-out infinite; flex-shrink: 0; }
-        .step .arrival.ok .ldot { background: var(--success); animation: none; }
-        .step .arrival .txt { flex: 1; min-width: 0; }
-        .step .arrival b { display: block; font-weight: 600; }
+        .tbox { display: flex; align-items: center; gap: 12px; margin-top: 12px; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--subtle); font-size: 13px; }
+        .tbox.ok { background: #F0FDF4; border-color: #A7F3D0; }
+        .tbox.bad { background: #FEF2F2; border-color: #FECACA; }
+        .tbox .ldot { width: 10px; height: 10px; border-radius: 50%; background: var(--warning); animation: blink 1.6s ease-in-out infinite; flex-shrink: 0; }
+        .tbox.ok .ldot { background: var(--success); animation: none; }
+        .tbox.bad .ldot { background: var(--danger); animation: none; }
+        .tbox .txt { flex: 1; min-width: 0; }
+        .tbox b { display: block; font-weight: 600; }
         .step textarea { width: 100%; min-height: 150px; margin-top: 10px; padding: 10px 12px; border: 1px solid var(--border-2); border-radius: 8px; font-family: var(--mono); font-size: 12px; line-height: 1.5; color: var(--text-2); background: var(--subtle); resize: vertical; }
+        .wfoot { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+        .wfoot .spacer { flex: 1; }
         .ref { max-width: 980px; margin-top: 16px; }
         .ref details { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow-sm); }
         .ref details + details { margin-top: 10px; }
@@ -631,7 +639,7 @@
         .api-list span { color: var(--text-2); }
         @media (max-width: 1100px) { .api-list { grid-template-columns: minmax(0, 1fr); } }
         @media (prefers-reduced-motion: reduce) {
-            .chip.active::before, .console-head .ldot, .rt-now .big .pulse, .map-wrap .ring, .step .arrival .ldot { animation: none; }
+            .chip.active::before, .console-head .ldot, .rt-now .big .pulse, .map-wrap .ring, .tbox .ldot { animation: none; }
         }
     </style>
 </head>
@@ -1032,20 +1040,25 @@
 
             <!-- Install -->
             <section class="tab" data-tab="install" id="tab-install">
-                <div class="page-head"><h1>Install</h1><p>Four steps. The first visit shows up in the dashboard a few seconds after step 2.</p></div>
-                <div class="steps">
-                    <div class="card step" id="step1">
-                        <div class="snum"><span>1</span></div>
+                <div class="page-head"><h1>Install</h1><p>Four steps, each with a test. The first visit shows up in the dashboard a few seconds after step 2.</p></div>
+                <div class="wizard">
+                    <ol class="wsteps" id="wizardSteps">
+                        <li><button type="button" data-action="install-step" data-step="1"><span class="n">1</span>Lock the server down</button></li>
+                        <li><button type="button" data-action="install-step" data-step="2"><span class="n">2</span>Add the script</button></li>
+                        <li><button type="button" data-action="install-step" data-step="3"><span class="n">3</span>Names and goals</button></li>
+                        <li><button type="button" data-action="install-step" data-step="4"><span class="n">4</span>Done</button></li>
+                    </ol>
+                    <div class="card step" data-step="1" id="step1">
                         <div class="sbody">
                             <h2>Lock the server down <span id="keysStatus"></span></h2>
-                            <p class="lead">Set these two values in the environment of the server running Hotspot, in <code>.env.hotspot</code> for the full stack or next to the standalone command. The key goes in the script tag below, so only your site can send data. The password protects this dashboard.</p>
+                            <p class="lead">Set these two values in the environment of the server running Hotspot, in <code>.env.hotspot</code> for the full stack or next to the standalone command. The key goes in the script tag in step 2, so only your site can send data. The password protects this dashboard.</p>
                             <pre class="snippet"><code id="envSnippet"></code><button class="btn sm" type="button" data-action="copy" data-target="envSnippet"><span class="ico" data-icon="copy"></span>Copy</button></pre>
-                            <p class="lead" style="margin-top: 10px;">Both values were generated in this browser just now and exist nowhere else. Restart the server after setting them.</p>
+                            <p class="lead" style="margin-top: 10px;">Both values were generated in this browser just now and exist nowhere else. Restart the server after setting them, then press Test.</p>
                             <div class="checks" id="serverChecks"></div>
+                            <div class="tbox" id="test1" hidden></div>
                         </div>
                     </div>
-                    <div class="card step" id="step2">
-                        <div class="snum"><span>2</span></div>
+                    <div class="card step" data-step="2" id="step2" hidden>
                         <div class="sbody">
                             <h2>Add the script to your site</h2>
                             <p class="lead">Paste this tag into the <code>&lt;head&gt;</code> of every page, before your other scripts. That is the whole install: page views, clicks, rage clicks, errors, web vitals and session replay all come from this one line.</p>
@@ -1055,24 +1068,37 @@
                                 <button class="btn ghost" type="button" data-action="toggle-prompt" id="promptToggle">Show the prompt</button>
                             </div>
                             <textarea id="promptText" readonly hidden aria-label="Prompt for an AI coding tool"></textarea>
+                            <p class="lead" style="margin-top: 12px;">Press Test, then open your site in another tab and click around. The test passes as soon as that visit reaches this server.</p>
+                            <div class="tbox" id="test2" hidden></div>
                         </div>
                     </div>
-                    <div class="card step" id="step3">
-                        <div class="snum"><span>3</span></div>
+                    <div class="card step" data-step="3" id="step3" hidden>
                         <div class="sbody">
-                            <h2>Check that data arrives</h2>
-                            <p class="lead">Open your site in another tab and click around. This box turns green when the first session reaches this server.</p>
-                            <div class="arrival" id="arrival"><span class="ldot"></span><div class="txt" id="arrivalText"></div><div id="arrivalActions"></div></div>
-                        </div>
-                    </div>
-                    <div class="card step" id="step4">
-                        <div class="snum"><span>4</span></div>
-                        <div class="sbody">
-                            <h2>Optional: names and goals</h2>
-                            <p class="lead">Tell Hotspot who a visitor is after they sign in, so sessions show a name instead of "Visitor 4a8b2c". Then name the events that count as a goal, so the funnel and the conversion rate mean something to you.</p>
+                            <h2>Names and goals</h2>
+                            <p class="lead">Tell Hotspot who a visitor is after they sign in, so sessions show a name instead of "Visitor 4a8b2c". Then name the events that count as a goal, so the funnel and the conversion rate mean something to you. Both are optional.</p>
                             <pre class="snippet"><code id="identifySnippet"></code><button class="btn sm" type="button" data-action="copy" data-target="identifySnippet"><span class="ico" data-icon="copy"></span>Copy</button></pre>
                             <p class="lead" style="margin-top: 10px;" id="conversionNote"></p>
+                            <p class="lead" style="margin-top: 10px;">Press Test to send a named test visitor and a goal event from this browser through the same endpoint your site uses. It shows up in Sessions as "Install test".</p>
+                            <div class="tbox" id="test3" hidden></div>
                         </div>
+                    </div>
+                    <div class="card step" data-step="4" id="step4" hidden>
+                        <div class="sbody">
+                            <h2>Done</h2>
+                            <p class="lead">Here is where everything stands. Anything still amber can be fixed later from this page.</p>
+                            <div class="checks" id="doneChecks"></div>
+                            <div class="row">
+                                <button class="btn primary" type="button" data-action="nav" data-tab="overview">Open the overview</button>
+                                <button class="btn" type="button" data-action="nav" data-tab="sessions">Watch a session</button>
+                                <a class="btn" href="/demo/" target="_blank" rel="noopener" id="demoLinkDone" hidden><span class="ico" data-icon="external"></span>Try the sample site</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="wfoot">
+                        <button class="btn" type="button" data-action="install-back" id="installBack">Back</button>
+                        <span class="spacer"></span>
+                        <button class="btn" type="button" data-action="install-test" id="installTest"><span class="ico" data-icon="check"></span>Test this step</button>
+                        <button class="btn primary" type="button" data-action="install-next" id="installNext">Next</button>
                     </div>
                 </div>
                 <div class="ref">
@@ -3691,6 +3717,149 @@
         ].join('\n');
     }
 
+    var install = { step: 1, testing: false, watchSeq: 0, passed: {} };
+    var INSTALL_STEPS = 4;
+    var TEST_WATCH_MS = 90000;
+    var TEST_POLL_MS = 3000;
+
+    function testBox(step, kind, title, text) {
+        var box = $('test' + step);
+        if (!box) { return; }
+        box.hidden = false;
+        box.className = 'tbox' + (kind ? ' ' + kind : '');
+        clear(box);
+        box.appendChild(el('span', { class: 'ldot' }));
+        box.appendChild(el('div', { class: 'txt' }, [el('b', { text: title }), text || '']));
+    }
+
+    function showInstallStep(step) {
+        install.step = clamp(step, 1, INSTALL_STEPS);
+        store('install.step', String(install.step));
+        Array.prototype.forEach.call(document.querySelectorAll('#tab-install .step'), function (card) {
+            card.hidden = Number(card.getAttribute('data-step')) !== install.step;
+        });
+        Array.prototype.forEach.call($('wizardSteps').querySelectorAll('button'), function (button) {
+            var n = Number(button.getAttribute('data-step'));
+            button.classList.toggle('active', n === install.step);
+            button.classList.toggle('done', n !== install.step && !!install.passed[n]);
+        });
+        $('installBack').disabled = install.step === 1;
+        $('installTest').hidden = install.step === INSTALL_STEPS;
+        $('installNext').hidden = install.step === INSTALL_STEPS;
+    }
+
+    function installChecks(setup, scope) {
+        return [
+            [!!setup.ingestion_keys_configured, 'Only your keys are accepted', 'Any key is accepted right now'],
+            [!!setup.dashboard_protected, 'Dashboard has a password', 'Dashboard has no password'],
+            [setup.storage === 'redis', 'Data is kept in Redis', 'Data is kept in memory and lost on restart'],
+            [!!setup.replay_enabled, 'Session replay is on', 'Session replay is off'],
+            [!!(scope && scope.sessions_stored), 'Visits are arriving', 'No visit has arrived yet']
+        ];
+    }
+
+    function fillChecks(node, rows) {
+        clear(node);
+        rows.forEach(function (row) { node.appendChild(statusChipFor(row[0], row[1], row[2])); });
+    }
+
+    // Step 1 asks the server for its settings again, so a restart after editing .env shows up at once.
+    function testServer() {
+        install.testing = true;
+        testBox(1, '', 'Checking the server', 'Asking it which settings are in place.');
+        api('/hotspot/api/overview/', { hours: '1', limit: '1' }).then(function (data) {
+            var setup = data.setup || {};
+            var ok = !!setup.ingestion_keys_configured && !!setup.dashboard_protected;
+            install.passed[1] = ok;
+            fillChecks($('serverChecks'), installChecks(setup, data.scope).slice(0, 4));
+            testBox(1, ok ? 'ok' : 'bad', ok ? 'The server is locked down.' : 'Not locked down yet.',
+                ok ? 'Only your keys are accepted and the dashboard asks for a password.' : (setup.ingestion_keys_configured ? 'The password is missing: set HOTSPOT_DASHBOARD_PASSWORD, restart the server and test again.' : 'Set both values, restart the server and test again. Until then any key is accepted.'));
+            state.overview = state.overview || data;
+            showInstallStep(install.step);
+        }).catch(function (err) {
+            if (err.unauthorized) { return; }
+            testBox(1, 'bad', "Couldn't reach the server.", 'Is it running? Restart it and test again.');
+        }).then(function () { install.testing = false; });
+    }
+
+    // Step 2 waits for a visit that starts after the button was pressed, from any page with the script.
+    function testArrival() {
+        var seq = ++install.watchSeq;
+        var startedAt = serverNow();
+        var deadline = Date.now() + TEST_WATCH_MS;
+        install.testing = true;
+        testBox(2, '', 'Waiting for a visit.', 'Open your site in another tab and click around. This keeps watching for 90 seconds.');
+        function poll() {
+            if (seq !== install.watchSeq) { return; }
+            api('/hotspot/api/overview/', { hours: '1', limit: '20' }).then(function (data) {
+                if (seq !== install.watchSeq) { return; }
+                var fresh = (data.sessions || []).filter(function (s) { return isNum(s.first_seen) && s.first_seen >= startedAt - 5 && String(s.distinct_id || '').indexOf('install-test') !== 0; })[0];
+                if (fresh) {
+                    install.passed[2] = true;
+                    install.testing = false;
+                    var where = fresh.entry_url ? hostOf(fresh.entry_url) + (fresh.entry_page || '') : (fresh.entry_page || 'your site');
+                    testBox(2, 'ok', 'It works.', 'A visit from ' + where + ' arrived ' + plural(Math.max(1, Math.round(serverNow() - fresh.first_seen)), 'second', 'seconds') + ' after it started. Replay, clicks and errors ride along with it.');
+                    showInstallStep(install.step);
+                    return;
+                }
+                if (Date.now() < deadline) { setTimeout(poll, TEST_POLL_MS); return; }
+                install.testing = false;
+                testBox(2, 'bad', 'Nothing arrived in 90 seconds.', 'Check that the tag is in the <head> with the key from step 1, that the page can reach ' + (CONFIG.siteUrl || 'this server') + ', and that no ad blocker is running on that page. Then test again.');
+            }).catch(function (err) {
+                if (err.unauthorized || seq !== install.watchSeq) { return; }
+                if (Date.now() < deadline) { setTimeout(poll, TEST_POLL_MS); return; }
+                install.testing = false;
+                testBox(2, 'bad', "Couldn't reach the server.", 'Restart it and test again.');
+            });
+        }
+        poll();
+    }
+
+    // Step 3 sends a named visitor and a goal event through the capture endpoint, then waits for them in the feed.
+    function testGoal() {
+        var now = Date.now();
+        var sessionId = 'install-test-' + now;
+        var props = { distinct_id: 'install-test', $session_id: sessionId, $pathname: '/install-test', $current_url: (CONFIG.siteUrl || '') + '/install-test', $title: 'Install test', $timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, $viewport_width: window.innerWidth, $viewport_height: window.innerHeight };
+        var batch = [
+            { event: '$pageview', timestamp: now, properties: props },
+            { event: '$identify', timestamp: now + 1, properties: Object.assign({ $set: { name: 'Install test' } }, props) },
+            { event: 'install_test_goal', timestamp: now + 2, properties: Object.assign({ source: 'install page' }, props) }
+        ];
+        install.testing = true;
+        testBox(3, '', 'Sending a test visitor and a goal event.', 'Through ' + (CONFIG.siteUrl || '') + '/hotspot/batch/, the same endpoint your site uses.');
+        fetch('/hotspot/batch/', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ api_key: CONFIG.apiKey, batch: batch }) }).then(function (response) {
+            if (!response.ok) { throw new Error('The capture endpoint answered ' + response.status + (response.status === 401 ? '. The key in the snippets is not one of HOTSPOT_API_KEYS.' : '.')); }
+            var deadline = Date.now() + 20000;
+            function poll() {
+                api('/hotspot/api/events/', { since: String(now / 1000 - 1), limit: '200' }).then(function (data) {
+                    var seen = (data.events || []).some(function (e) { return e.event === 'install_test_goal' && e.session_id === sessionId; });
+                    if (seen) {
+                        install.passed[3] = true;
+                        install.testing = false;
+                        testBox(3, 'ok', 'The server received it in ' + ((Date.now() - now) / 1000).toFixed(1) + ' seconds.', 'Sessions now lists a visitor called "Install test". Add install_test_goal to HOTSPOT_CONVERSION_EVENTS and that session would count as converted.');
+                        showInstallStep(install.step);
+                        loadOverview();
+                        return;
+                    }
+                    if (Date.now() < deadline) { setTimeout(poll, 1500); return; }
+                    install.testing = false;
+                    testBox(3, 'bad', 'The event was accepted but has not shown up yet.', 'Refresh the dashboard in a moment. If it never appears, the server may be writing to a different store than it reads from.');
+                }).catch(function () { if (Date.now() < deadline) { setTimeout(poll, 1500); } else { install.testing = false; testBox(3, 'bad', "Couldn't read the event feed.", 'Reload the dashboard and test again.'); } });
+            }
+            poll();
+        }).catch(function (err) {
+            install.testing = false;
+            testBox(3, 'bad', 'The test event was refused.', String(err.message || err));
+        });
+    }
+
+    function runInstallTest() {
+        if (install.testing) { return; }
+        if (install.step === 1) { testServer(); }
+        else if (install.step === 2) { testArrival(); }
+        else if (install.step === 3) { testGoal(); }
+    }
+
     function renderInstall(setup, scope, metrics) {
         scope = scope || {};
         var keysOk = !!setup.ingestion_keys_configured;
@@ -3699,37 +3868,17 @@
         var keysStatus = $('keysStatus');
         clear(keysStatus);
         keysStatus.appendChild(statusChipFor(keysOk && passwordOk, 'Done', keysOk || passwordOk ? 'Half done' : 'Not done'));
-        $('step1').classList.toggle('done', keysOk && passwordOk);
-        var checks = $('serverChecks');
-        clear(checks);
-        checks.appendChild(statusChipFor(keysOk, 'Only your keys are accepted', 'Any key is accepted right now'));
-        checks.appendChild(statusChipFor(passwordOk, 'Dashboard has a password', 'Dashboard has no password'));
-        checks.appendChild(statusChipFor(setup.storage === 'redis', 'Data is kept in Redis', 'Data is kept in memory and lost on restart'));
-        checks.appendChild(statusChipFor(!!setup.replay_enabled, 'Session replay is on', 'Session replay is off'));
-
+        var checks = installChecks(setup, scope);
+        fillChecks($('serverChecks'), checks.slice(0, 4));
+        fillChecks($('doneChecks'), checks);
+        if (keysOk && passwordOk) { install.passed[1] = true; }
+        if (scope.sessions_stored) { install.passed[2] = install.passed[2] || !install.testing; }
         $('promptText').value = installPrompt(setup);
-        var arrived = !!scope.sessions_stored;
-        $('step2').classList.toggle('done', arrived);
-        $('step3').classList.toggle('done', arrived);
-        var arrival = $('arrival');
-        arrival.classList.toggle('ok', arrived);
-        var text = $('arrivalText');
-        clear(text);
-        var actions = $('arrivalActions');
-        clear(actions);
-        if (arrived) {
-            var latest = state.overview && state.overview.sessions && state.overview.sessions[0];
-            text.appendChild(el('b', { text: 'Data is arriving.' }));
-            text.appendChild(document.createTextNode(plural(scope.sessions_stored, 'session', 'sessions') + ' stored' + (latest ? ', the latest ' + agoFromTs(latest.last_seen) : '') + '.'));
-            actions.appendChild(el('button', { class: 'btn', type: 'button', 'data-action': 'nav', 'data-tab': 'sessions', text: 'Open sessions' }));
-        } else {
-            text.appendChild(el('b', { text: 'Waiting for the first page view.' }));
-            text.appendChild(document.createTextNode('This checks every few seconds on its own.'));
-            if (setup.demo_enabled) { actions.appendChild(el('a', { class: 'btn', href: '/demo/', target: '_blank', rel: 'noopener', text: 'Try the sample site' })); }
-        }
         $('identifySnippet').textContent = 'window.hotspot.identify("user_123", { email: "user@example.com", name: "Sam" })\nwindow.hotspot.capture("plan_selected", { plan: "team" })';
         var goals = (setup.conversion_events || []);
         $('conversionNote').textContent = 'Goals are the event names in HOTSPOT_CONVERSION_EVENTS, right now ' + (goals.length ? goals.join(', ') : '$form_submit') + '. Any event counts, including the custom ones you capture, and a session that fires one shows as "Reached a goal".';
+        $('demoLinkDone').hidden = !setup.demo_enabled;
+        showInstallStep(install.step);
 
         var facts = $('setupFacts');
         clear(facts);
@@ -3919,6 +4068,18 @@
                 $('promptToggle').textContent = area.hidden ? 'Show the prompt' : 'Hide the prompt';
                 break;
             }
+            case 'install-step':
+                showInstallStep(Number(trigger.getAttribute('data-step')) || 1);
+                break;
+            case 'install-next':
+                showInstallStep(install.step + 1);
+                break;
+            case 'install-back':
+                showInstallStep(install.step - 1);
+                break;
+            case 'install-test':
+                runInstallTest();
+                break;
             case 'filter-status':
                 goToSessions({ status: trigger.getAttribute('data-status') || 'all', search: '' });
                 break;
@@ -4078,6 +4239,8 @@
         updatePlayButton();
         if (store('flow.animate') === '0' || REDUCED_MOTION) { state.flowAnimate = false; }
         $('flowAnimate').checked = state.flowAnimate;
+        install.step = clamp(Number(store('install.step')) || 1, 1, INSTALL_STEPS);
+        showInstallStep(install.step);
 
         var storedHours = store('hours');
         state.hours = storedHours !== null && HOURS_VALUES.indexOf(Number(storedHours)) >= 0 ? Number(storedHours) : 24;
