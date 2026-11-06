@@ -117,4 +117,6 @@ def test_recording_endpoint_splices_stored_chunks_into_one_json_document(protect
     recorder = views.asset(factory.get("/hotspot/assets/recorder.js"), "recorder.js")
     assert (recorder.status_code, recorder["Access-Control-Allow-Origin"]) == (200, "*")
     assert recorder["Content-Type"].startswith("application/javascript")
+    world = json.loads(views.asset(factory.get("/hotspot/assets/world.json"), "world.json").content)
+    assert "IN" in world["countries"] and world["centers"]["IN"]
     assert views.asset(factory.get("/hotspot/assets/other.js"), "other.js").status_code == 404

@@ -148,19 +148,26 @@
 
         /* Sample notice */
 
-        .notice {
+        .sample-tag {
+            position: fixed;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 50;
             background: var(--notice-bg);
-            color: #DDE6E0;
-            font-size: 0.8125rem;
-            line-height: 1.5;
-            padding: 9px 16px;
-            text-align: center;
+            color: #FFFFFF;
+            font-size: 0.6875rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            line-height: 1;
+            padding: 5px 9px;
+            border-radius: 999px;
+            text-decoration: none;
+            opacity: 0.9;
         }
 
-        .notice a {
-            color: #FFFFFF;
-            font-weight: 600;
-        }
+        .sample-tag:hover { opacity: 1; }
 
         /* Header */
 
@@ -1034,10 +1041,7 @@
 
     <a class="skip-link" href="#main">Skip to content</a>
 
-    <div class="notice" role="note">
-        Sample site for testing Hotspot. Nothing here is real.
-        <a href="/dashboard/" target="_blank" rel="noopener">Open the dashboard</a> to see your clicks.
-    </div>
+    <a class="sample-tag" href="/dashboard/" target="_blank" rel="noopener" title="Sample site. Open the dashboard">Sample</a>
 
     <header class="site-header">
         <div class="container header-inner">

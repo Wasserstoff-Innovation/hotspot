@@ -21,12 +21,14 @@ logger = logging.getLogger(__name__)
 
 PRODUCT_PATH = Path(__file__).resolve().parent.parent
 SDK_PATH = PRODUCT_PATH / "sdk" / "hotspot.js"
-# The files served under /hotspot/assets/: the rrweb recorder the script loads on visitors' pages and
-# the player the dashboard uses. This allowlist is the only way a request reaches the vendor directory.
+# The files served under /hotspot/assets/: the rrweb recorder the script loads on visitors' pages, the
+# player the dashboard uses and the world map it draws. This allowlist is the only way a request
+# reaches the vendor directory.
 ASSETS: dict[str, tuple[Path, str]] = {
     "recorder.js": (PRODUCT_PATH / "vendor" / "rrweb-record.js", "application/javascript; charset=utf-8"),
     "replay.js": (PRODUCT_PATH / "vendor" / "rrweb-replay.js", "application/javascript; charset=utf-8"),
     "replay.css": (PRODUCT_PATH / "vendor" / "rrweb-replay.css", "text/css; charset=utf-8"),
+    "world.json": (PRODUCT_PATH / "vendor" / "world-map.json", "application/json; charset=utf-8"),
 }
 MAX_FEED_EVENTS = 500
 MAX_RECORDING_CURSOR = 1_000_000

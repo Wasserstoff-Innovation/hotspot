@@ -12,7 +12,7 @@
 
 Hotspot records what visitors do on your site and shows you where they get stuck.
 One script captures page views, clicks, rage clicks, dead clicks, scroll depth, form submits, web vitals, JavaScript errors and single-page-app route changes, and records the page itself so a session can be replayed as the visitor saw it, with console output and network requests next to it.
-Your own server stores everything, and the dashboard shows sessions with replay, funnels you define, paths, friction by element, pages, referrers and errors.
+Your own server stores everything, and the dashboard shows an overview with trends, a realtime world map, sessions with replay, an animated flow of how visitors move between pages, funnels you define, breakage by element, pages and sources, and a guided install page.
 No data leaves your infrastructure.
 
 The product lives in [`products/hotspot/`](products/hotspot/README.md).

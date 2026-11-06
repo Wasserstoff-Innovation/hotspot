@@ -91,6 +91,8 @@ def _populated_store() -> SessionStore:
     )
     # A single pageview an hour ago with nothing else: a bounce.
     store.record(capture_events(config, visit("bounce", old, ["/blog"], distinct_id="visitor-3"), NOW), now=NOW)
+    # Ninety minutes ago, so it sits in the hour before a "last hour" range.
+    store.record(capture_events(config, visit("earlier", NOW - 5400, ["/docs"], distinct_id="visitor-4"), NOW), now=NOW)
     return store
 
 
@@ -99,13 +101,27 @@ def test_overview_counts_only_what_really_happened() -> None:
     overview = build_overview(store, OverviewQuery(), make_config(), NOW)
 
     metrics = overview["metrics"]
-    assert (metrics["sessions"], metrics["converted_sessions"], metrics["conversion_rate"]) == (4, 2, 50.0)
-    assert (metrics["rage_clicks"], metrics["bounce_rate"]) == (2, 25.0)
+    assert (metrics["sessions"], metrics["converted_sessions"], metrics["conversion_rate"]) == (5, 2, 40.0)
+    assert (metrics["rage_clicks"], metrics["bounce_rate"], metrics["visitors"]) == (2, 40.0, 4)
+    assert (metrics["sessions_with_rage"], metrics["sessions_with_breakage"]) == (1, 1)
+    assert overview["comparison"] is None
 
     steps = overview["funnel"]["steps"]
     assert [step["label"] for step in steps] == ["Viewed a page", "Clicked anything", "Submitted a form"]
-    assert [step["count"] for step in steps] == [4, 2, 1]
+    assert [step["count"] for step in steps] == [5, 2, 1]
     assert steps[2]["median_seconds_to_next"] is None and steps[1]["median_seconds_to_next"] == 10.0
+
+    flow = overview["paths"]["flow"]
+    assert flow["steps"][0][0] == {"pathname": "/", "count": 3, "exits": 1, "converted": 2, "other": False}
+    assert [node["pathname"] for node in flow["steps"][0]] == ["/", "/blog", "/docs"]
+    assert flow["steps"][1] == [{"pathname": "/pricing", "count": 2, "exits": 2, "converted": 1, "other": False}]
+    assert flow["links"] == [{"step": 0, "from": 0, "to": 0, "count": 2}] and flow["sessions"] == 5
+    assert overview["referrers"]["channels"] == [
+        {"channel": "direct", "sessions": 5, "share": 100.0, "converted": 2, "conversion_rate": 40.0}
+    ]
+    # Hourly buckets align to the clock, so the session from 90 minutes ago lands one bucket earlier.
+    trend = overview["trend"]
+    assert (trend["bucket_seconds"], trend["sessions"], sum(trend["pageviews"])) == (3600, [1, 4, 0], 7)
 
     assert overview["friction"]["rage_clicks"] == [
         {
@@ -118,14 +134,20 @@ def test_overview_counts_only_what_really_happened() -> None:
         }
     ]
     assert overview["paths"]["transitions"][0] == {"from": "/", "to": "/pricing", "count": 2, "share": 100.0}
-    assert overview["paths"]["entry_pages"][0] == {"pathname": "/", "count": 3, "share": 75.0}
-    assert overview["breakdowns"]["device_type"] == {"desktop": 3, "mobile": 1}
+    assert overview["paths"]["entry_pages"][0] == {"pathname": "/", "count": 3, "share": 60.0}
+    assert overview["breakdowns"]["device_type"] == {"desktop": 4, "mobile": 1}
     pricing = next(row for row in overview["pages"] if row["pathname"] == "/pricing")
     assert (pricing["views"], pricing["sessions"], pricing["avg_seconds"], pricing["avg_scroll_depth"]) == (
         2,
         2,
         15.0,
         80,
+    )
+    assert (pricing["converted"], pricing["conversion_rate"], pricing["rage_clicks"], pricing["errors"]) == (
+        1,
+        50.0,
+        2,
+        0,
     )
     # Web vitals are reported at the 75th percentile, so two samples report the slower one.
     assert pricing["vitals"] == {
@@ -152,12 +174,40 @@ def test_custom_funnel_steps_and_session_filters() -> None:
     assert overview["sessions"][0]["status"] == "rage"
     assert overview["metrics"]["sessions"] == 1
     # Filter menus must keep every option even while one device is selected.
-    assert overview["breakdowns"]["device_type"] == {"desktop": 3, "mobile": 1}
-    assert (overview["scope"]["sessions_in_range"], overview["scope"]["sessions_stored"]) == (4, 4)
+    assert overview["breakdowns"]["device_type"] == {"desktop": 4, "mobile": 1}
+    assert (overview["scope"]["sessions_in_range"], overview["scope"]["sessions_stored"]) == (5, 5)
 
     searched = build_overview(store, OverviewQuery(search="/blog"), make_config(), NOW)
     assert [session["session_id"] for session in searched["sessions"]] == ["bounce"]
     assert searched["sessions"][0]["label"] == "Visitor bounce"
+
+    # The hour before the range is the comparison period: only the session from 90 minutes ago is in it.
+    hourly = build_overview(store, OverviewQuery(hours=1), make_config(), NOW)
+    assert (hourly["metrics"]["sessions"], hourly["comparison"]["sessions"], hourly["comparison"]["bounce_rate"]) == (
+        4,
+        1,
+        100.0,
+    )
+    assert hourly["trend"]["bucket_seconds"] == 300 and sum(hourly["trend"]["sessions"]) == 4
+
+
+def test_realtime_covers_the_last_30_minutes_with_countries_from_timezones() -> None:
+    config = make_config()
+    store = SessionStore(MemoryBackend(config), config)
+    live = visit("live", NOW - 20, ["/", "/pricing"])
+    recent = visit("recent", NOW - 1200, ["/blog"], distinct_id="visitor-2")
+    stale = visit("stale", NOW - 7200, ["/old"], distinct_id="visitor-3")
+    for item in live:
+        item["properties"]["$timezone"] = "Asia/Calcutta"
+    for item in recent:
+        item["properties"]["$timezone"] = "Europe/Berlin"
+    store.record(capture_events(config, [*live, *recent, *stale], NOW), now=NOW)
+
+    realtime = build_overview(store, OverviewQuery(hours=1), make_config(), NOW)["realtime"]
+    assert (realtime["active_now"], realtime["active_in_window"]) == (1, 2)
+    assert realtime["countries"] == [{"country": "IN", "sessions": 1}, {"country": "DE", "sessions": 1}]
+    assert realtime["pages"] == [{"pathname": "/pricing", "sessions": 1}, {"pathname": "/blog", "sessions": 1}]
+    assert len(realtime["sessions_per_minute"]) == 30 and sum(realtime["sessions_per_minute"]) == 2
 
 
 def test_status_prefers_conversion_then_rage_then_recency() -> None:

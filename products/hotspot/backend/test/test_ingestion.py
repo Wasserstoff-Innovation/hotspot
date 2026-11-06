@@ -49,13 +49,19 @@ class TestNormalization:
 
     def test_mobile_user_agent_and_country_header_are_recorded(self) -> None:
         context = RequestContext.from_headers({"User-Agent": SAFARI_IPHONE, "CF-IPCountry": "de"})
-        (event,) = parse_batch(batch_body([event_item("$pageview", "s", NOW)]), context, make_config(), NOW)
+        item = event_item("$pageview", "s", NOW, **{"$timezone": "Asia/Calcutta"})
+        (event,) = parse_batch(batch_body([item]), context, make_config(), NOW)
         assert (event.properties["$browser"], event.properties["$os"], event.properties["$device_type"]) == (
             "Safari",
             "iOS",
             "mobile",
         )
+        # The CDN header wins over the timezone, and a legacy timezone name still resolves without one.
         assert event.properties["$country"] == "DE"
+        (fallback,) = parse_batch(batch_body([item]), RequestContext(), make_config(), NOW)
+        assert fallback.properties["$country"] == "IN"
+        (unknown,) = parse_batch(batch_body([event_item("$pageview", "s", NOW)]), RequestContext(), make_config(), NOW)
+        assert "$country" not in unknown.properties
 
     @parameterized.expand(
         [

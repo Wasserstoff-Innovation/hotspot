@@ -13,12 +13,49 @@ from products.hotspot.backend.config import HotspotConfig
 from products.hotspot.backend.store import SessionStore
 
 ACTIVE_WINDOW_SECONDS = 300
+REALTIME_WINDOW_SECONDS = 1800
 BOUNCE_SECONDS = 15
 MAX_SESSIONS_ANALYZED = 1000
 MAX_LIST_ROWS = 25
+TREND_MAX_BUCKETS = 91
+FLOW_DEPTH = 5
+FLOW_NODES_PER_STEP = 6
 STATUS_FILTERS = frozenset({"all", "converted", "rage", "error", "bounced", "engaged", "active", "identified", "dead"})
 STEP_KINDS = frozenset({"path", "event", "click", "text"})
 CLICK_EVENTS = frozenset({"$autocapture", "$rageclick"})
+# Referrer hosts are grouped into the channels a marketing report uses. A label match ("google" in
+# www.google.co.uk) covers the engines with many country domains; the exact domains are too short
+# or too generic to match by label.
+SEARCH_LABELS = frozenset(
+    {"google", "bing", "duckduckgo", "yahoo", "baidu", "yandex", "ecosia", "qwant", "naver", "seznam", "startpage"}
+)
+SEARCH_DOMAINS = ("search.brave.com", "ask.com")
+SOCIAL_LABELS = frozenset(
+    {
+        "facebook",
+        "instagram",
+        "twitter",
+        "linkedin",
+        "reddit",
+        "youtube",
+        "tiktok",
+        "pinterest",
+        "threads",
+        "mastodon",
+        "snapchat",
+        "whatsapp",
+        "telegram",
+        "discord",
+        "quora",
+        "tumblr",
+    }
+)
+SOCIAL_DOMAINS = ("x.com", "t.co", "fb.com", "youtu.be", "bsky.app", "lnkd.in")
+PAID_MEDIUMS = frozenset(
+    {"cpc", "ppc", "paid", "paidsearch", "paid_search", "paid_social", "paidsocial", "display", "cpm", "retargeting"}
+)
+EMAIL_MEDIUMS = frozenset({"email", "e-mail", "newsletter"})
+CHANNEL_ORDER = ("direct", "search", "social", "ai", "email", "paid", "campaign", "referral")
 # Each web vital with the $web_vitals property it arrives in and the decimals it is reported with.
 # CLS is a unitless score around 0.1, so it keeps three decimals; the rest are milliseconds.
 WEB_VITALS: tuple[tuple[str, str, int], ...] = (
@@ -49,6 +86,8 @@ class OverviewQuery:
     limit: int = 200
     funnel: tuple[str, ...] = ()
     conversion_event: str | None = None
+    # The viewer's offset from UTC in minutes, so chart buckets start on their hours and days.
+    tz_offset: int = 0
 
     @classmethod
     def from_params(cls, params: Mapping[str, str]) -> OverviewQuery:
@@ -64,6 +103,7 @@ class OverviewQuery:
             limit=_bounded_int(params.get("limit"), default=200, low=1, high=MAX_SESSIONS_ANALYZED),
             funnel=tuple(step.strip() for step in funnel_raw.split("|") if step.strip())[:8],
             conversion_event=(params.get("conversion_event") or "").strip()[:200] or None,
+            tz_offset=_bounded_int(params.get("tz_offset"), default=0, low=-14 * 60, high=14 * 60),
         )
 
 
@@ -284,10 +324,12 @@ def compute_paths(summaries: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     outgoing: Counter[str] = Counter()
     paths: Counter[tuple[str, ...]] = Counter()
     converted_by_path: Counter[tuple[str, ...]] = Counter()
+    sequences: list[tuple[list[str], bool]] = []
     for summary in summaries:
         pages = [page for page in (summary.get("pages") or []) if isinstance(page, str)]
         if not pages:
             continue
+        sequences.append((pages, bool(summary.get("converted"))))
         entries[pages[0]] += 1
         exits[pages[-1]] += 1
         for source, target in zip(pages, pages[1:]):
@@ -300,6 +342,7 @@ def compute_paths(summaries: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
 
     total_entries = sum(entries.values())
     return {
+        "flow": compute_flow(sequences),
         "entry_pages": [
             {"pathname": page, "count": count, "share": _share(count, total_entries)}
             for page, count in entries.most_common(MAX_LIST_ROWS)
@@ -321,6 +364,71 @@ def compute_paths(summaries: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
             }
             for key, count in paths.most_common(MAX_LIST_ROWS)
         ],
+    }
+
+
+def compute_flow(sequences: Sequence[tuple[Sequence[str], bool]]) -> dict[str, Any]:
+    """Page sequences as columns of nodes with the moves between them, the shape a flow diagram draws.
+
+    Each column keeps its busiest pages and folds the rest into one "other" node, so a site with
+    hundreds of URLs still draws a readable picture. A session that has no next page leaves the site
+    at that node, which is what the diagram shows as drop-off.
+    """
+    steps: list[list[dict[str, Any]]] = []
+    positions: list[dict[str, int]] = []
+    for depth in range(FLOW_DEPTH):
+        at_step: Counter[str] = Counter()
+        exits: Counter[str] = Counter()
+        converted: Counter[str] = Counter()
+        for pages, did_convert in sequences:
+            if len(pages) <= depth:
+                continue
+            page = pages[depth]
+            at_step[page] += 1
+            if len(pages) == depth + 1:
+                exits[page] += 1
+            if did_convert:
+                converted[page] += 1
+        if not at_step:
+            break
+        kept = [page for page, _count in at_step.most_common(FLOW_NODES_PER_STEP)]
+        nodes = [
+            {
+                "pathname": page,
+                "count": at_step[page],
+                "exits": exits[page],
+                "converted": converted[page],
+                "other": False,
+            }
+            for page in kept
+        ]
+        rest = [page for page in at_step if page not in kept]
+        if rest:
+            nodes.append(
+                {
+                    "pathname": None,
+                    "count": sum(at_step[page] for page in rest),
+                    "exits": sum(exits[page] for page in rest),
+                    "converted": sum(converted[page] for page in rest),
+                    "other": True,
+                }
+            )
+        index = {page: position for position, page in enumerate(kept)}
+        other_index = len(kept)
+        positions.append({page: index.get(page, other_index) for page in at_step})
+        steps.append(nodes)
+
+    links: Counter[tuple[int, int, int]] = Counter()
+    for pages, _did_convert in sequences:
+        for depth in range(min(len(pages) - 1, len(steps) - 1)):
+            links[(depth, positions[depth][pages[depth]], positions[depth + 1][pages[depth + 1]])] += 1
+    return {
+        "steps": steps,
+        "links": [
+            {"step": depth, "from": source, "to": target, "count": count}
+            for (depth, source, target), count in sorted(links.items())
+        ],
+        "sessions": len(sequences),
     }
 
 
@@ -414,6 +522,10 @@ def compute_pages(
 ) -> list[dict[str, Any]]:
     views: Counter[str] = Counter()
     sessions_by_page: dict[str, set[str]] = defaultdict(set)
+    converted_by_page: dict[str, set[str]] = defaultdict(set)
+    rage: Counter[str] = Counter()
+    dead: Counter[str] = Counter()
+    errors: Counter[str] = Counter()
     # A page can send several $pageleave events in one session (the tab was hidden and shown
     # again), so time on page is summed per session before it is averaged across sessions.
     seconds: dict[tuple[str, str], float] = defaultdict(float)
@@ -433,6 +545,14 @@ def compute_pages(
             if name == "$pageview":
                 views[pathname] += 1
                 sessions_by_page[pathname].add(session_id)
+                if summary.get("converted"):
+                    converted_by_page[pathname].add(session_id)
+            elif name == "$rageclick":
+                rage[pathname] += 1
+            elif name == "$autocapture" and props.get("$is_dead_click"):
+                dead[pathname] += 1
+            elif name == "$exception":
+                errors[pathname] += 1
             elif name == "$pageleave":
                 key = (session_id, pathname)
                 duration = props.get("$duration_seconds")
@@ -455,6 +575,11 @@ def compute_pages(
                 "avg_scroll_depth": round(statistics.mean(page_depths)) if page_depths else None,
                 "exits": exits[pathname],
                 "exit_rate": _share(exits[pathname], session_count),
+                "converted": len(converted_by_page[pathname]),
+                "conversion_rate": _share(len(converted_by_page[pathname]), session_count),
+                "rage_clicks": rage[pathname],
+                "dead_clicks": dead[pathname],
+                "errors": errors[pathname],
                 "vitals": dict((page_vitals or {}).get(pathname) or {}) or None,
             }
         )
@@ -486,9 +611,58 @@ def compute_referrers(summaries: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
             }
             for host, count in sessions.most_common(MAX_LIST_ROWS)
         ],
+        "channels": compute_channels(summaries),
         "ai_sessions": ai_sessions,
         "ai_sources": [{"source": source, "sessions": count} for source, count in ai_sources.most_common(10)],
     }
+
+
+def channel_for(summary: Mapping[str, Any]) -> str:
+    if summary.get("is_ai_referral"):
+        return "ai"
+    utm = summary.get("utm") or {}
+    medium = str(utm.get("utm_medium") or "").strip().lower()
+    if medium in EMAIL_MEDIUMS:
+        return "email"
+    if medium in PAID_MEDIUMS or medium.startswith("paid"):
+        return "paid"
+    host = str(summary.get("referrer_host") or "").strip().lower()
+    if host.startswith("www."):
+        host = host[4:]
+    if not host:
+        return "campaign" if utm else "direct"
+    labels = set(host.split("."))
+    if labels & SEARCH_LABELS or _host_in(host, SEARCH_DOMAINS):
+        return "search"
+    if labels & SOCIAL_LABELS or _host_in(host, SOCIAL_DOMAINS):
+        return "social"
+    return "referral"
+
+
+def _host_in(host: str, domains: Sequence[str]) -> bool:
+    return any(host == domain or host.endswith("." + domain) for domain in domains)
+
+
+def compute_channels(summaries: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    sessions: Counter[str] = Counter()
+    converted: Counter[str] = Counter()
+    for summary in summaries:
+        channel = channel_for(summary)
+        sessions[channel] += 1
+        if summary.get("converted"):
+            converted[channel] += 1
+    total = sum(sessions.values())
+    return [
+        {
+            "channel": channel,
+            "sessions": sessions[channel],
+            "share": _share(sessions[channel], total),
+            "converted": converted[channel],
+            "conversion_rate": _share(converted[channel], sessions[channel]),
+        }
+        for channel in CHANNEL_ORDER
+        if sessions[channel]
+    ]
 
 
 def compute_errors(
@@ -541,6 +715,118 @@ def compute_activity(
     return {"events_per_minute": per_minute, "sessions_per_hour": per_hour}
 
 
+def compute_trend(
+    sessions: Iterable[tuple[Mapping[str, Any], Sequence[Mapping[str, Any]]]],
+    hours: int,
+    now: float,
+    tz_offset_minutes: int = 0,
+) -> dict[str, Any]:
+    """Sessions, visitors, page views and conversions per time bucket across the selected range.
+
+    Buckets align to the viewer's clock (whole hours or whole days), so the first and last buckets
+    can be partial; one extra bucket keeps every session in the range on the chart.
+    """
+    rows = list(sessions)
+    offset = tz_offset_minutes * 60
+    span: float
+    if hours == 1:
+        bucket = 300
+        span = 3600.0
+    elif hours:
+        bucket = 3600 if hours <= 48 else 86400
+        span = hours * 3600.0
+    else:
+        earliest = min((float(summary.get("first_seen") or now) for summary, _events in rows), default=now)
+        span = max(3600.0, now - earliest)
+        bucket = 3600 if span <= 48 * 3600 else 86400
+    end = math.floor((now + offset) / bucket) * bucket + bucket - offset
+    count = min(TREND_MAX_BUCKETS, int(math.ceil(span / bucket)) + 1)
+    start = end - count * bucket
+    counts = {key: [0] * count for key in ("sessions", "pageviews", "converted")}
+    visitors: list[set[str]] = [set() for _ in range(count)]
+
+    def slot(timestamp: Any) -> int | None:
+        try:
+            moment = float(timestamp)
+        except (TypeError, ValueError):
+            return None
+        if moment < start or moment >= end:
+            return None
+        return int((moment - start) // bucket)
+
+    for summary, events in rows:
+        index = slot(summary.get("first_seen"))
+        if index is not None:
+            counts["sessions"][index] += 1
+            visitors[index].add(str(summary.get("distinct_id") or ""))
+            if summary.get("converted"):
+                counts["converted"][index] += 1
+        for event in events:
+            if event.get("event") != "$pageview":
+                continue
+            event_index = slot(event.get("timestamp"))
+            if event_index is not None:
+                counts["pageviews"][event_index] += 1
+    return {
+        "bucket_seconds": bucket,
+        "start": start,
+        "sessions": counts["sessions"],
+        "visitors": [len(bucket_visitors) for bucket_visitors in visitors],
+        "pageviews": counts["pageviews"],
+        "converted": counts["converted"],
+    }
+
+
+def summarize_metrics(summaries: Sequence[Mapping[str, Any]], now: float) -> dict[str, Any]:
+    """The headline numbers for a set of sessions, used for the range itself and the period before it."""
+    total = len(summaries)
+    converted = sum(1 for summary in summaries if summary.get("converted"))
+    bounced = sum(1 for summary in summaries if session_status(summary, now) == "bounced")
+    return {
+        "sessions": total,
+        "visitors": len({str(summary.get("distinct_id") or "") for summary in summaries}),
+        "pageviews": sum(int(summary.get("pageview_count") or 0) for summary in summaries),
+        "converted_sessions": converted,
+        "conversion_rate": _share(converted, total),
+        "bounce_rate": _share(bounced, total),
+        "avg_duration_seconds": round(
+            statistics.mean(int(summary.get("duration_seconds") or 0) for summary in summaries), 1
+        )
+        if summaries
+        else 0.0,
+    }
+
+
+def compute_realtime(
+    summaries: Sequence[Mapping[str, Any]], recent_events: Sequence[Mapping[str, Any]], now: float
+) -> dict[str, Any]:
+    """Who is on the site right now: the last 30 minutes regardless of the dashboard's time range."""
+    recent = [s for s in summaries if now - float(s.get("last_seen") or 0) < REALTIME_WINDOW_SECONDS]
+    countries: Counter[str] = Counter()
+    pages: Counter[str] = Counter()
+    for summary in recent:
+        country = summary.get("country")
+        if isinstance(country, str) and country:
+            countries[country.upper()] += 1
+        page = summary.get("exit_page")
+        if isinstance(page, str) and page:
+            pages[page] += 1
+    minutes = REALTIME_WINDOW_SECONDS // 60
+    per_minute: list[set[str]] = [set() for _ in range(minutes)]
+    for event in recent_events:
+        age = now - float(event.get("timestamp") or 0)
+        if 0 <= age < REALTIME_WINDOW_SECONDS:
+            per_minute[minutes - 1 - int(age // 60)].add(str(event.get("session_id") or ""))
+    return {
+        "window_seconds": REALTIME_WINDOW_SECONDS,
+        "active_now": sum(1 for s in recent if now - float(s.get("last_seen") or 0) < ACTIVE_WINDOW_SECONDS),
+        "active_in_window": len(recent),
+        "countries": [{"country": code, "sessions": count} for code, count in countries.most_common(MAX_LIST_ROWS)],
+        "pages": [{"pathname": page, "sessions": count} for page, count in pages.most_common(MAX_LIST_ROWS)],
+        "sessions_per_minute": [len(ids) for ids in per_minute],
+    }
+
+
 def compute_breakdowns(summaries: Sequence[Mapping[str, Any]]) -> dict[str, dict[str, int]]:
     result: dict[str, dict[str, int]] = {}
     for field in ("device_type", "browser", "os", "country"):
@@ -568,33 +854,43 @@ def build_overview(store: SessionStore, query: OverviewQuery, config: HotspotCon
         steps = [*steps[:-1], _step("event", query.conversion_event)] if query.funnel else steps
     funnel = compute_funnel(with_events, steps)
 
-    total = len(summaries)
-    converted = sum(1 for summary in summaries if summary.get("converted"))
-    bounced = sum(1 for summary in summaries if session_status(summary, now) == "bounced")
     depths = [summary["max_scroll_depth"] for summary in summaries if summary.get("max_scroll_depth") is not None]
+    with_rage = sum(1 for summary in summaries if summary.get("rage_click_count"))
+    with_dead = sum(1 for summary in summaries if summary.get("dead_click_count"))
+    with_errors = sum(1 for summary in summaries if summary.get("error_count"))
     metrics = {
-        "sessions": total,
+        **summarize_metrics(summaries, now),
         "filtered_sessions": len(visible),
         "active_sessions": sum(1 for summary in summaries if now - float(summary.get("last_seen") or 0) < 300),
         "identified_sessions": sum(1 for summary in summaries if summary.get("identity")),
-        "pageviews": sum(int(summary.get("pageview_count") or 0) for summary in summaries),
         "clicks": sum(int(summary.get("click_count") or 0) for summary in summaries),
         "rage_clicks": sum(int(summary.get("rage_click_count") or 0) for summary in summaries),
         "dead_clicks": sum(int(summary.get("dead_click_count") or 0) for summary in summaries),
         "form_submits": sum(int(summary.get("form_submit_count") or 0) for summary in summaries),
         "errors": sum(int(summary.get("error_count") or 0) for summary in summaries),
-        "converted_sessions": converted,
-        "conversion_rate": _share(converted, total),
-        "bounce_rate": _share(bounced, total),
-        "avg_duration_seconds": round(
-            statistics.mean(int(summary.get("duration_seconds") or 0) for summary in summaries), 1
-        )
-        if summaries
-        else 0.0,
+        "sessions_with_rage": with_rage,
+        "sessions_with_dead_clicks": with_dead,
+        "sessions_with_errors": with_errors,
+        "sessions_with_breakage": sum(
+            1
+            for summary in summaries
+            if summary.get("rage_click_count") or summary.get("dead_click_count") or summary.get("error_count")
+        ),
         "avg_scroll_depth": round(statistics.mean(depths)) if depths else None,
         "ai_referral_sessions": sum(1 for summary in summaries if summary.get("is_ai_referral")),
         "sessions_with_replay": sum(1 for summary in summaries if int(summary.get("recording_chunks") or 0) > 0),
     }
+    comparison = None
+    if query.hours:
+        window = query.hours * 3600
+        previous = [
+            summary
+            for summary in stored
+            if now - 2 * window <= float(summary.get("last_seen") or 0) < now - window
+            and _matches_scope(summary, query)
+        ]
+        comparison = summarize_metrics(previous, now)
+    recent_events = store.recent_events(limit=config.max_events)
 
     return {
         "status": 1,
@@ -606,12 +902,14 @@ def build_overview(store: SessionStore, query: OverviewQuery, config: HotspotCon
             "os": query.os,
             "status": query.status,
             "search": query.search,
-            "sessions_analyzed": total,
+            "sessions_analyzed": len(summaries),
             "sessions_in_range": len(in_range),
             "sessions_stored": len(stored),
         },
         "setup": setup_info(store, config),
         "metrics": metrics,
+        "comparison": comparison,
+        "trend": compute_trend(with_events, query.hours, now, query.tz_offset),
         "sessions": [format_session(summary, now) for summary in visible[: query.limit]],
         "funnel": funnel,
         "paths": compute_paths(summaries),
@@ -620,7 +918,9 @@ def build_overview(store: SessionStore, query: OverviewQuery, config: HotspotCon
         "web_vitals": vitals["site"],
         "referrers": compute_referrers(summaries),
         "errors": compute_errors(with_events),
-        "activity": compute_activity(store.recent_events(limit=config.max_events), summaries, now),
+        "activity": compute_activity(recent_events, summaries, now),
+        # Realtime ignores the time range: it is always the last 30 minutes across every session.
+        "realtime": compute_realtime(stored, recent_events, now),
         # Computed before the device, browser and OS scope so filter menus keep every option.
         "breakdowns": compute_breakdowns(in_range),
     }

@@ -17,7 +17,7 @@ urlpatterns = [
     path("dashboard/logout/", views.logout, name="hotspot_logout"),
     path("app/", RedirectView.as_view(url="/dashboard/", permanent=False)),
     path("hotspot.js", views.sdk, name="hotspot_sdk"),
-    re_path(r"^hotspot/assets/(?P<name>[a-z]+\.(?:js|css))$", views.asset, name="hotspot_asset"),
+    re_path(r"^hotspot/assets/(?P<name>[a-z]+\.(?:js|css|json))$", views.asset, name="hotspot_asset"),
     path("llms.txt", views.llms_txt, name="hotspot_llms_txt"),
     path("favicon.ico", views.favicon, name="hotspot_favicon"),
     re_path(r"^hotspot/batch/?$", views.capture, name="hotspot_capture"),

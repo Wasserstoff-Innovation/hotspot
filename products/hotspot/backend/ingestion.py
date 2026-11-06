@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from products.hotspot.backend.config import HotspotConfig
+from products.hotspot.backend.geo import country_for_timezone
 from products.hotspot.backend.useragent import parse_user_agent
 
 MAX_EVENT_NAME_LENGTH = 200
@@ -225,6 +226,11 @@ def _parse_item(item: Any, api_key: str, server_properties: dict[str, Any], now:
         properties.pop(key, None)
     for key, value in server_properties.items():
         properties.setdefault(key, value)
+    # Without a CDN in front, the browser's timezone is the only hint of where the visitor is.
+    if "$country" not in properties:
+        country = country_for_timezone(properties.get("$timezone"))
+        if country:
+            properties["$country"] = country
 
     return CapturedEvent(
         event=name,

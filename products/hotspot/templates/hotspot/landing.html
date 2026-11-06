@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ page_title }}</title>
-    <meta name="description" content="Hotspot is self-hosted product telemetry. One script tag records page views, clicks, rage clicks, dead clicks, scroll depth, form submits, JavaScript errors, web vitals and the page itself. Your server stores the data and a dashboard replays each session as the visitor saw it, next to funnels, paths and friction.">
+    <meta name="description" content="Hotspot is self-hosted product telemetry. One script tag records page views, clicks, rage clicks, dead clicks, scroll depth, form submits, JavaScript errors, web vitals and the page itself. Your server stores the data and a dashboard replays each session as the visitor saw it, next to a realtime map, the flow between pages, funnels and breakage.">
     <meta name="theme-color" content="#2563EB">
     <link rel="canonical" href="{{ site_url }}/">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='none' stroke='%232563EB' stroke-width='3.5'/%3E%3Ccircle cx='16' cy='16' r='7.5' fill='none' stroke='%233B82F6' stroke-width='1.75' stroke-dasharray='3 2'/%3E%3Ccircle cx='16' cy='16' r='4.5' fill='%2310B981'/%3E%3Ccircle cx='16' cy='16' r='1.8' fill='%23FFFFFF'/%3E%3C/svg%3E">
@@ -1797,7 +1797,7 @@
                 <div class="hero-copy">
                     <p class="eyebrow">Self-hosted product telemetry</p>
                     <h1>See where users get stuck on your site.</h1>
-                    <p class="hero-sub">Hotspot records what visitors do with one script tag and stores it on your own server. The dashboard replays each session as the visitor saw it, and shows funnels, paths and the clicks that go nowhere.</p>
+                    <p class="hero-sub">Hotspot records what visitors do with one script tag and stores it on your own server. The dashboard replays each session as the visitor saw it, and shows who is on the site right now, how visitors move between pages, where they drop out of a funnel and which clicks go nowhere.</p>
 
                     <div class="code">
                         <div class="code-head">
@@ -2078,8 +2078,8 @@
                             </svg>
                         </div>
                         <div class="dash-body">
-                            <h3>Paths</h3>
-                            <p>Entry pages, exit pages, the most common page-to-page transitions and the top full paths, with how many of them converted.</p>
+                            <h3>Flow</h3>
+                            <p>An animated map of how visitors move from page to page, with the drop-off at each page, rage clicks and errors marked on the page where they happened, and the landing, exit and most common journeys underneath.</p>
                         </div>
                     </article>
 
@@ -2093,8 +2093,8 @@
                             </svg>
                         </div>
                         <div class="dash-body">
-                            <h3>Friction tables</h3>
-                            <p>Rage clicks and dead clicks grouped by page and element, with the element's text, how many sessions hit it and when it last happened.</p>
+                            <h3>Breakage</h3>
+                            <p>Rage clicks, dead clicks and JavaScript errors in one place: the share of sessions each one hit, grouped by page and element, with a button that opens the sessions it happened in.</p>
                         </div>
                     </article>
 
@@ -2131,8 +2131,8 @@
                             </svg>
                         </div>
                         <div class="dash-body">
-                            <h3>Errors</h3>
-                            <p>JavaScript errors grouped by message and type, with the count, the sessions affected, the page and when they last happened.</p>
+                            <h3>Overview</h3>
+                            <p>Visitors, sessions, page views, time on site, bounce and conversion rate against the period before, a trend chart, top pages, where visitors come from, devices and countries, and plain sentences about what stands out.</p>
                         </div>
                     </article>
 
@@ -2147,8 +2147,8 @@
                             </svg>
                         </div>
                         <div class="dash-body">
-                            <h3>Live feed</h3>
-                            <p>Events as they arrive, newest first, with events per minute and sessions per hour.</p>
+                            <h3>Realtime</h3>
+                            <p>Who is on the site right now on a world map, visitors per minute, the pages being viewed and the raw event feed as it arrives.</p>
                         </div>
                     </article>
                 </div>
@@ -2178,7 +2178,7 @@
                     <div class="step d2" data-reveal>
                         <span class="step-num">03</span>
                         <h3>Open the dashboard</h3>
-                        <p>Sign in with the dashboard password you set and look at sessions, session replays, funnels, paths, friction, pages, web vitals, referrers, errors and the live feed.</p>
+                        <p>Sign in with the dashboard password you set and look at the overview, the realtime map, sessions with their replays, the flow between pages, funnels, breakage, pages and sources, and a guided install page.</p>
                     </div>
                 </div>
 
@@ -2408,7 +2408,7 @@
                         <div class="faq-panel" id="faq-a6" role="region" aria-labelledby="faq-q6">
                             <div class="faq-panel-inner">
                                 <p>A dead click is a click on something that is not interactive: no link, button, form control, role, handler or pointer cursor within five ancestors. It usually means something looks clickable and is not.</p>
-                                <p>A rage click is three or more clicks within 1.2 seconds and 40 pixels of each other. It usually means something is clickable and does not respond. Both show up in the friction tables with the page and the element.</p>
+                                <p>A rage click is three or more clicks within 1.2 seconds and 40 pixels of each other. It usually means something is clickable and does not respond. Both show up under Breakage with the page and the element.</p>
                             </div>
                         </div>
                     </li>
