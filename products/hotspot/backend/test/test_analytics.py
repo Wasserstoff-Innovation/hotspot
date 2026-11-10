@@ -110,6 +110,8 @@ def test_overview_counts_only_what_really_happened() -> None:
     assert [step["label"] for step in steps] == ["Viewed a page", "Clicked anything", "Submitted a form"]
     assert [step["count"] for step in steps] == [5, 2, 1]
     assert steps[2]["median_seconds_to_next"] is None and steps[1]["median_seconds_to_next"] == 10.0
+    assert len(steps[1]["dropoff_sessions"]) == 3
+    assert any(s["id"] == "top_journey" for s in overview["funnel"]["suggested_funnels"])
 
     flow = overview["paths"]["flow"]
     assert flow["steps"][0][0] == {"pathname": "/", "count": 3, "exits": 1, "converted": 2, "other": False}

@@ -275,11 +275,13 @@ def compute_funnel(
 ) -> dict[str, Any]:
     reached = [0] * len(steps)
     gaps: list[list[float]] = [[] for _ in steps]
+    dropoff_session_ids: list[list[str]] = [[] for _ in steps]
     total = 0
-    for _summary, events in sessions:
+    for summary, events in sessions:
         total += 1
         index = 0
         previous_ts: float | None = None
+        sid = str(summary.get("session_id") or "")
         for event in sorted(events, key=lambda item: float(item.get("timestamp") or 0)):
             if index >= len(steps):
                 break
@@ -290,6 +292,9 @@ def compute_funnel(
                 previous_ts = timestamp
                 reached[index] += 1
                 index += 1
+        if 0 < index < len(steps):
+            if sid and len(dropoff_session_ids[index - 1]) < 30:
+                dropoff_session_ids[index - 1].append(sid)
 
     rows: list[dict[str, Any]] = []
     first = reached[0] if reached else 0
@@ -297,6 +302,7 @@ def compute_funnel(
         count = reached[position]
         previous = reached[position - 1] if position else count
         conv_from_prev = round(count / previous * 100, 1) if previous else 0.0
+        dropoff_sessions = dropoff_session_ids[position - 1] if position else []
         rows.append(
             {
                 "index": position + 1,
@@ -309,6 +315,7 @@ def compute_funnel(
                 "conv_from_prev": conv_from_prev if position else 100.0,
                 "dropoff_from_prev": round(100 - conv_from_prev, 1) if position else 0.0,
                 "dropoff_count": max(0, previous - count) if position else 0,
+                "dropoff_sessions": dropoff_sessions,
                 "median_seconds_to_next": round(statistics.median(gaps[position]), 1) if gaps[position] else None,
             }
         )
@@ -368,6 +375,93 @@ def compute_paths(summaries: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
             for key, count in paths.most_common(MAX_LIST_ROWS)
         ],
     }
+
+
+def compute_suggested_funnels(
+    paths_data: Mapping[str, Any],
+    pages_data: Sequence[Mapping[str, Any]],
+    config: HotspotConfig,
+) -> list[dict[str, Any]]:
+    suggestions: list[dict[str, Any]] = []
+    top_paths = paths_data.get("top_paths") or []
+    entry_pages = paths_data.get("entry_pages") or []
+    conversion = sorted(config.conversion_events)[0] if config.conversion_events else "$form_submit"
+
+    # 1. Top Discovered Multi-page Journey
+    multi_page_paths = [p for p in top_paths if len(p.get("pages") or []) >= 2]
+    if multi_page_paths:
+        best_path = multi_page_paths[0]
+        pages = best_path["pages"][:4]
+        steps = [{"kind": "path", "value": p, "label": f"Visited {p}"} for p in pages]
+        path_name = " → ".join(pages)
+        suggestions.append(
+            {
+                "id": "top_journey",
+                "title": f"⚡ Discovered Flow ({path_name})",
+                "badge": "Top Journey",
+                "description": f"Discovered from {best_path.get('count', 0)} sessions ({best_path.get('share', 0)}% of traffic)",
+                "steps": steps,
+            }
+        )
+
+    # 2. Key Pages Corridor (Entry -> Destination -> Goal)
+    if entry_pages:
+        entry = entry_pages[0]["pathname"]
+        other_pages = [p["pathname"] for p in pages_data if p.get("pathname") != entry]
+        steps = [{"kind": "path", "value": entry, "label": f"Visited {entry}"}]
+        if other_pages:
+            steps.append({"kind": "path", "value": other_pages[0], "label": f"Visited {other_pages[0]}"})
+            if len(other_pages) > 1:
+                steps.append({"kind": "path", "value": other_pages[1], "label": f"Visited {other_pages[1]}"})
+            else:
+                steps.append({"kind": "event", "value": conversion, "label": _step("event", conversion).label})
+        else:
+            steps.append({"kind": "event", "value": "$autocapture", "label": "Clicked anything"})
+            steps.append({"kind": "event", "value": conversion, "label": _step("event", conversion).label})
+
+        name = " → ".join(s["value"] for s in steps)
+        suggestions.append(
+            {
+                "id": "core_pages",
+                "title": f"📄 Core Flow ({name})",
+                "badge": "Traffic Flow",
+                "description": "Top entry page and key destination pages",
+                "steps": steps,
+            }
+        )
+
+    # 3. Action / Engagement Funnel
+    first_page = entry_pages[0]["pathname"] if entry_pages else (pages_data[0]["pathname"] if pages_data else "/")
+    suggestions.append(
+        {
+            "id": "interaction",
+            "title": f"🖱️ Interaction ({first_page} → Click → Goal)",
+            "badge": "Interaction",
+            "description": "Visitor arrives on key page, interacts with element, and reaches goal",
+            "steps": [
+                {"kind": "path", "value": first_page, "label": f"Visited {first_page}"},
+                {"kind": "event", "value": "$autocapture", "label": "Clicked anything"},
+                {"kind": "event", "value": conversion, "label": _step("event", conversion).label},
+            ],
+        }
+    )
+
+    # 4. Standard Generic Baseline
+    suggestions.append(
+        {
+            "id": "standard",
+            "title": "📊 Standard Baseline",
+            "badge": "Baseline",
+            "description": "Viewed any page → Clicked anything → Form submit",
+            "steps": [
+                {"kind": "event", "value": "$pageview", "label": "Viewed any page"},
+                {"kind": "event", "value": "$autocapture", "label": "Clicked anything"},
+                {"kind": "event", "value": conversion, "label": _step("event", conversion).label},
+            ],
+        }
+    )
+
+    return suggestions
 
 
 def compute_flow(sequences: Sequence[tuple[Sequence[str], bool]]) -> dict[str, Any]:
@@ -963,6 +1057,11 @@ def build_overview(
 
         sites_data.append(site_entry)
 
+    paths_data = compute_paths(summaries)
+    pages_data = compute_pages(with_events, vitals["pages"])
+    funnel["is_custom"] = bool(query.funnel)
+    funnel["suggested_funnels"] = compute_suggested_funnels(paths_data, pages_data, config)
+
     return {
         "status": 1,
         "generated_at": now,
@@ -988,9 +1087,9 @@ def build_overview(
         "trend": compute_trend(with_events, query.hours, now, query.tz_offset),
         "sessions": [format_session(summary, now) for summary in visible[: query.limit]],
         "funnel": funnel,
-        "paths": compute_paths(summaries),
+        "paths": paths_data,
         "friction": compute_friction(with_events),
-        "pages": compute_pages(with_events, vitals["pages"]),
+        "pages": pages_data,
         "web_vitals": vitals["site"],
         "referrers": compute_referrers(summaries),
         "errors": compute_errors(with_events),
