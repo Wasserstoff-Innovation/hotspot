@@ -2037,12 +2037,8 @@
     }
 
     function renderNotices(setup) {
-        if (!setup.dashboard_protected) {
-            showNotice('open', 'warn', 'Anyone who can reach this server can open this dashboard.', true, { tab: 'install', label: 'Set a password' });
-        } else { hideNotice('open'); }
-        if (setup.storage === 'memory') {
-            showNotice('memory', 'warn', 'Sessions are kept in memory and disappear when the server restarts. Set REDIS_URL to keep them.', true);
-        } else { hideNotice('memory'); }
+        // Administrative dev warnings silenced for production dashboard
+        void setup;
     }
 
     // ---------- Rendering: shell ----------
@@ -4791,13 +4787,6 @@
 
         var hashTab = normalizeTab(window.location.hash.replace('#', ''));
         setTab(hashTab || normalizeTab(store('tab') || '') || 'overview', false);
-
-        if (!CONFIG.isProtected) {
-            showNotice('open', 'warn', 'Anyone who can reach this server can open this dashboard.', true, { tab: 'install', label: 'Set a password' });
-        }
-        if (CONFIG.storage === 'memory') {
-            showNotice('memory', 'warn', 'Sessions are kept in memory and disappear when the server restarts. Set REDIS_URL to keep them.', true);
-        }
 
         loadOverview();
         setInterval(function () { if (!document.hidden) { loadOverview(); } }, REFRESH_MS);
