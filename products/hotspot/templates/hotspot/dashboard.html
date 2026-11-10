@@ -8,7 +8,7 @@
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Ccircle cx='13' cy='13' r='11' fill='none' stroke='%232563EB' stroke-width='2.75'/%3E%3Ccircle cx='13' cy='13' r='6.25' fill='none' stroke='%233B82F6' stroke-width='1.5' stroke-dasharray='2.5 1.5'/%3E%3Ccircle cx='13' cy='13' r='3.75' fill='%2310B981'/%3E%3Ccircle cx='13' cy='13' r='1.5' fill='%23FFFFFF'/%3E%3C/svg%3E">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Satisfy&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/hotspot/assets/replay.css?v={{ version }}">
     <style>
         :root {
@@ -35,6 +35,7 @@
             --shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 6px 16px rgba(15, 23, 42, 0.05);
             --font: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
             --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+            --cursive: 'Satisfy', cursive;
         }
         *, *::before, *::after { box-sizing: border-box; }
         html, body { height: 100%; }
@@ -68,39 +69,20 @@
         .brand {
             display: flex;
             align-items: center;
-            gap: 10px;
             height: 56px;
-            padding: 0 16px;
+            padding: 0 18px;
             border-bottom: 1px solid var(--border);
             text-decoration: none;
             color: var(--text);
-            font-family: var(--font);
-            font-size: 16px;
-            font-weight: 700;
-            letter-spacing: -0.02em;
+            font-family: var(--cursive);
+            font-size: 28px;
             line-height: 1;
             white-space: nowrap;
             user-select: none;
         }
-        .brand .logo-mark {
-            width: 28px;
-            height: 28px;
-            border-radius: 8px;
-            background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 1px 3px rgba(37, 99, 235, 0.25);
-            flex-shrink: 0;
-        }
-        .brand .logo-mark svg {
-            width: 16px;
-            height: 16px;
-            display: block;
-        }
-        .brand .brand-text {
-            color: var(--text);
-        }
+        .brand .word { font-family: var(--cursive); }
+        .brand .o { display: inline-flex; width: 18px; height: 18px; margin: 0 -1px 0 0; position: relative; top: 2px; }
+        .brand .o svg { width: 100%; height: 100%; display: block; }
 
         /* Site Switcher */
         .site-switcher-wrap {
@@ -309,6 +291,12 @@
         .sites-table tr:hover td {
             background: rgba(248, 250, 252, 0.6);
         }
+        .sites-table th:nth-child(1), .sites-table td:nth-child(1) { width: 22%; min-width: 140px; }
+        .sites-table th:nth-child(2), .sites-table td:nth-child(2) { width: 18%; min-width: 130px; }
+        .sites-table th:nth-child(3), .sites-table td:nth-child(3) { width: 30%; min-width: 250px; }
+        .sites-table th:nth-child(4), .sites-table td:nth-child(4) { width: 12%; min-width: 100px; white-space: nowrap; }
+        .sites-table th:nth-child(5), .sites-table td:nth-child(5) { width: 8%; min-width: 70px; white-space: nowrap; }
+        .sites-table th:nth-child(6), .sites-table td:nth-child(6) { width: 10%; min-width: 140px; text-align: right; white-space: nowrap; }
         .site-status-pill {
             display: inline-flex;
             align-items: center;
@@ -340,12 +328,77 @@
             font-size: 11.5px;
             background: var(--subtle);
             border: 1px solid var(--border);
-            padding: 3px 8px;
+            padding: 4px 8px;
             border-radius: 6px;
             color: var(--text-2);
             display: inline-flex;
             align-items: center;
+            justify-content: space-between;
             gap: 6px;
+            max-width: 320px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .site-api-key-box span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex: 1;
+            min-width: 0;
+        }
+
+        /* Modern Bulletproof Code Card */
+        .code-box-card {
+            background: #0B0F17;
+            border: 1px solid #1E293B;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 12px 0;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+        }
+        .code-box-card-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #111827;
+            padding: 8px 14px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .code-box-tag {
+            font-family: var(--mono);
+            font-size: 11px;
+            font-weight: 600;
+            color: #94A3B8;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+        .code-box-card-head .btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #F8FAFC;
+            height: 30px;
+            padding: 0 12px;
+            font-size: 12px;
+            font-weight: 500;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .code-box-card-head .btn:hover {
+            background: rgba(255, 255, 255, 0.18);
+        }
+        .code-box-card-content {
+            padding: 14px 16px;
+            font-family: var(--mono);
+            font-size: 12.5px;
+            line-height: 1.6;
+            color: #E2E8F0;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
         }
 
         /* Modal */
@@ -877,8 +930,8 @@
         .empty p { margin-bottom: 14px; }
         .empty .actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
         .empty .snippet { text-align: left; max-width: 720px; margin: 0 auto 14px; }
-        .snippet { position: relative; margin: 0; background: var(--dark-2); color: #E5E7EB; border-radius: 10px; padding: 14px 110px 14px 16px; font-family: var(--mono); font-size: 12.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-all; }
-        .snippet .btn { position: absolute; top: 9px; right: 9px; background: #1F2937; border-color: #374151; color: #E5E7EB; }
+        .snippet { position: relative; margin: 0; background: #0B0F17; border: 1px solid #1E293B; color: #E5E7EB; border-radius: 10px; padding: 12px 16px; font-family: var(--mono); font-size: 12.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-all; }
+        .snippet .btn { position: absolute; top: 8px; right: 8px; background: #1F2937; border-color: #374151; color: #E5E7EB; }
         .snippet .btn:hover { background: #374151; }
         .snippet .c { color: #9CA3AF; }
 
@@ -1031,16 +1084,22 @@
 <body data-site-url="{{ site_url }}" data-sdk-url="{{ sdk_url }}" data-api-key="{{ api_key }}" data-version="{{ version }}" data-protected="{{ dashboard_protected }}" data-demo="{{ demo_enabled }}" data-replay="{{ replay_enabled }}" data-storage="{{ storage }}">
 <div class="app" id="app">
     <aside class="sidebar">
-        <div class="brand">
-            <div class="logo-mark">
-                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="12" cy="12" r="9" stroke="#FFFFFF" stroke-width="2"/>
-                    <circle cx="12" cy="12" r="5" stroke="#93C5FD" stroke-width="1.5" stroke-dasharray="2 2"/>
-                    <circle cx="12" cy="12" r="2.5" fill="#10B981"/>
+        <a class="brand" href="/" aria-label="Hotspot">
+            <span class="word">H</span><span class="o" aria-hidden="true">
+                <svg viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="logoGrad" x1="2" y1="2" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+                            <stop stop-color="#2563EB"/>
+                            <stop offset="1" stop-color="#1D4ED8"/>
+                        </linearGradient>
+                    </defs>
+                    <circle cx="13" cy="13" r="11" stroke="url(#logoGrad)" stroke-width="2.75"/>
+                    <circle cx="13" cy="13" r="6.25" stroke="#3B82F6" stroke-width="1.5" stroke-dasharray="2.5 1.5"/>
+                    <circle cx="13" cy="13" r="3.75" fill="#10B981"/>
+                    <circle cx="13" cy="13" r="1.5" fill="#FFFFFF"/>
                 </svg>
-            </div>
-            <span class="brand-text">Hotspot</span>
-        </div>
+            </span><span class="word">tspot</span>
+        </a>
         <nav class="nav" aria-label="Dashboard sections">
             <button class="nav-btn" type="button" data-action="nav" data-tab="overview" title="Overview">
                 <span class="ico" data-icon="home"></span>
@@ -1257,7 +1316,18 @@
                     <div class="empty" id="sessionsEmptyNone" hidden>
                         <h3>No sessions yet</h3>
                         <p>Add this script tag to your site. Sessions appear here a few seconds after the first page view.</p>
-                        <pre class="snippet"><code id="snippetEmpty">&lt;script src="{{ sdk_url }}" data-api-key="{{ api_key }}" defer&gt;&lt;/script&gt;</code><button class="btn sm" type="button" data-action="copy" data-target="snippetEmpty"><span class="ico" data-icon="copy"></span>Copy</button></pre>
+                        <div class="code-box-card" style="text-align: left; max-width: 720px; margin: 0 auto 14px;">
+                            <div class="code-box-card-head">
+                                <span class="code-box-tag">HTML Tracking Snippet</span>
+                                <button class="btn sm" type="button" data-action="copy" data-target="snippetEmpty">
+                                    <span class="ico" data-icon="copy"></span>
+                                    <span>Copy Script</span>
+                                </button>
+                            </div>
+                            <div class="code-box-card-content">
+                                <code id="snippetEmpty">&lt;script src="{{ sdk_url }}" data-api-key="{{ api_key }}" defer&gt;&lt;/script&gt;</code>
+                            </div>
+                        </div>
                         <div class="actions">
                             <a class="btn" href="/demo/" target="_blank" rel="noopener" id="demoLinkEmpty" hidden><span class="ico" data-icon="external"></span>Open the sample site</a>
                             <button class="btn" type="button" data-action="nav" data-tab="install">Install instructions</button>
@@ -1491,14 +1561,25 @@
                             </div>
                         </div>
 
-                        <pre class="snippet"><code id="snippetInstallDynamic">&lt;script src="{{ sdk_url }}" data-api-host="{{ site_url }}" data-api-key="{{ api_key }}" defer&gt;&lt;/script&gt;</code><button class="btn sm" type="button" id="btnCopyInstallDynamic"><span class="ico" data-icon="copy"></span><span id="copyInstallBtnText">Copy Script</span></button></pre>
+                        <div class="code-box-card">
+                            <div class="code-box-card-head">
+                                <span class="code-box-tag">HTML Tracking Snippet</span>
+                                <button class="btn sm" type="button" id="btnCopyInstallDynamic">
+                                    <span class="ico" data-icon="copy"></span>
+                                    <span id="copyInstallBtnText">Copy Script</span>
+                                </button>
+                            </div>
+                            <div class="code-box-card-content">
+                                <code id="snippetInstallDynamic">&lt;script src="{{ sdk_url }}" data-api-host="{{ site_url }}" data-api-key="{{ api_key }}" defer&gt;&lt;/script&gt;</code>
+                            </div>
+                        </div>
 
-                        <div class="verify-bar" style="margin-top: 16px; display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--subtle); border-radius: 8px; border: 1px solid var(--border);">
+                        <div class="verify-bar" style="margin-top: 14px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 16px; background: var(--subtle); border-radius: 8px; border: 1px solid var(--border);">
                             <button class="btn primary sm" type="button" id="btnVerifyConnection">
                                 <span class="ico" data-icon="check"></span>
                                 <span>Verify Real-time Connection</span>
                             </button>
-                            <span class="muted" id="verifyStatusText" style="font-size: 12.5px;">Click to verify whether telemetry from your site is reaching Hotspot.</span>
+                            <span class="muted" id="verifyStatusText" style="font-size: 12.5px; flex: 1; min-width: 220px; line-height: 1.45;">Click to verify whether telemetry from your site is reaching Hotspot.</span>
                         </div>
                     </div>
                 </div>
@@ -1572,7 +1653,18 @@
         <div id="newSiteResult" class="modal-result" hidden>
             <div class="result-success-badge">Site Created Successfully! ✓</div>
             <p class="result-lead">Embed this 1-line script into the <code>&lt;head&gt;</code> of <strong id="resSiteDomain"></strong>:</p>
-            <pre class="snippet"><code id="newSiteSnippetCode"></code><button class="btn sm" type="button" id="btnCopyNewSiteSnippet"><span class="ico" data-icon="copy"></span><span id="copySiteBtnText">Copy Script</span></button></pre>
+            <div class="code-box-card">
+                <div class="code-box-card-head">
+                    <span class="code-box-tag">HTML Tracking Snippet</span>
+                    <button class="btn sm" type="button" id="btnCopyNewSiteSnippet">
+                        <span class="ico" data-icon="copy"></span>
+                        <span id="copySiteBtnText">Copy Script</span>
+                    </button>
+                </div>
+                <div class="code-box-card-content">
+                    <code id="newSiteSnippetCode"></code>
+                </div>
+            </div>
             <div class="modal-actions" style="margin-top: 16px;">
                 <button type="button" class="btn primary" id="btnDoneAddSite">Done &amp; View in Dashboard</button>
             </div>
@@ -4255,6 +4347,9 @@
     function renderSitesTab(sites, currentSite, setup) {
         setup = setup || {};
         sites = sites || [];
+        var isAdmin = !(state.overview && state.overview.scope && state.overview.scope.is_admin === false);
+        var tabAddBtn = $('btnOpenAddSiteFromTab');
+        if (tabAddBtn) tabAddBtn.style.display = isAdmin ? '' : 'none';
         var tbody = $('sitesTableBody');
         if (tbody) {
             clear(tbody);

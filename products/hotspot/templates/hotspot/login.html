@@ -8,7 +8,7 @@
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='9' fill='none' stroke='%232563EB' stroke-width='2.75'/%3E%3Ccircle cx='12' cy='12' r='3' fill='%2310B981'/%3E%3C/svg%3E">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Satisfy&display=swap" rel="stylesheet">
     <style>
         :root {
             --brand-primary: #2563EB;
@@ -66,38 +66,59 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 0.75rem;
+            gap: 0.85rem;
+            text-decoration: none;
+            user-select: none;
+        }
+
+        .brand-cursive {
+            display: inline-flex;
+            align-items: center;
+            font-family: 'Satisfy', cursive;
+            font-size: 2.35rem;
+            font-weight: 400;
+            line-height: 1;
+            color: var(--text-primary);
             text-decoration: none;
         }
 
-        .brand-logo-mark {
-            width: 36px;
-            height: 36px;
-            background: linear-gradient(135deg, #2563EB, #1D4ED8);
-            border-radius: 9px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.28);
+        .brand-cursive .brand-h {
+            font-size: 1.12em;
+            margin-right: -0.06em;
+            font-family: 'Satisfy', cursive;
         }
 
-        .brand-logo-text {
-            font-size: 1.35rem;
-            font-weight: 800;
-            letter-spacing: -0.025em;
-            color: var(--text-primary);
+        .brand-cursive .brand-ring {
+            position: relative;
+            top: 0.08em;
+            width: 0.62em;
+            height: 0.62em;
+            margin-right: -0.02em;
+            display: inline-flex;
+        }
+
+        .brand-cursive .brand-ring svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .brand-cursive .brand-tail {
+            font-family: 'Satisfy', cursive;
         }
 
         .brand-badge {
+            font-family: var(--font-sans);
             font-size: 0.65rem;
             font-weight: 700;
             letter-spacing: 0.04em;
             text-transform: uppercase;
-            padding: 0.15rem 0.5rem;
+            padding: 0.2rem 0.55rem;
             background: var(--brand-light);
             color: var(--brand-primary);
             border: 1px solid var(--brand-border);
             border-radius: 9999px;
+            align-self: center;
         }
 
         /* Main Card */
@@ -395,14 +416,23 @@
 
 <div class="auth-container">
     <!-- Brand Logo -->
-    <a href="/" class="brand-header">
-        <div class="brand-logo-mark">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5">
-                <circle cx="12" cy="12" r="9"/>
-                <circle cx="12" cy="12" r="3" fill="#10B981" stroke="none"/>
-            </svg>
-        </div>
-        <span class="brand-logo-text">Hotspot</span>
+    <a href="/" class="brand-header" aria-label="Hotspot">
+        <span class="brand-cursive">
+            <span class="brand-h">H</span><span class="brand-ring" aria-hidden="true">
+                <svg viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="loginLogoGrad" x1="2" y1="2" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+                            <stop stop-color="#2563EB"/>
+                            <stop offset="1" stop-color="#1D4ED8"/>
+                        </linearGradient>
+                    </defs>
+                    <circle cx="13" cy="13" r="11" stroke="url(#loginLogoGrad)" stroke-width="2.75"/>
+                    <circle cx="13" cy="13" r="6.25" stroke="#3B82F6" stroke-width="1.5" stroke-dasharray="2.5 1.5"/>
+                    <circle cx="13" cy="13" r="3.75" fill="#10B981"/>
+                    <circle cx="13" cy="13" r="1.5" fill="#FFFFFF"/>
+                </svg>
+            </span><span class="brand-tail">tspot</span>
+        </span>
         <span class="brand-badge">Zero-Knowledge</span>
     </a>
 
