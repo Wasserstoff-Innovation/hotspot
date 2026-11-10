@@ -7,10 +7,12 @@ processes; the in-memory backend keeps a single process working without it.
 
 from __future__ import annotations
 
+import re
 import json
 import time
 import zlib
 import logging
+import secrets
 import threading
 from collections import deque
 from collections.abc import Callable, Iterable, Mapping
@@ -75,6 +77,14 @@ class StorageBackend(Protocol):
 
     def clear(self) -> None: ...
 
+    def save_site(self, site: dict[str, Any]) -> None: ...
+
+    def get_sites(self) -> list[dict[str, Any]]: ...
+
+    def get_site(self, site_id: str) -> dict[str, Any] | None: ...
+
+    def delete_site(self, site_id: str) -> bool: ...
+
 
 class MemoryBackend:
     name = "memory"
@@ -87,6 +97,7 @@ class MemoryBackend:
         self._recordings: dict[str, list[bytes]] = {}
         self._last_seen: dict[str, float] = {}
         self._events: deque[str] = deque(maxlen=config.max_events)
+        self._sites: dict[str, dict[str, Any]] = {}
 
     def update_session(
         self,
@@ -146,6 +157,24 @@ class MemoryBackend:
             self._recordings.clear()
             self._last_seen.clear()
             self._events.clear()
+            self._sites.clear()
+
+    def save_site(self, site: dict[str, Any]) -> None:
+        with self._lock:
+            self._sites[site["id"]] = dict(site)
+
+    def get_sites(self) -> list[dict[str, Any]]:
+        with self._lock:
+            return list(self._sites.values())
+
+    def get_site(self, site_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            site = self._sites.get(site_id)
+            return dict(site) if site else None
+
+    def delete_site(self, site_id: str) -> bool:
+        with self._lock:
+            return self._sites.pop(site_id, None) is not None
 
 
 class RedisBackend:
@@ -157,6 +186,7 @@ class RedisBackend:
         self._prefix = prefix
         self._events_key = f"{prefix}events"
         self._index_key = f"{prefix}sessions"
+        self._sites_key = f"{prefix}sites"
 
     def _session_key(self, session_id: str) -> str:
         return f"{self._prefix}s:{session_id}"
@@ -234,6 +264,32 @@ class RedisBackend:
         if keys:
             self._client.delete(*keys)
 
+    def save_site(self, site: dict[str, Any]) -> None:
+        raw = json.dumps(site, separators=(",", ":"))
+        self._client.hset(self._sites_key, site["id"], raw)
+
+    def get_sites(self) -> list[dict[str, Any]]:
+        raws = self._client.hgetall(self._sites_key)
+        sites = []
+        for raw in raws.values():
+            try:
+                sites.append(json.loads(_text(raw)))
+            except Exception:
+                pass
+        return sites
+
+    def get_site(self, site_id: str) -> dict[str, Any] | None:
+        raw = self._client.hget(self._sites_key, site_id)
+        if not raw:
+            return None
+        try:
+            return json.loads(_text(raw))
+        except Exception:
+            return None
+
+    def delete_site(self, site_id: str) -> bool:
+        return bool(self._client.hdel(self._sites_key, site_id))
+
 
 def _text(value: Any) -> str:
     if isinstance(value, bytes):
@@ -266,6 +322,13 @@ class SessionStore:
         by_session: dict[str, list[CapturedEvent]] = {}
         for event in ordered:
             by_session.setdefault(event.session_id, []).append(event)
+            host = event.properties.get("$host")
+            if host and isinstance(host, str):
+                host_clean = host.strip().lower().split(":")[0]
+                if host_clean and host_clean not in ("localhost", "127.0.0.1"):
+                    registered = [s.get("domain") for s in self._backend.get_sites()]
+                    if host_clean not in registered:
+                        self.save_site(host_clean, host_clean, event.project_id)
 
         for session_id, session_events in by_session.items():
             events_json = [json.dumps(event.to_dict(), separators=(",", ":")) for event in session_events]
@@ -323,6 +386,56 @@ class SessionStore:
     def clear(self) -> None:
         self._backend.clear()
 
+    def save_site(self, name: str, domain: str, api_key: str | None = None) -> dict[str, Any]:
+        domain_clean = (
+            domain.strip().lower().removeprefix("http://").removeprefix("https://").split("/")[0].split(":")[0]
+        )
+        site_id = _slugify(domain_clean)
+        key = api_key or generate_api_key(domain_clean)
+        site = {
+            "id": site_id,
+            "name": name.strip() or domain_clean,
+            "domain": domain_clean,
+            "api_key": key,
+            "created_at": time.time(),
+        }
+        self._backend.save_site(site)
+        return site
+
+    def sites(self) -> list[dict[str, Any]]:
+        existing = self._backend.get_sites()
+        if not existing:
+            self.ensure_default_sites()
+            existing = self._backend.get_sites()
+        return existing
+
+    def site(self, site_id: str) -> dict[str, Any] | None:
+        return self._backend.get_site(site_id)
+
+    def delete_site(self, site_id: str) -> bool:
+        return self._backend.delete_site(site_id)
+
+    def all_api_keys(self) -> frozenset[str]:
+        keys = {s["api_key"] for s in self._backend.get_sites() if s.get("api_key")}
+        return frozenset(keys)
+
+    def ensure_default_sites(self) -> None:
+        self.save_site("Buxa AI", "buxa.ai", "hs_live_buxa_ai")
+        host = urlsplit(self._config.site_url).hostname
+        if host and host != "buxa.ai":
+            self.save_site("Hotspot Console", host, self._config.api_key_for_pages)
+
+
+def _slugify(text: str) -> str:
+    cleaned = re.sub(r"[^a-zA-Z0-9]+", "-", text.strip().lower()).strip("-")
+    return cleaned or "site"
+
+
+def generate_api_key(domain: str) -> str:
+    slug = _slugify(domain.replace(".", "-"))[:15]
+    rand = secrets.token_hex(4)
+    return f"hs_live_{slug}_{rand}"
+
 
 def _build_mutator(events: list[CapturedEvent], config: HotspotConfig) -> SessionMutator:
     first = events[0]
@@ -376,6 +489,7 @@ def new_session_summary(session_id: str, distinct_id: str, project_id: str, time
         "session_id": session_id,
         "distinct_id": distinct_id,
         "project_id": project_id,
+        "host": None,
         "first_seen": timestamp,
         "last_seen": timestamp,
         "duration_seconds": 0,
@@ -436,6 +550,16 @@ def apply_event(summary: dict[str, Any], event: CapturedEvent, config: HotspotCo
     for prop_key, field in _SESSION_PROPERTY_FIELDS.items():
         if summary.get(field) in (None, 0) and props.get(prop_key) not in (None, "", 0):
             summary[field] = props[prop_key]
+
+    if summary.get("host") is None:
+        host = props.get("$host")
+        if not host and summary.get("entry_url"):
+            try:
+                host = urlsplit(summary["entry_url"]).hostname
+            except Exception:
+                host = None
+        if host:
+            summary["host"] = str(host).lower().split(":")[0]
 
     if summary.get("referrer") is None and props.get("$referrer"):
         referrer = str(props["$referrer"])

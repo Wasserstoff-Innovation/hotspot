@@ -114,9 +114,15 @@ def decode_body(body: bytes, compression: str | None, limit: int) -> bytes:
     return data
 
 
-def parse_batch(body: bytes, context: RequestContext, config: HotspotConfig, now: float) -> list[CapturedEvent]:
+def parse_batch(
+    body: bytes,
+    context: RequestContext,
+    config: HotspotConfig,
+    now: float,
+    extra_valid_keys: frozenset[str] | None = None,
+) -> list[CapturedEvent]:
     payload = _load_object(decode_body(body, None, config.max_body_bytes))
-    api_key = _check_api_key(payload, config)
+    api_key = _check_api_key(payload, config, extra_valid_keys)
 
     raw_items = payload.get("batch")
     if raw_items is None:
@@ -147,9 +153,15 @@ def parse_batch(body: bytes, context: RequestContext, config: HotspotConfig, now
     return events
 
 
-def parse_recording(body: bytes, compression: str | None, config: HotspotConfig, now: float) -> RecordingChunk:
+def parse_recording(
+    body: bytes,
+    compression: str | None,
+    config: HotspotConfig,
+    now: float,
+    extra_valid_keys: frozenset[str] | None = None,
+) -> RecordingChunk:
     payload = _load_object(decode_body(body, compression, config.max_recording_body_bytes))
-    api_key = _check_api_key(payload, config)
+    api_key = _check_api_key(payload, config, extra_valid_keys)
     session_id = _clean_id(payload.get("session_id"))
     if not session_id:
         raise IngestionError("session_id is required")
@@ -199,12 +211,16 @@ def _load_object(body: bytes) -> dict[str, Any]:
     return payload
 
 
-def _check_api_key(payload: Mapping[str, Any], config: HotspotConfig) -> str:
+def _check_api_key(
+    payload: Mapping[str, Any], config: HotspotConfig, extra_valid_keys: frozenset[str] | None = None
+) -> str:
     api_key = _clean_id(payload.get("api_key"))
     if not api_key:
         raise IngestionError("api_key is required", status=401)
-    if config.api_keys and api_key not in config.api_keys:
-        raise IngestionError("Unknown api_key", status=401)
+    if config.api_keys:
+        allowed = config.api_keys | (extra_valid_keys or frozenset())
+        if api_key not in allowed:
+            raise IngestionError("Unknown api_key", status=401)
     return api_key
 
 

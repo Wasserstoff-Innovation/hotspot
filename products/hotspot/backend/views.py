@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable, Mapping
 from typing import Any
 
@@ -129,6 +130,33 @@ def overview(request: HttpRequest) -> HttpResponse:
     if not _authorized(request):
         return _unauthorized()
     return _json(get_service().overview(_params(request)))
+
+
+@csrf_exempt
+def sites_endpoint(request: HttpRequest) -> HttpResponse:
+    if not _authorized(request):
+        return _unauthorized()
+    service = get_service()
+    if request.method == "POST":
+        try:
+            payload = json.loads(request.body.decode("utf-8")) if request.body else {}
+        except Exception:
+            payload = {}
+        name = str(payload.get("name") or "").strip()
+        domain = str(payload.get("domain") or "").strip()
+        if not domain:
+            return _json({"status": 0, "error": "domain is required"}, status=400)
+        site = service.create_site(name or domain, domain)
+        return _json({"status": 1, "site": site})
+    return _json({"status": 1, "sites": service.list_sites()})
+
+
+@csrf_exempt
+def site_delete_endpoint(request: HttpRequest, site_id: str) -> HttpResponse:
+    if not _authorized(request):
+        return _unauthorized()
+    ok = get_service().delete_site(site_id)
+    return _json({"status": 1 if ok else 0})
 
 
 def session_detail(request: HttpRequest, session_id: str) -> HttpResponse:

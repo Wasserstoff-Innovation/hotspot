@@ -120,3 +120,63 @@ def test_recording_endpoint_splices_stored_chunks_into_one_json_document(protect
     world = json.loads(views.asset(factory.get("/hotspot/assets/world.json"), "world.json").content)
     assert "IN" in world["countries"] and world["centers"]["IN"]
     assert views.asset(factory.get("/hotspot/assets/other.js"), "other.js").status_code == 404
+
+
+def test_sites_management_and_scoping(protected_service: HotspotService) -> None:
+    factory = RequestFactory()
+    auth = {"Authorization": "Bearer open-sesame"}
+
+    # 1. List default sites
+    res = views.sites_endpoint(factory.get("/hotspot/api/sites/", headers=auth))
+    data = json.loads(res.content)
+    assert data["status"] == 1
+    assert any(s["domain"] == "buxa.ai" for s in data["sites"])
+
+    # 2. Create new site
+    post_res = views.sites_endpoint(
+        factory.post(
+            "/hotspot/api/sites/",
+            data=json.dumps({"name": "Client App", "domain": "client.example.com"}),
+            content_type="application/json",
+            headers=auth,
+        )
+    )
+    new_site = json.loads(post_res.content)["site"]
+    assert new_site["domain"] == "client.example.com"
+    new_key = new_site["api_key"]
+    assert new_key.startswith("hs_live_")
+
+    # 3. Newly created site API key is dynamically accepted by capture
+    now = time.time()
+    body = batch_body(
+        [
+            event_item(
+                "$pageview",
+                "s1",
+                now,
+                "v1",
+                **{
+                    "$current_url": "https://client.example.com/pricing",
+                    "$host": "client.example.com",
+                    "$pathname": "/pricing",
+                },
+            )
+        ],
+        api_key=new_key,
+    )
+    capture_res = views.capture(factory.post("/hotspot/batch/", data=body, content_type="text/plain"))
+    assert capture_res.status_code == 200
+
+    # 4. Overview filtering by site
+    # Filter for client.example.com: matches
+    overview_filtered = json.loads(
+        views.overview(factory.get("/hotspot/api/overview/?site=client.example.com", headers=auth)).content
+    )
+    assert overview_filtered["metrics"]["sessions"] == 1
+    assert overview_filtered["sessions"][0]["session_id"] == "s1"
+
+    # Filter for non-matching site: returns 0
+    overview_other = json.loads(
+        views.overview(factory.get("/hotspot/api/overview/?site=other.com", headers=auth)).content
+    )
+    assert overview_other["metrics"]["sessions"] == 0

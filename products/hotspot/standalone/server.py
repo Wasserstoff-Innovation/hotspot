@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import sys
+import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -21,7 +22,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from products.hotspot.backend.auth import DASHBOARD_COOKIE, TOKEN_TTL_SECONDS  # noqa: E402
+from products.hotspot.backend.auth import DASHBOARD_COOKIE, TOKEN_TTL_SECONDS, make_dashboard_token  # noqa: E402
 from products.hotspot.backend.security import (  # noqa: E402
     API_CSP,
     CAPTURE_CORS_HEADERS,
@@ -88,17 +89,32 @@ async def app_redirect(request: Request) -> Response:
 
 async def login(request: Request) -> Response:
     service = _service()
-    if not service.config.dashboard_protected or _authorized(request):
-        return RedirectResponse(DASHBOARD_PATH, status_code=302)
-    if request.method == "GET":
-        return _page(request, "login", error="")
+    if request.method in ("GET", "HEAD"):
+        return _page(
+            request,
+            "login",
+            error="",
+            api_key=service.config.api_key_for_pages,
+            site_url=service.config.site_url,
+            sdk_url=service.config.sdk_url,
+        )
     if not is_same_site_form_post(request.headers):
         return PlainTextResponse("Cross-site form posts are refused.", status_code=403)
     form = await request.form()
     password = form.get("password")
     token = service.login(password if isinstance(password, str) else None)
+    if token is None and service.config.dashboard_protected:
+        return _page(
+            request,
+            "login",
+            status=401,
+            error="Invalid credentials. Try again or continue as guest.",
+            api_key=service.config.api_key_for_pages,
+            site_url=service.config.site_url,
+            sdk_url=service.config.sdk_url,
+        )
     if token is None:
-        return _page(request, "login", status=401, error="That password is not right. Try again.")
+        token = make_dashboard_token(service.config.secret_key, time.time())
     response = RedirectResponse(DASHBOARD_PATH, status_code=303)
     response.set_cookie(
         DASHBOARD_COOKIE,
@@ -198,12 +214,40 @@ async def events_feed(request: Request) -> Response:
     return _json(_service().events_feed(dict(request.query_params)))
 
 
+async def sites_endpoint(request: Request) -> Response:
+    if not _authorized(request):
+        return _unauthorized()
+    service = _service()
+    if request.method == "POST":
+        try:
+            payload = await request.json()
+        except Exception:
+            payload = {}
+        name = str(payload.get("name") or "").strip()
+        domain = str(payload.get("domain") or "").strip()
+        if not domain:
+            return _json({"status": 0, "error": "domain is required"}, status=400)
+        site = service.create_site(name or domain, domain)
+        return _json({"status": 1, "site": site})
+    return _json({"status": 1, "sites": service.list_sites()})
+
+
+async def site_delete_endpoint(request: Request) -> Response:
+    if not _authorized(request):
+        return _unauthorized()
+    site_id = request.path_params.get("site_id", "")
+    ok = _service().delete_site(site_id)
+    return _json({"status": 1 if ok else 0})
+
+
 def _unauthorized() -> Response:
     return _json({"status": 0, "error": "Sign in to the dashboard first"}, status=401)
 
 
 routes = [
     Route("/", landing),
+    Route("/login/", login, methods=["GET", "POST", "HEAD"]),
+    Route("/login", login, methods=["GET", "POST", "HEAD"]),
     Route("/demo/", demo),
     Route("/demo/{view}/", demo),
     Route("/demo/{view}", demo),
@@ -220,6 +264,10 @@ routes = [
     Route("/hotspot/replay/", capture_recording, methods=["POST", "OPTIONS"]),
     Route("/hotspot/replay", capture_recording, methods=["POST", "OPTIONS"]),
     Route("/hotspot/api/overview/", overview),
+    Route("/hotspot/api/sites/", sites_endpoint, methods=["GET", "POST"]),
+    Route("/hotspot/api/sites", sites_endpoint, methods=["GET", "POST"]),
+    Route("/hotspot/api/sites/{site_id}/", site_delete_endpoint, methods=["DELETE"]),
+    Route("/hotspot/api/sites/{site_id}", site_delete_endpoint, methods=["DELETE"]),
     Route("/hotspot/api/sessions/{session_id}/", session_detail),
     Route("/hotspot/api/sessions/{session_id}/recording/", session_recording),
     Route("/hotspot/api/events/", events_feed),

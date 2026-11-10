@@ -23,6 +23,12 @@ urlpatterns = [
     re_path(r"^hotspot/batch/?$", views.capture, name="hotspot_capture"),
     re_path(r"^hotspot/replay/?$", views.capture_recording, name="hotspot_capture_recording"),
     re_path(r"^hotspot/api/overview/?$", views.overview, name="hotspot_api_overview"),
+    re_path(r"^hotspot/api/sites/?$", views.sites_endpoint, name="hotspot_api_sites"),
+    re_path(
+        r"^hotspot/api/sites/(?P<site_id>[a-z0-9_-]{1,100})/?$",
+        views.site_delete_endpoint,
+        name="hotspot_api_site_delete",
+    ),
     re_path(rf"^hotspot/api/sessions/{SESSION_ID}/?$", views.session_detail, name="hotspot_api_session"),
     re_path(rf"^hotspot/api/sessions/{SESSION_ID}/recording/?$", views.session_recording, name="hotspot_api_recording"),
     re_path(r"^hotspot/api/events/?$", views.events_feed, name="hotspot_api_events"),

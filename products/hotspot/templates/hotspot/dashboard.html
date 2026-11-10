@@ -8,7 +8,7 @@
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Ccircle cx='13' cy='13' r='11' fill='none' stroke='%232563EB' stroke-width='2.75'/%3E%3Ccircle cx='13' cy='13' r='6.25' fill='none' stroke='%233B82F6' stroke-width='1.5' stroke-dasharray='2.5 1.5'/%3E%3Ccircle cx='13' cy='13' r='3.75' fill='%2310B981'/%3E%3Ccircle cx='13' cy='13' r='1.5' fill='%23FFFFFF'/%3E%3C/svg%3E">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Satisfy&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/hotspot/assets/replay.css?v={{ version }}">
     <style>
         :root {
@@ -35,7 +35,6 @@
             --shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 6px 16px rgba(15, 23, 42, 0.05);
             --font: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
             --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-            --cursive: Satisfy, cursive;
         }
         *, *::before, *::after { box-sizing: border-box; }
         html, body { height: 100%; }
@@ -69,20 +68,406 @@
         .brand {
             display: flex;
             align-items: center;
+            gap: 10px;
             height: 56px;
-            padding: 0 18px;
+            padding: 0 16px;
             border-bottom: 1px solid var(--border);
             text-decoration: none;
             color: var(--text);
-            font-family: var(--cursive);
-            font-size: 27px;
+            font-family: var(--font);
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
             line-height: 1;
             white-space: nowrap;
             user-select: none;
         }
-        .brand .word { font-family: var(--cursive); }
-        .brand .o { display: inline-flex; width: 18px; height: 18px; margin: 0 -1px 0 0; position: relative; top: 2px; }
-        .brand .o svg { width: 100%; height: 100%; display: block; }
+        .brand .logo-mark {
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 1px 3px rgba(37, 99, 235, 0.25);
+            flex-shrink: 0;
+        }
+        .brand .logo-mark svg {
+            width: 16px;
+            height: 16px;
+            display: block;
+        }
+        .brand .brand-text {
+            color: var(--text);
+        }
+
+        /* Site Switcher */
+        .site-switcher-wrap {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+        }
+        .site-switcher-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            height: 34px;
+            padding: 0 12px;
+            background: var(--surface);
+            border: 1px solid var(--border-2);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            box-shadow: var(--shadow-sm);
+        }
+        .site-switcher-btn:hover {
+            border-color: var(--brand);
+            background: var(--subtle);
+        }
+        .site-switcher-btn .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            box-shadow: 0 0 0 2px #D1FAE5;
+            flex-shrink: 0;
+        }
+        .site-switcher-btn .dot.inactive {
+            background: var(--muted);
+            box-shadow: none;
+        }
+        .site-label-group {
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+            max-width: 240px;
+            overflow: hidden;
+        }
+        .site-name {
+            font-weight: 600;
+            color: var(--text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .site-domain {
+            font-size: 11.5px;
+            color: var(--muted);
+            font-family: var(--mono);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .site-chevron {
+            color: var(--muted);
+            transition: transform 0.2s ease;
+        }
+        .site-switcher-btn[aria-expanded="true"] .site-chevron {
+            transform: rotate(180deg);
+        }
+        .site-dropdown-menu {
+            position: absolute;
+            top: calc(100% + 6px);
+            left: 0;
+            width: 300px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            box-shadow: var(--shadow);
+            z-index: 1000;
+            overflow: hidden;
+            animation: fadeInMenu 0.15s ease;
+        }
+        @keyframes fadeInMenu {
+            from { opacity: 0; transform: translateY(-4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .site-menu-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border);
+            background: var(--subtle);
+        }
+        .site-menu-title {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--muted);
+        }
+        .btn-add-site-quick {
+            background: transparent;
+            border: 0;
+            color: var(--brand);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        .btn-add-site-quick:hover {
+            background: var(--brand-soft);
+        }
+        .site-menu-list {
+            max-height: 280px;
+            overflow-y: auto;
+            padding: 4px;
+        }
+        .site-menu-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            padding: 8px 10px;
+            border: 0;
+            border-radius: 6px;
+            background: transparent;
+            text-align: left;
+            cursor: pointer;
+            transition: background 0.1s ease;
+            color: var(--text);
+        }
+        .site-menu-item:hover {
+            background: var(--subtle);
+        }
+        .site-menu-item.active {
+            background: var(--brand-soft);
+            color: var(--brand);
+        }
+        .site-menu-item-info {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+        .site-menu-item-name {
+            font-size: 13px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .site-menu-item-domain {
+            font-size: 11px;
+            color: var(--muted);
+            font-family: var(--mono);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .site-menu-badge {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 7px;
+            border-radius: 12px;
+            background: var(--subtle);
+            border: 1px solid var(--border);
+            color: var(--text-2);
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+        .site-menu-badge.live {
+            background: #ECFDF5;
+            border-color: #A7F3D0;
+            color: #047857;
+        }
+
+        /* Sites Table & Setup */
+        .sites-table-wrap {
+            overflow-x: auto;
+        }
+        .sites-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            text-align: left;
+        }
+        .sites-table th {
+            padding: 10px 16px;
+            font-size: 11.5px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--muted);
+            border-bottom: 1px solid var(--border);
+            background: var(--subtle);
+        }
+        .sites-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            color: var(--text);
+            vertical-align: middle;
+        }
+        .sites-table tr:last-child td {
+            border-bottom: 0;
+        }
+        .sites-table tr:hover td {
+            background: rgba(248, 250, 252, 0.6);
+        }
+        .site-status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11.5px;
+            font-weight: 600;
+            padding: 3px 8px;
+            border-radius: 999px;
+            line-height: 1;
+        }
+        .site-status-pill.active {
+            background: #ECFDF5;
+            color: #047857;
+            border: 1px solid #A7F3D0;
+        }
+        .site-status-pill.waiting {
+            background: #FFFBEB;
+            color: #B45309;
+            border: 1px solid #FDE68A;
+        }
+        .site-status-pill .pill-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+        .site-api-key-box {
+            font-family: var(--mono);
+            font-size: 11.5px;
+            background: var(--subtle);
+            border: 1px solid var(--border);
+            padding: 3px 8px;
+            border-radius: 6px;
+            color: var(--text-2);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.5);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            padding: 16px;
+            animation: fadeInOverlay 0.15s ease;
+        }
+        @keyframes fadeInOverlay {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .modal-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            box-shadow: var(--shadow);
+            width: 100%;
+            max-width: 520px;
+            overflow: hidden;
+            animation: slideUpModal 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        @keyframes slideUpModal {
+            from { transform: translateY(12px) scale(0.98); opacity: 0; }
+            to { transform: translateY(0) scale(1); opacity: 1; }
+        }
+        .modal-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            padding: 20px 24px 16px;
+            border-bottom: 1px solid var(--border);
+        }
+        .modal-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text);
+            margin: 0;
+        }
+        .modal-subtitle {
+            font-size: 13px;
+            color: var(--muted);
+            margin: 4px 0 0;
+            line-height: 1.4;
+        }
+        .modal-close {
+            background: transparent;
+            border: 0;
+            font-size: 22px;
+            line-height: 1;
+            color: var(--muted);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 6px;
+        }
+        .modal-close:hover {
+            color: var(--text);
+            background: var(--subtle);
+        }
+        .modal-form {
+            padding: 20px 24px;
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        .form-label {
+            display: block;
+            font-size: 12.5px;
+            font-weight: 600;
+            color: var(--text-2);
+            margin-bottom: 6px;
+        }
+        .form-input {
+            width: 100%;
+            height: 38px;
+            padding: 0 12px;
+            border: 1px solid var(--border-2);
+            border-radius: 8px;
+            font-size: 13.5px;
+            color: var(--text);
+            background: var(--surface);
+            box-sizing: border-box;
+        }
+        .form-input:focus {
+            border-color: var(--brand);
+            outline: 2px solid var(--brand-border);
+        }
+        .modal-actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 24px;
+        }
+        .modal-result {
+            padding: 20px 24px;
+        }
+        .result-success-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: #ECFDF5;
+            color: #047857;
+            border: 1px solid #A7F3D0;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+        .result-lead {
+            font-size: 13.5px;
+            color: var(--text-2);
+            margin-bottom: 10px;
+        }
         .nav { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 2px; }
         .nav-btn {
             display: flex;
@@ -646,22 +1031,16 @@
 <body data-site-url="{{ site_url }}" data-sdk-url="{{ sdk_url }}" data-api-key="{{ api_key }}" data-version="{{ version }}" data-protected="{{ dashboard_protected }}" data-demo="{{ demo_enabled }}" data-replay="{{ replay_enabled }}" data-storage="{{ storage }}">
 <div class="app" id="app">
     <aside class="sidebar">
-        <a class="brand" href="/" aria-label="Hotspot">
-            <span class="word">H</span><span class="o" aria-hidden="true">
-                <svg viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <defs>
-                        <linearGradient id="logoGrad" x1="2" y1="2" x2="24" y2="24" gradientUnits="userSpaceOnUse">
-                            <stop stop-color="#2563EB"/>
-                            <stop offset="1" stop-color="#1D4ED8"/>
-                        </linearGradient>
-                    </defs>
-                    <circle cx="13" cy="13" r="11" stroke="url(#logoGrad)" stroke-width="2.75"/>
-                    <circle cx="13" cy="13" r="6.25" stroke="#3B82F6" stroke-width="1.5" stroke-dasharray="2.5 1.5"/>
-                    <circle cx="13" cy="13" r="3.75" fill="#10B981"/>
-                    <circle cx="13" cy="13" r="1.5" fill="#FFFFFF"/>
+        <div class="brand">
+            <div class="logo-mark">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="12" r="9" stroke="#FFFFFF" stroke-width="2"/>
+                    <circle cx="12" cy="12" r="5" stroke="#93C5FD" stroke-width="1.5" stroke-dasharray="2 2"/>
+                    <circle cx="12" cy="12" r="2.5" fill="#10B981"/>
                 </svg>
-            </span><span class="word">tspot</span>
-        </a>
+            </div>
+            <span class="brand-text">Hotspot</span>
+        </div>
         <nav class="nav" aria-label="Dashboard sections">
             <button class="nav-btn" type="button" data-action="nav" data-tab="overview" title="Overview">
                 <span class="ico" data-icon="home"></span>
@@ -691,13 +1070,13 @@
                 <span class="ico" data-icon="file"></span>
                 <span class="label">Pages</span>
             </button>
-            <button class="nav-btn" type="button" data-action="nav" data-tab="install" title="Install">
-                <span class="ico" data-icon="code"></span>
-                <span class="label">Install</span>
+            <button class="nav-btn" type="button" data-action="nav" data-tab="install" title="Sites &amp; Setup">
+                <span class="ico" data-icon="globe"></span>
+                <span class="label">Sites &amp; Setup</span>
             </button>
         </nav>
         <div class="sidebar-foot">
-            <span class="foot-text"><a href="/">Hotspot</a> <span id="footVersion"></span></span>
+            <span class="foot-text">Hotspot <span id="footVersion"></span></span>
             <button class="btn ghost icon sm" type="button" id="sidebarToggle" data-action="toggle-sidebar" title="Collapse sidebar" aria-label="Collapse sidebar">
                 <span class="ico" id="sidebarToggleIcon"></span>
             </button>
@@ -706,7 +1085,29 @@
 
     <div class="main">
         <header class="topbar">
-            <div class="host"><span class="dot" id="hostDot"></span><span id="hostName"></span></div>
+            <div class="site-switcher-wrap" id="siteSwitcherWrap">
+                <button class="site-switcher-btn" type="button" id="siteSwitcherBtn" aria-haspopup="true" aria-expanded="false">
+                    <span class="dot" id="siteDot"></span>
+                    <span class="site-label-group">
+                        <span class="site-name" id="currentSiteName">All Tracked Sites</span>
+                        <span class="site-domain" id="currentSiteDomain">all</span>
+                    </span>
+                    <svg class="site-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+                <div class="site-dropdown-menu" id="siteDropdownMenu" hidden>
+                    <div class="site-menu-head">
+                        <span class="site-menu-title">Tracked Web Properties</span>
+                        <button class="btn-add-site-quick" type="button" id="btnQuickAddSite">+ New Site</button>
+                    </div>
+                    <div class="site-menu-list" id="siteMenuList">
+                        <!-- Rendered dynamically -->
+                    </div>
+                </div>
+            </div>
+            <button class="btn sm" type="button" id="topbarAddSiteBtn" style="border-style: dashed;">
+                <span class="ico" data-icon="plus"></span>
+                <span>Add Site</span>
+            </button>
             <div class="spacer"></div>
             <label class="updated" for="hoursSelect" hidden>Time range</label>
             <select class="select" id="hoursSelect" aria-label="Time range">
@@ -1038,93 +1439,85 @@
                 </div>
             </section>
 
-            <!-- Install -->
+            <!-- Sites & Setup -->
             <section class="tab" data-tab="install" id="tab-install">
-                <div class="page-head"><h1>Install</h1><p>Four steps, each with a test. The first visit shows up in the dashboard a few seconds after step 2.</p></div>
-                <div class="wizard">
-                    <ol class="wsteps" id="wizardSteps">
-                        <li><button type="button" data-action="install-step" data-step="1"><span class="n">1</span>Lock the server down</button></li>
-                        <li><button type="button" data-action="install-step" data-step="2"><span class="n">2</span>Add the script</button></li>
-                        <li><button type="button" data-action="install-step" data-step="3"><span class="n">3</span>Names and goals</button></li>
-                        <li><button type="button" data-action="install-step" data-step="4"><span class="n">4</span>Done</button></li>
-                    </ol>
-                    <div class="card step" data-step="1" id="step1">
-                        <div class="sbody">
-                            <h2>Lock the server down <span id="keysStatus"></span></h2>
-                            <p class="lead">Set these two values in the environment of the server running Hotspot, in <code>.env.hotspot</code> for the full stack or next to the standalone command. The key goes in the script tag in step 2, so only your site can send data. The password protects this dashboard.</p>
-                            <pre class="snippet"><code id="envSnippet"></code><button class="btn sm" type="button" data-action="copy" data-target="envSnippet"><span class="ico" data-icon="copy"></span>Copy</button></pre>
-                            <p class="lead" style="margin-top: 10px;">Both values were generated in this browser just now and exist nowhere else. Restart the server after setting them, then press Test.</p>
-                            <div class="checks" id="serverChecks"></div>
-                            <div class="tbox" id="test1" hidden></div>
-                        </div>
+                <div class="page-head">
+                    <div>
+                        <h1>Sites &amp; Setup</h1>
+                        <p>Manage your tracked web properties, copy embed snippets, and verify live telemetry.</p>
                     </div>
-                    <div class="card step" data-step="2" id="step2" hidden>
-                        <div class="sbody">
-                            <h2>Add the script to your site</h2>
-                            <p class="lead">Paste this tag into the <code>&lt;head&gt;</code> of every page, before your other scripts. That is the whole install: page views, clicks, rage clicks, errors, web vitals and session replay all come from this one line.</p>
-                            <pre class="snippet"><code id="snippetInstall">&lt;script src="{{ sdk_url }}" data-api-key="{{ api_key }}" defer&gt;&lt;/script&gt;</code><button class="btn sm" type="button" data-action="copy" data-target="snippetInstall"><span class="ico" data-icon="copy"></span>Copy</button></pre>
-                            <div class="row">
-                                <button class="btn" type="button" data-action="copy" data-target="promptText"><span class="ico" data-icon="sparkles"></span>Copy a prompt for your AI coding tool</button>
-                                <button class="btn ghost" type="button" data-action="toggle-prompt" id="promptToggle">Show the prompt</button>
-                            </div>
-                            <textarea id="promptText" readonly hidden aria-label="Prompt for an AI coding tool"></textarea>
-                            <p class="lead" style="margin-top: 12px;">Press Test, then open your site in another tab and click around. The test passes as soon as that visit reaches this server.</p>
-                            <div class="tbox" id="test2" hidden></div>
-                        </div>
-                    </div>
-                    <div class="card step" data-step="3" id="step3" hidden>
-                        <div class="sbody">
-                            <h2>Names and goals</h2>
-                            <p class="lead">Tell Hotspot who a visitor is after they sign in, so sessions show a name instead of "Visitor 4a8b2c". Then name the events that count as a goal, so the funnel and the conversion rate mean something to you. Both are optional.</p>
-                            <pre class="snippet"><code id="identifySnippet"></code><button class="btn sm" type="button" data-action="copy" data-target="identifySnippet"><span class="ico" data-icon="copy"></span>Copy</button></pre>
-                            <p class="lead" style="margin-top: 10px;" id="conversionNote"></p>
-                            <p class="lead" style="margin-top: 10px;">Press Test to send a named test visitor and a goal event from this browser through the same endpoint your site uses. It shows up in Sessions as "Install test".</p>
-                            <div class="tbox" id="test3" hidden></div>
-                        </div>
-                    </div>
-                    <div class="card step" data-step="4" id="step4" hidden>
-                        <div class="sbody">
-                            <h2>Done</h2>
-                            <p class="lead">Here is where everything stands. Anything still amber can be fixed later from this page.</p>
-                            <div class="checks" id="doneChecks"></div>
-                            <div class="row">
-                                <button class="btn primary" type="button" data-action="nav" data-tab="overview">Open the overview</button>
-                                <button class="btn" type="button" data-action="nav" data-tab="sessions">Watch a session</button>
-                                <a class="btn" href="/demo/" target="_blank" rel="noopener" id="demoLinkDone" hidden><span class="ico" data-icon="external"></span>Try the sample site</a>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="wfoot">
-                        <button class="btn" type="button" data-action="install-back" id="installBack">Back</button>
-                        <span class="spacer"></span>
-                        <button class="btn" type="button" data-action="install-test" id="installTest"><span class="ico" data-icon="check"></span>Test this step</button>
-                        <button class="btn primary" type="button" data-action="install-next" id="installNext">Next</button>
+                    <div class="right">
+                        <button class="btn primary" type="button" id="btnOpenAddSiteFromTab">
+                            <span class="ico" data-icon="plus"></span>
+                            <span>Add New Site</span>
+                        </button>
                     </div>
                 </div>
+
+                <!-- 1. Tracked Sites Directory -->
+                <div class="card mb-20" style="margin-bottom: 20px;">
+                    <div class="card-head">
+                        <div>
+                            <h2 style="font-size: 15px; font-weight: 600; margin: 0;">Tracked Web Properties</h2>
+                            <p class="muted" style="font-size: 12.5px; margin: 3px 0 0;">Websites and applications currently streaming data into this Hotspot instance.</p>
+                        </div>
+                    </div>
+                    <div class="sites-table-wrap">
+                        <table class="sites-table" id="sitesTable">
+                            <thead>
+                                <tr>
+                                    <th>Website / App</th>
+                                    <th>Domain</th>
+                                    <th>Tracking Key</th>
+                                    <th>Status</th>
+                                    <th>Sessions</th>
+                                    <th style="text-align: right;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sitesTableBody">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 2. Installation Guide for Selected Site -->
+                <div class="card mb-20" id="installGuideCard" style="margin-bottom: 20px;">
+                    <div class="sbody">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                            <div>
+                                <h2 style="font-size: 16px; font-weight: 600; margin: 0;">1-Line Embed Script for <span id="installSiteLabel" style="color: var(--brand);">Current Site</span></h2>
+                                <p class="lead" style="margin-top: 4px;">Paste this tag into the <code>&lt;head&gt;</code> of your website. Clicks, rage clicks, session replays, and dropoffs are recorded automatically.</p>
+                            </div>
+                        </div>
+
+                        <pre class="snippet"><code id="snippetInstallDynamic">&lt;script src="{{ sdk_url }}" data-api-host="{{ site_url }}" data-api-key="{{ api_key }}" defer&gt;&lt;/script&gt;</code><button class="btn sm" type="button" id="btnCopyInstallDynamic"><span class="ico" data-icon="copy"></span><span id="copyInstallBtnText">Copy Script</span></button></pre>
+
+                        <div class="verify-bar" style="margin-top: 16px; display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--subtle); border-radius: 8px; border: 1px solid var(--border);">
+                            <button class="btn primary sm" type="button" id="btnVerifyConnection">
+                                <span class="ico" data-icon="check"></span>
+                                <span>Verify Real-time Connection</span>
+                            </button>
+                            <span class="muted" id="verifyStatusText" style="font-size: 12.5px;">Click to verify whether telemetry from your site is reaching Hotspot.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Reference Options -->
                 <div class="ref">
                     <details>
-                        <summary><span class="ico" data-icon="chevronRight"></span>Script options</summary>
+                        <summary><span class="ico" data-icon="chevronRight"></span>Framework &amp; CMS Integration Guides (React, Next.js, HTML)</summary>
                         <div class="card-body">
-                            <dl class="kv">
-                                <dt><code>data-api-key</code></dt><dd>The key sent with every event. Required.</dd>
-                                <dt><code>data-api-host</code></dt><dd>Where events are sent. Defaults to the host the script came from.</dd>
-                                <dt><code>data-autocapture="false"</code></dt><dd>Turn off click and form capture.</dd>
-                                <dt><code>data-capture-errors="false"</code></dt><dd>Turn off JavaScript error capture.</dd>
-                                <dt><code>data-capture-pageview="false"</code></dt><dd>Turn off automatic page views.</dd>
-                                <dt><code>data-replay="false"</code></dt><dd>Turn off the session recording. The event timeline still works.</dd>
-                                <dt><code>data-mask-inputs="all"</code></dt><dd>Mask every typed value in the recording. Password and payment fields are always masked.</dd>
-                                <dt><code>data-mask-text="true"</code></dt><dd>Mask all text on the page in the recording.</dd>
-                                <dt><code>data-capture-console="false"</code></dt><dd>Leave console output out of the recording.</dd>
-                                <dt><code>data-capture-network="false"</code></dt><dd>Leave network requests out of the recording.</dd>
-                                <dt><code>data-capture-web-vitals="false"</code></dt><dd>Turn off web vitals.</dd>
-                                <dt><code>data-debug="true"</code></dt><dd>Log every captured event to the browser console.</dd>
-                                <dt><code>data-debug-hud="true"</code></dt><dd>Show an on-page overlay of your own clicks. Toggle it with Alt+H, or add <code>?hotspot_debug_hud=1</code> to a URL.</dd>
-                                <dt><code>data-hotspot-mask</code></dt><dd>On any element: mask its text and typed values in the recording.</dd>
-                                <dt><code>data-hotspot-block</code></dt><dd>On any element: replace it with an empty box of the same size in the recording.</dd>
-                            </dl>
+                            <h4 style="margin: 0 0 6px 0; font-size: 13px;">React / Next.js (App Router)</h4>
+                            <p class="muted" style="font-size: 12px; margin-bottom: 8px;">Add to <code>app/layout.tsx</code> inside <code>&lt;head&gt;</code>:</p>
+                            <pre class="snippet" style="margin-bottom: 16px;"><code>&lt;Script src="{{ sdk_url }}" data-api-host="{{ site_url }}" data-api-key="YOUR_KEY" strategy="afterInteractive" /&gt;</code></pre>
+                            
+                            <h4 style="margin: 0 0 6px 0; font-size: 13px;">Plain HTML / WordPress / Webflow</h4>
+                            <p class="muted" style="font-size: 12px; margin-bottom: 8px;">Paste right before <code>&lt;/head&gt;</code>:</p>
+                            <pre class="snippet"><code>&lt;script src="{{ sdk_url }}" data-api-host="{{ site_url }}" data-api-key="YOUR_KEY" defer&gt;&lt;/script&gt;</code></pre>
                         </div>
                     </details>
-                    <details>
+                    <details style="margin-top: 8px;">
                         <summary><span class="ico" data-icon="chevronRight"></span>JavaScript API (window.hotspot)</summary>
                         <div class="card-body">
                             <ul class="api-list">
@@ -1142,12 +1535,50 @@
                             </ul>
                         </div>
                     </details>
-                    <details>
+                    <details style="margin-top: 8px;">
                         <summary><span class="ico" data-icon="chevronRight"></span>This server</summary>
                         <div class="card-body"><dl class="kv" id="setupFacts"></dl></div>
                     </details>
                 </div>
             </section>
+        </main>
+    </div>
+</div>
+
+<!-- Modal: Add New Site -->
+<div class="modal-overlay" id="addSiteModal" hidden>
+    <div class="modal-card">
+        <div class="modal-header">
+            <div>
+                <h2 class="modal-title">Track a New Website or App</h2>
+                <p class="modal-subtitle">Generate a 1-line tracking script and begin capturing dropoff corridors and session replays.</p>
+            </div>
+            <button class="modal-close" type="button" id="closeAddSiteModal" aria-label="Close">&times;</button>
+        </div>
+        <form id="addSiteForm" class="modal-form">
+            <div class="form-group">
+                <label class="form-label" for="newSiteName">Website or App Name</label>
+                <input class="form-input" id="newSiteName" type="text" placeholder="e.g. Buxa Production App" required autofocus>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="newSiteDomain">Domain or Hostname</label>
+                <input class="form-input" id="newSiteDomain" type="text" placeholder="e.g. buxa.ai, app.buxa.ai, or mysite.com" required>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn" id="cancelAddSite">Cancel</button>
+                <button type="submit" class="btn primary" id="submitAddSite">Create Site &amp; Get Script →</button>
+            </div>
+        </form>
+        <div id="newSiteResult" class="modal-result" hidden>
+            <div class="result-success-badge">Site Created Successfully! ✓</div>
+            <p class="result-lead">Embed this 1-line script into the <code>&lt;head&gt;</code> of <strong id="resSiteDomain"></strong>:</p>
+            <pre class="snippet"><code id="newSiteSnippetCode"></code><button class="btn sm" type="button" id="btnCopyNewSiteSnippet"><span class="ico" data-icon="copy"></span><span id="copySiteBtnText">Copy Script</span></button></pre>
+            <div class="modal-actions" style="margin-top: 16px;">
+                <button type="button" class="btn primary" id="btnDoneAddSite">Done &amp; View in Dashboard</button>
+            </div>
+        </div>
+    </div>
+</div>
         </main>
     </div>
 </div>
@@ -1428,6 +1859,7 @@
     var state = {
         tab: 'overview',
         hours: 24,
+        site: store('selected_site') || 'all',
         status: 'all',
         device: 'all',
         browser: 'all',
@@ -1488,7 +1920,7 @@
 
     // ---------- Networking ----------
 
-    function api(path, params) {
+    function api(path, params, options) {
         var url = path;
         if (params) {
             var parts = [];
@@ -1499,7 +1931,15 @@
             });
             if (parts.length) { url += '?' + parts.join('&'); }
         }
-        return fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } }).then(function (response) {
+        var opts = Object.assign({
+            credentials: 'same-origin',
+            headers: { Accept: 'application/json' }
+        }, options || {});
+        if (opts.body && typeof opts.body === 'string' && (!opts.headers || !opts.headers['Content-Type'])) {
+            opts.headers = opts.headers || {};
+            opts.headers['Content-Type'] = 'application/json';
+        }
+        return fetch(url, opts).then(function (response) {
             if (response.status === 401) {
                 window.location.href = '/dashboard/login/';
                 var unauthorized = new Error('unauthorized');
@@ -1531,6 +1971,9 @@
             limit: '200',
             tz_offset: String(-new Date().getTimezoneOffset())
         };
+        if (state.site && state.site !== 'all') {
+            params.site = state.site;
+        }
         var spec = funnelSpec();
         if (spec) { params.funnel = spec; }
         return params;
@@ -1606,15 +2049,15 @@
 
     function renderUpdated() {
         var node = $('updated');
-        var dot = $('hostDot');
+        var dot = $('siteDot');
         if (state.failing) {
             node.textContent = "Couldn't reach the server. Retrying.";
             node.classList.add('bad');
-            dot.classList.add('bad');
+            if (dot) { dot.classList.add('bad'); }
             return;
         }
         node.classList.remove('bad');
-        dot.classList.remove('bad');
+        if (dot) { dot.classList.remove('bad'); }
         if (!state.loadedAt) { node.textContent = state.inflight ? 'Loading' : ''; return; }
         node.textContent = 'Updated ' + fmtAgo((Date.now() - state.loadedAt) / 1000);
     }
@@ -1651,6 +2094,8 @@
         if (!o) { return; }
         renderNotices(o.setup);
         renderNavCounts(o.metrics, o.realtime);
+        renderSiteSwitcher(o.sites, o.current_site || state.site);
+        renderSitesTab(o.sites, o.current_site || state.site, o.setup);
         renderOverview(o);
         renderRealtime(o);
         renderFilters(o.breakdowns);
@@ -1660,7 +2105,6 @@
         renderFlow(o);
         renderBreakage(o);
         renderPages(o.pages, o.referrers);
-        renderInstall(o.setup, o.scope, o.metrics);
     }
 
     // ---------- Shared pieces ----------
@@ -3692,211 +4136,323 @@
         });
     }
 
-    // ---------- Install ----------
+    // ---------- Sites & Setup ----------
 
-    var generatedKeys = { key: 'hs_' + randomToken(24), password: randomToken(20) };
+    function renderSiteSwitcher(sites, currentSite) {
+        currentSite = currentSite || state.site || 'all';
+        var nameNode = $('currentSiteName');
+        var domainNode = $('currentSiteDomain');
+        var siteDot = $('siteDot');
+        var listNode = $('siteMenuList');
 
-    function statusChipFor(ok, okText, badText) {
-        return el('span', { class: 'chip ' + (ok ? 'ok' : 'warn') }, [icon(ok ? 'check' : 'alert'), ok ? okText : badText]);
-    }
+        var selectedObj = (sites || []).filter(function (s) {
+            return s.domain === currentSite || s.id === currentSite;
+        })[0];
 
-    function installPrompt(setup) {
-        var snippet = '<script src="' + (setup.sdk_url || CONFIG.sdkUrl) + '" data-api-key="' + (setup.api_key || CONFIG.apiKey) + '" defer><' + '/script>';
-        var host = setup.site_url || CONFIG.siteUrl;
-        return [
-            'Add Hotspot, a self-hosted analytics and session replay script, to this website.',
-            '',
-            '1. Put this script tag in the <head> of every page, before other scripts:',
-            '   ' + snippet,
-            '2. If the site is a single-page app, nothing else is needed: route changes are tracked automatically.',
-            '3. After a user signs in, call window.hotspot.identify(userId, { email, name }) once.',
-            '4. Add the attribute data-hotspot-mask to any input or element that shows private data. Password and payment fields are masked automatically.',
-            '5. When the user completes something important (signed up, paid, booked), call window.hotspot.capture("event_name", { ...details }) and tell me which event names you used so I can set them as goals.',
-            '',
-            'Do not add any other analytics code. When done, open a page in the browser and confirm it sends requests to ' + host + '/hotspot/batch/.'
-        ].join('\n');
-    }
+        if (currentSite === 'all' || !selectedObj) {
+            if (nameNode) nameNode.textContent = 'All Tracked Sites';
+            if (domainNode) domainNode.textContent = (sites && sites.length ? sites.length + ' properties' : 'all');
+            if (siteDot) siteDot.className = 'dot';
+        } else {
+            if (nameNode) nameNode.textContent = selectedObj.name;
+            if (domainNode) domainNode.textContent = selectedObj.domain;
+            if (siteDot) siteDot.className = 'dot' + (selectedObj.active_visitors > 0 ? '' : ' inactive');
+        }
 
-    var install = { step: 1, testing: false, watchSeq: 0, passed: {} };
-    var INSTALL_STEPS = 4;
-    var TEST_WATCH_MS = 90000;
-    var TEST_POLL_MS = 3000;
+        if (!listNode) return;
+        clear(listNode);
 
-    function testBox(step, kind, title, text) {
-        var box = $('test' + step);
-        if (!box) { return; }
-        box.hidden = false;
-        box.className = 'tbox' + (kind ? ' ' + kind : '');
-        clear(box);
-        box.appendChild(el('span', { class: 'ldot' }));
-        box.appendChild(el('div', { class: 'txt' }, [el('b', { text: title }), text || '']));
-    }
-
-    function showInstallStep(step) {
-        install.step = clamp(step, 1, INSTALL_STEPS);
-        store('install.step', String(install.step));
-        Array.prototype.forEach.call(document.querySelectorAll('#tab-install .step'), function (card) {
-            card.hidden = Number(card.getAttribute('data-step')) !== install.step;
+        // 1. "All Tracked Sites" option
+        var totalAllSessions = (sites || []).reduce(function (sum, s) { return sum + (s.total_sessions || 0); }, 0);
+        var allItem = el('button', {
+            class: 'site-menu-item' + (currentSite === 'all' ? ' active' : ''),
+            type: 'button',
+            'data-site': 'all'
+        }, [
+            el('div', { class: 'site-menu-item-info' }, [
+                el('span', { class: 'site-menu-item-name', text: 'All Tracked Sites' }),
+                el('span', { class: 'site-menu-item-domain', text: 'Aggregate fleet view' })
+            ]),
+            el('span', { class: 'site-menu-badge', text: totalAllSessions ? fmtNum(totalAllSessions) + ' visits' : '0' })
+        ]);
+        allItem.addEventListener('click', function () {
+            selectSite('all');
         });
-        Array.prototype.forEach.call($('wizardSteps').querySelectorAll('button'), function (button) {
-            var n = Number(button.getAttribute('data-step'));
-            button.classList.toggle('active', n === install.step);
-            button.classList.toggle('done', n !== install.step && !!install.passed[n]);
+        listNode.appendChild(allItem);
+
+        // Divider
+        var div = el('div', { style: 'height: 1px; background: var(--border); margin: 4px 0;' });
+        listNode.appendChild(div);
+
+        // 2. Individual sites
+        (sites || []).forEach(function (s) {
+            var isSel = currentSite === s.domain || currentSite === s.id;
+            var item = el('button', {
+                class: 'site-menu-item' + (isSel ? ' active' : ''),
+                type: 'button',
+                'data-site': s.domain
+            }, [
+                el('div', { class: 'site-menu-item-info' }, [
+                    el('span', { class: 'site-menu-item-name', text: s.name }),
+                    el('span', { class: 'site-menu-item-domain', text: s.domain })
+                ]),
+                el('span', {
+                    class: 'site-menu-badge' + (s.active_visitors > 0 ? ' live' : ''),
+                    text: s.active_visitors > 0 ? s.active_visitors + ' online' : fmtNum(s.total_sessions || 0) + ' visits'
+                })
+            ]);
+            item.addEventListener('click', function () {
+                selectSite(s.domain);
+            });
+            listNode.appendChild(item);
         });
-        $('installBack').disabled = install.step === 1;
-        $('installTest').hidden = install.step === INSTALL_STEPS;
-        $('installNext').hidden = install.step === INSTALL_STEPS;
     }
 
-    function installChecks(setup, scope) {
-        return [
-            [!!setup.ingestion_keys_configured, 'Only your keys are accepted', 'Any key is accepted right now'],
-            [!!setup.dashboard_protected, 'Dashboard has a password', 'Dashboard has no password'],
-            [setup.storage === 'redis', 'Data is kept in Redis', 'Data is kept in memory and lost on restart'],
-            [!!setup.replay_enabled, 'Session replay is on', 'Session replay is off'],
-            [!!(scope && scope.sessions_stored), 'Visits are arriving', 'No visit has arrived yet']
-        ];
+    function selectSite(siteDomain) {
+        state.site = siteDomain;
+        store('selected_site', siteDomain);
+        var menu = $('siteDropdownMenu');
+        var btn = $('siteSwitcherBtn');
+        if (menu) menu.hidden = true;
+        if (btn) btn.setAttribute('aria-expanded', 'false');
+        reloadForFilters();
     }
 
-    function fillChecks(node, rows) {
-        clear(node);
-        rows.forEach(function (row) { node.appendChild(statusChipFor(row[0], row[1], row[2])); });
+    function generateEmbedSnippet(apiKey, domain) {
+        var sdk = CONFIG.sdkUrl || '/hotspot/assets/hotspot.js';
+        var host = CONFIG.siteUrl || window.location.origin;
+        return '<script src="' + sdk + '" data-api-host="' + host + '" data-api-key="' + apiKey + '" defer></' + 'script>';
     }
 
-    // Step 1 asks the server for its settings again, so a restart after editing .env shows up at once.
-    function testServer() {
-        install.testing = true;
-        testBox(1, '', 'Checking the server', 'Asking it which settings are in place.');
-        api('/hotspot/api/overview/', { hours: '1', limit: '1' }).then(function (data) {
-            var setup = data.setup || {};
-            var ok = !!setup.ingestion_keys_configured && !!setup.dashboard_protected;
-            install.passed[1] = ok;
-            fillChecks($('serverChecks'), installChecks(setup, data.scope).slice(0, 4));
-            testBox(1, ok ? 'ok' : 'bad', ok ? 'The server is locked down.' : 'Not locked down yet.',
-                ok ? 'Only your keys are accepted and the dashboard asks for a password.' : (setup.ingestion_keys_configured ? 'The password is missing: set HOTSPOT_DASHBOARD_PASSWORD, restart the server and test again.' : 'Set both values, restart the server and test again. Until then any key is accepted.'));
-            state.overview = state.overview || data;
-            showInstallStep(install.step);
-        }).catch(function (err) {
-            if (err.unauthorized) { return; }
-            testBox(1, 'bad', "Couldn't reach the server.", 'Is it running? Restart it and test again.');
-        }).then(function () { install.testing = false; });
+    function renderSitesTab(sites, currentSite, setup) {
+        setup = setup || {};
+        sites = sites || [];
+        var tbody = $('sitesTableBody');
+        if (tbody) {
+            clear(tbody);
+            if (!sites.length) {
+                var emptyRow = el('tr', null, [
+                    el('td', { colspan: '6', style: 'text-align: center; color: var(--muted); padding: 28px;' }, 'No web properties registered yet. Click "Add New Site" above to begin tracking.')
+                ]);
+                tbody.appendChild(emptyRow);
+            } else {
+                sites.forEach(function (s) {
+                    var isCurrent = (currentSite === s.domain || currentSite === s.id);
+                    var hasData = (s.total_sessions || 0) > 0;
+                    var row = el('tr', null, [
+                        el('td', null, [
+                            el('div', { style: 'font-weight: 600;' }, s.name),
+                            el('div', { class: 'muted', style: 'font-size: 11px;' }, 'Created ' + (s.created_at ? fmtDay(s.created_at) : 'recently'))
+                        ]),
+                        el('td', null, el('span', { class: 'mono', style: 'color: var(--brand); font-weight: 500;' }, s.domain)),
+                        el('td', null, el('div', { class: 'site-api-key-box' }, [
+                            el('span', { text: s.api_key }),
+                            el('button', {
+                                class: 'btn ghost icon xs',
+                                type: 'button',
+                                title: 'Copy API Key',
+                                'aria-label': 'Copy API Key',
+                                style: 'padding: 1px 4px; height: auto;'
+                            }, icon('copy'))
+                        ])),
+                        el('td', null, el('span', {
+                            class: 'site-status-pill ' + (s.active_visitors > 0 || hasData ? 'active' : 'waiting')
+                        }, [
+                            el('span', { class: 'pill-dot' }),
+                            document.createTextNode(s.active_visitors > 0 ? (s.active_visitors + ' online') : (hasData ? 'Active' : 'Awaiting data'))
+                        ])),
+                        el('td', null, el('span', { style: 'font-variant-numeric: tabular-nums; font-weight: 600;' }, fmtNum(s.total_sessions || 0))),
+                        el('td', { style: 'text-align: right;' }, [
+                            el('button', {
+                                class: 'btn sm' + (isCurrent ? ' primary' : ''),
+                                type: 'button',
+                                style: 'margin-right: 6px;',
+                                text: isCurrent ? 'Viewing' : 'Switch'
+                            }),
+                            el('button', {
+                                class: 'btn sm ghost',
+                                type: 'button',
+                                title: 'Copy 1-line script',
+                                'aria-label': 'Copy 1-line script'
+                            }, [icon('code'), document.createTextNode('Script')])
+                        ])
+                    ]);
+
+                    var copyKeyBtn = row.querySelector('.site-api-key-box button');
+                    if (copyKeyBtn) {
+                        copyKeyBtn.addEventListener('click', function (e) {
+                            e.stopPropagation();
+                            copyText(s.api_key, copyKeyBtn);
+                        });
+                    }
+
+                    var actionBtns = row.querySelectorAll('td:last-child button');
+                    if (actionBtns[0]) {
+                        actionBtns[0].addEventListener('click', function () {
+                            selectSite(s.domain);
+                        });
+                    }
+                    if (actionBtns[1]) {
+                        actionBtns[1].addEventListener('click', function () {
+                            copyText(s.snippet || generateEmbedSnippet(s.api_key, s.domain), actionBtns[1]);
+                        });
+                    }
+
+                    tbody.appendChild(row);
+                });
+            }
+        }
+
+        // Active site script embed card
+        var activeSiteObj = sites.filter(function (s) {
+            return s.domain === currentSite || s.id === currentSite;
+        })[0] || sites[0];
+
+        var activeKey = activeSiteObj ? activeSiteObj.api_key : (setup.api_key || CONFIG.apiKey);
+        var activeDomain = activeSiteObj ? activeSiteObj.domain : (CONFIG.siteUrl || 'your website');
+        var activeName = activeSiteObj ? activeSiteObj.name : 'Your Website';
+
+        var labelEl = $('installSiteLabel');
+        if (labelEl) labelEl.textContent = activeName + ' (' + activeDomain + ')';
+
+        var snippetCode = generateEmbedSnippet(activeKey, activeDomain);
+        var snippetEl = $('snippetInstallDynamic');
+        if (snippetEl) snippetEl.textContent = snippetCode;
+
+        var copyBtn = $('btnCopyInstallDynamic');
+        if (copyBtn) {
+            copyBtn.onclick = function () {
+                copyText(snippetCode, copyBtn);
+            };
+        }
     }
 
-    // Step 2 waits for a visit that starts after the button was pressed, from any page with the script.
-    function testArrival() {
-        var seq = ++install.watchSeq;
-        var startedAt = serverNow();
-        var deadline = Date.now() + TEST_WATCH_MS;
-        install.testing = true;
-        testBox(2, '', 'Waiting for a visit.', 'Open your site in another tab and click around. This keeps watching for 90 seconds.');
-        function poll() {
-            if (seq !== install.watchSeq) { return; }
-            api('/hotspot/api/overview/', { hours: '1', limit: '20' }).then(function (data) {
-                if (seq !== install.watchSeq) { return; }
-                var fresh = (data.sessions || []).filter(function (s) { return isNum(s.first_seen) && s.first_seen >= startedAt - 5 && String(s.distinct_id || '').indexOf('install-test') !== 0; })[0];
-                if (fresh) {
-                    install.passed[2] = true;
-                    install.testing = false;
-                    var where = fresh.entry_url ? hostOf(fresh.entry_url) + (fresh.entry_page || '') : (fresh.entry_page || 'your site');
-                    testBox(2, 'ok', 'It works.', 'A visit from ' + where + ' arrived ' + plural(Math.max(1, Math.round(serverNow() - fresh.first_seen)), 'second', 'seconds') + ' after it started. Replay, clicks and errors ride along with it.');
-                    showInstallStep(install.step);
-                    return;
+    function setupSiteModalAndVerify() {
+        var modal = $('addSiteModal');
+        var form = $('addSiteForm');
+        var openBtns = [$('btnOpenAddSiteFromTab'), $('topbarAddSiteBtn'), $('btnQuickAddSite')];
+        var closeBtn = $('closeAddSiteModal');
+        var cancelBtn = $('cancelAddSite');
+        var doneBtn = $('btnDoneAddSite');
+        var copySnippetBtn = $('btnCopyNewSiteSnippet');
+
+        function openModal() {
+            if (!modal) return;
+            modal.hidden = false;
+            if (form) {
+                form.hidden = false;
+                form.reset();
+            }
+            var res = $('newSiteResult');
+            if (res) res.hidden = true;
+            var nameInput = $('newSiteName');
+            if (nameInput) setTimeout(function () { nameInput.focus(); }, 50);
+            var menu = $('siteDropdownMenu');
+            if (menu) menu.hidden = true;
+        }
+
+        function closeModal() {
+            if (modal) modal.hidden = true;
+        }
+
+        openBtns.forEach(function (btn) {
+            if (btn) btn.addEventListener('click', openModal);
+        });
+        if (closeBtn) closeBtn.addEventListener('click', closeModal);
+        if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+
+        if (form) {
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                var name = ($('newSiteName').value || '').trim();
+                var domain = ($('newSiteDomain').value || '').trim().toLowerCase()
+                    .replace(/^https?:\/\//, '')
+                    .replace(/\/.*$/, '');
+                if (!name || !domain) return;
+
+                var submitBtn = $('submitAddSite');
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = 'Generating...';
                 }
-                if (Date.now() < deadline) { setTimeout(poll, TEST_POLL_MS); return; }
-                install.testing = false;
-                testBox(2, 'bad', 'Nothing arrived in 90 seconds.', 'Check that the tag is in the <head> with the key from step 1, that the page can reach ' + (CONFIG.siteUrl || 'this server') + ', and that no ad blocker is running on that page. Then test again.');
-            }).catch(function (err) {
-                if (err.unauthorized || seq !== install.watchSeq) { return; }
-                if (Date.now() < deadline) { setTimeout(poll, TEST_POLL_MS); return; }
-                install.testing = false;
-                testBox(2, 'bad', "Couldn't reach the server.", 'Restart it and test again.');
+
+                api('/hotspot/api/sites/', null, {
+                    method: 'POST',
+                    body: JSON.stringify({ name: name, domain: domain })
+                }).then(function (res) {
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Create Site & Get Script →';
+                    }
+                    if (res.status === 1 && res.site) {
+                        form.hidden = true;
+                        var resultBox = $('newSiteResult');
+                        resultBox.hidden = false;
+                        $('resSiteDomain').textContent = res.site.domain;
+                        var snippet = res.site.snippet || generateEmbedSnippet(res.site.api_key, res.site.domain);
+                        $('newSiteSnippetCode').textContent = snippet;
+                        if (copySnippetBtn) {
+                            copySnippetBtn.onclick = function () {
+                                copyText(snippet, copySnippetBtn);
+                            };
+                        }
+                        if (doneBtn) {
+                            doneBtn.onclick = function () {
+                                closeModal();
+                                selectSite(res.site.domain);
+                            };
+                        }
+                    }
+                }).catch(function (err) {
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Create Site & Get Script →';
+                    }
+                    alert('Error creating site: ' + (err.message || 'Please check input.'));
+                });
             });
         }
-        poll();
-    }
 
-    // Step 3 sends a named visitor and a goal event through the capture endpoint, then waits for them in the feed.
-    function testGoal() {
-        var now = Date.now();
-        var sessionId = 'install-test-' + now;
-        var props = { distinct_id: 'install-test', $session_id: sessionId, $pathname: '/install-test', $current_url: (CONFIG.siteUrl || '') + '/install-test', $title: 'Install test', $timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, $viewport_width: window.innerWidth, $viewport_height: window.innerHeight };
-        var batch = [
-            { event: '$pageview', timestamp: now, properties: props },
-            { event: '$identify', timestamp: now + 1, properties: Object.assign({ $set: { name: 'Install test' } }, props) },
-            { event: 'install_test_goal', timestamp: now + 2, properties: Object.assign({ source: 'install page' }, props) }
-        ];
-        install.testing = true;
-        testBox(3, '', 'Sending a test visitor and a goal event.', 'Through ' + (CONFIG.siteUrl || '') + '/hotspot/batch/, the same endpoint your site uses.');
-        fetch('/hotspot/batch/', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ api_key: CONFIG.apiKey, batch: batch }) }).then(function (response) {
-            if (!response.ok) { throw new Error('The capture endpoint answered ' + response.status + (response.status === 401 ? '. The key in the snippets is not one of HOTSPOT_API_KEYS.' : '.')); }
-            var deadline = Date.now() + 20000;
-            function poll() {
-                api('/hotspot/api/events/', { since: String(now / 1000 - 1), limit: '200' }).then(function (data) {
-                    var seen = (data.events || []).some(function (e) { return e.event === 'install_test_goal' && e.session_id === sessionId; });
-                    if (seen) {
-                        install.passed[3] = true;
-                        install.testing = false;
-                        testBox(3, 'ok', 'The server received it in ' + ((Date.now() - now) / 1000).toFixed(1) + ' seconds.', 'Sessions now lists a visitor called "Install test". Add install_test_goal to HOTSPOT_CONVERSION_EVENTS and that session would count as converted.');
-                        showInstallStep(install.step);
-                        loadOverview();
-                        return;
-                    }
-                    if (Date.now() < deadline) { setTimeout(poll, 1500); return; }
-                    install.testing = false;
-                    testBox(3, 'bad', 'The event was accepted but has not shown up yet.', 'Refresh the dashboard in a moment. If it never appears, the server may be writing to a different store than it reads from.');
-                }).catch(function () { if (Date.now() < deadline) { setTimeout(poll, 1500); } else { install.testing = false; testBox(3, 'bad', "Couldn't read the event feed.", 'Reload the dashboard and test again.'); } });
-            }
-            poll();
-        }).catch(function (err) {
-            install.testing = false;
-            testBox(3, 'bad', 'The test event was refused.', String(err.message || err));
-        });
-    }
-
-    function runInstallTest() {
-        if (install.testing) { return; }
-        if (install.step === 1) { testServer(); }
-        else if (install.step === 2) { testArrival(); }
-        else if (install.step === 3) { testGoal(); }
-    }
-
-    function renderInstall(setup, scope, metrics) {
-        scope = scope || {};
-        var keysOk = !!setup.ingestion_keys_configured;
-        var passwordOk = !!setup.dashboard_protected;
-        $('envSnippet').textContent = 'HOTSPOT_API_KEYS=' + generatedKeys.key + '\nHOTSPOT_DASHBOARD_PASSWORD=' + generatedKeys.password;
-        var keysStatus = $('keysStatus');
-        clear(keysStatus);
-        keysStatus.appendChild(statusChipFor(keysOk && passwordOk, 'Done', keysOk || passwordOk ? 'Half done' : 'Not done'));
-        var checks = installChecks(setup, scope);
-        fillChecks($('serverChecks'), checks.slice(0, 4));
-        fillChecks($('doneChecks'), checks);
-        if (keysOk && passwordOk) { install.passed[1] = true; }
-        if (scope.sessions_stored) { install.passed[2] = install.passed[2] || !install.testing; }
-        $('promptText').value = installPrompt(setup);
-        $('identifySnippet').textContent = 'window.hotspot.identify("user_123", { email: "user@example.com", name: "Sam" })\nwindow.hotspot.capture("plan_selected", { plan: "team" })';
-        var goals = (setup.conversion_events || []);
-        $('conversionNote').textContent = 'Goals are the event names in HOTSPOT_CONVERSION_EVENTS, right now ' + (goals.length ? goals.join(', ') : '$form_submit') + '. Any event counts, including the custom ones you capture, and a session that fires one shows as "Reached a goal".';
-        $('demoLinkDone').hidden = !setup.demo_enabled;
-        showInstallStep(install.step);
-
-        var facts = $('setupFacts');
-        clear(facts);
-        function row(label, value) {
-            facts.appendChild(el('dt', { text: label }));
-            facts.appendChild(el('dd', null, value));
+        // Dropdown toggle
+        var switcherBtn = $('siteSwitcherBtn');
+        var switcherMenu = $('siteDropdownMenu');
+        if (switcherBtn && switcherMenu) {
+            switcherBtn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                var isHidden = switcherMenu.hidden;
+                switcherMenu.hidden = !isHidden;
+                switcherBtn.setAttribute('aria-expanded', String(isHidden));
+            });
+            document.addEventListener('click', function (e) {
+                if (!switcherMenu.hidden && !switcherMenu.contains(e.target) && !switcherBtn.contains(e.target)) {
+                    switcherMenu.hidden = true;
+                    switcherBtn.setAttribute('aria-expanded', 'false');
+                }
+            });
         }
-        row('Version', setup.version || CONFIG.version || 'Unknown');
-        row('Site URL', el('code', { text: setup.site_url || CONFIG.siteUrl }));
-        row('Script URL', el('code', { text: setup.sdk_url || CONFIG.sdkUrl }));
-        row('Key in the snippets', el('code', { text: setup.api_key || CONFIG.apiKey || 'none' }));
-        row('Storage', setup.storage === 'redis' ? 'Redis' : 'Process memory');
-        row('Goals', goals.length ? goals.map(function (name) { return el('code', { text: name }); }).reduce(function (acc, node, i) { if (i) { acc.push(' '); } acc.push(node); return acc; }, []) : 'None');
-        row('Sessions kept for', fmtDays(setup.session_ttl_seconds));
-        row('Sample site', setup.demo_enabled ? el('a', { href: '/demo/', target: '_blank', rel: 'noopener', text: '/demo/' }) : 'Disabled');
-        row('Session replay', setup.replay_enabled ? 'On' : 'Off (HOTSPOT_REPLAY_ENABLED)');
-        row('Recording size limit', fmtBytes(setup.max_recording_bytes) + ' per session');
-        void metrics;
+
+        // Connection verification
+        var verifyBtn = $('btnVerifyConnection');
+        var verifyText = $('verifyStatusText');
+        if (verifyBtn && verifyText) {
+            verifyBtn.addEventListener('click', function () {
+                verifyBtn.disabled = true;
+                verifyText.textContent = 'Connecting to telemetry pipeline...';
+                var checkDomain = (state.site && state.site !== 'all') ? state.site : '';
+                api('/hotspot/api/overview/', { hours: '1', site: checkDomain, limit: '20' }).then(function (data) {
+                    verifyBtn.disabled = false;
+                    var count = (data.metrics && data.metrics.sessions) || 0;
+                    if (count > 0) {
+                        verifyText.innerHTML = '<b style="color: var(--success);">✓ Telemetry verified!</b> ' + count + ' session' + (count === 1 ? '' : 's') + ' captured from ' + (checkDomain || 'your tracked sites') + '.';
+                    } else {
+                        verifyText.innerHTML = '<span style="color: var(--warning);">⚡ Telemetry endpoint ready.</span> Listening for incoming events from ' + (checkDomain || 'your site') + '. Open your site and click around to record the first session.';
+                    }
+                }).catch(function () {
+                    verifyBtn.disabled = false;
+                    verifyText.textContent = 'Could not verify telemetry right now. Please refresh the dashboard.';
+                });
+            });
+        }
     }
 
     // ---------- Tabs and navigation ----------
@@ -4068,18 +4624,6 @@
                 $('promptToggle').textContent = area.hidden ? 'Show the prompt' : 'Hide the prompt';
                 break;
             }
-            case 'install-step':
-                showInstallStep(Number(trigger.getAttribute('data-step')) || 1);
-                break;
-            case 'install-next':
-                showInstallStep(install.step + 1);
-                break;
-            case 'install-back':
-                showInstallStep(install.step - 1);
-                break;
-            case 'install-test':
-                runInstallTest();
-                break;
             case 'filter-status':
                 goToSessions({ status: trigger.getAttribute('data-status') || 'all', search: '' });
                 break;
@@ -4228,7 +4772,6 @@
         setIcon($('playIcon'), 'play');
         Array.prototype.forEach.call(document.querySelectorAll('[data-icon]'), function (node) { setIcon(node, node.getAttribute('data-icon')); });
 
-        $('hostName').textContent = hostOf(CONFIG.siteUrl) || 'Hotspot';
         $('signoutForm').hidden = !CONFIG.isProtected;
         $('footVersion').textContent = CONFIG.version ? 'v' + CONFIG.version : '';
         setSidebar(store('sidebar') === '1');
@@ -4239,8 +4782,7 @@
         updatePlayButton();
         if (store('flow.animate') === '0' || REDUCED_MOTION) { state.flowAnimate = false; }
         $('flowAnimate').checked = state.flowAnimate;
-        install.step = clamp(Number(store('install.step')) || 1, 1, INSTALL_STEPS);
-        showInstallStep(install.step);
+        setupSiteModalAndVerify();
 
         var storedHours = store('hours');
         state.hours = storedHours !== null && HOURS_VALUES.indexOf(Number(storedHours)) >= 0 ? Number(storedHours) : 24;

@@ -8,6 +8,7 @@ from collections import Counter, defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlsplit
 
 from products.hotspot.backend.config import HotspotConfig
 from products.hotspot.backend.store import SessionStore
@@ -82,6 +83,7 @@ class OverviewQuery:
     device_type: str = "all"
     browser: str = "all"
     os: str = "all"
+    site: str = "all"
     hours: int = 0
     limit: int = 200
     funnel: tuple[str, ...] = ()
@@ -99,6 +101,7 @@ class OverviewQuery:
             device_type=(params.get("device_type") or "all").strip().lower()[:40] or "all",
             browser=(params.get("browser") or "all").strip().lower()[:40] or "all",
             os=(params.get("os") or "all").strip().lower()[:40] or "all",
+            site=(params.get("site") or "all").strip().lower()[:100] or "all",
             hours=_bounded_int(params.get("hours"), default=0, low=0, high=24 * 90),
             limit=_bounded_int(params.get("limit"), default=200, low=1, high=MAX_SESSIONS_ANALYZED),
             funnel=tuple(step.strip() for step in funnel_raw.split("|") if step.strip())[:8],
@@ -892,10 +895,48 @@ def build_overview(store: SessionStore, query: OverviewQuery, config: HotspotCon
         comparison = summarize_metrics(previous, now)
     recent_events = store.recent_events(limit=config.max_events)
 
+    all_sites = store.sites()
+    sites_data = []
+    for s in all_sites:
+        s_domain = s.get("domain", "").lower()
+        s_key = s.get("api_key", "").lower()
+        s_id = s.get("id", "").lower()
+        matching_sessions = [
+            sum_item
+            for sum_item in in_range
+            if (sum_item.get("host") or "").lower() == s_domain
+            or (sum_item.get("host") or "").lower().endswith("." + s_domain)
+            or (sum_item.get("project_id") or "").lower() == s_key
+            or (sum_item.get("project_id") or "").lower() == s_id
+        ]
+        active_now = sum(
+            1 for sum_item in matching_sessions if now - float(sum_item.get("last_seen") or 0) < ACTIVE_WINDOW_SECONDS
+        )
+        last_seen_time = max(
+            [float(sum_item.get("last_seen") or 0) for sum_item in matching_sessions],
+            default=s.get("created_at", now),
+        )
+        sites_data.append(
+            {
+                "id": s.get("id"),
+                "name": s.get("name"),
+                "domain": s.get("domain"),
+                "api_key": s.get("api_key"),
+                "total_sessions": len(matching_sessions),
+                "active_visitors": active_now,
+                "last_seen": last_seen_time,
+                "created_at": s.get("created_at"),
+                "snippet": f'<script src="{config.sdk_url}" data-api-host="{config.site_url}" data-api-key="{s.get("api_key")}" defer></script>',
+            }
+        )
+
     return {
         "status": 1,
         "generated_at": now,
+        "current_site": query.site,
+        "sites": sites_data,
         "scope": {
+            "site": query.site,
             "hours": query.hours,
             "device_type": query.device_type,
             "browser": query.browser,
@@ -946,6 +987,17 @@ def setup_info(store: SessionStore, config: HotspotConfig) -> dict[str, Any]:
 
 
 def _matches_scope(summary: Mapping[str, Any], query: OverviewQuery) -> bool:
+    if query.site != "all":
+        host = str(summary.get("host") or "").lower()
+        if not host and summary.get("entry_url"):
+            try:
+                host = str(urlsplit(summary["entry_url"]).hostname or "").lower()
+            except Exception:
+                host = ""
+        project_id = str(summary.get("project_id") or "").lower()
+        wanted = query.site.lower()
+        if wanted not in (host, project_id) and not host.endswith("." + wanted):
+            return False
     for field, wanted in (("device_type", query.device_type), ("browser", query.browser), ("os", query.os)):
         if wanted != "all" and str(summary.get(field) or "").lower() != wanted:
             return False
