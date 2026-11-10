@@ -22,7 +22,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from products.hotspot.backend.auth import DASHBOARD_COOKIE, TOKEN_TTL_SECONDS, make_dashboard_token  # noqa: E402
+from products.hotspot.backend.auth import DASHBOARD_COOKIE, TOKEN_TTL_SECONDS, verify_dashboard_token  # noqa: E402
 from products.hotspot.backend.security import (  # noqa: E402
     API_CSP,
     CAPTURE_CORS_HEADERS,
@@ -43,8 +43,15 @@ def _service() -> HotspotService:
     return get_service()
 
 
+def _authorized_scope(request: Request) -> tuple[bool, str]:
+    service = _service()
+    ok, scope = service.authorized_scope(request.cookies.get(DASHBOARD_COOKIE), request.headers.get("authorization"))
+    return ok, scope or "*"
+
+
 def _authorized(request: Request) -> bool:
-    return _service().is_authorized(request.cookies.get(DASHBOARD_COOKIE), request.headers.get("authorization"))
+    ok, _ = _authorized_scope(request)
+    return ok
 
 
 def _page(request: Request, page: str, replay: bool = False, status: int = 200, **extra: str) -> Response:
@@ -90,6 +97,8 @@ async def app_redirect(request: Request) -> Response:
 async def login(request: Request) -> Response:
     service = _service()
     if request.method in ("GET", "HEAD"):
+        if _authorized(request):
+            return RedirectResponse(DASHBOARD_PATH, status_code=302)
         return _page(
             request,
             "login",
@@ -100,22 +109,47 @@ async def login(request: Request) -> Response:
         )
     if not is_same_site_form_post(request.headers):
         return PlainTextResponse("Cross-site form posts are refused.", status_code=403)
-    form = await request.form()
-    password = form.get("password")
-    token = service.login(password if isinstance(password, str) else None)
-    if token is None and service.config.dashboard_protected:
+
+    domain = None
+    secret_or_password = None
+    content_type = request.headers.get("content-type", "")
+    if "application/json" in content_type:
+        try:
+            data = await request.json()
+            domain = data.get("domain")
+            secret_or_password = data.get("password") or data.get("secret_key")
+        except Exception:
+            pass
+    else:
+        form = await request.form()
+        password_val = form.get("password")
+        secret_val = form.get("secret_key")
+        domain_val = form.get("domain")
+        secret_or_password = str(password_val or secret_val or "") if (password_val or secret_val) else None
+        domain = str(domain_val) if domain_val else None
+
+    token = service.login(secret_or_password, domain)
+    scope = verify_dashboard_token(service.config.secret_key, token, time.time()) or "*" if token else None
+    is_json = "application/json" in request.headers.get("accept", "") or "application/json" in content_type
+
+    if token is None:
+        if is_json:
+            return _json({"status": 0, "error": "Invalid domain or secret key. Try again."}, status=401)
         return _page(
             request,
             "login",
             status=401,
-            error="Invalid credentials. Try again or continue as guest.",
+            error="Invalid domain or secret key. Try again.",
             api_key=service.config.api_key_for_pages,
             site_url=service.config.site_url,
             sdk_url=service.config.sdk_url,
         )
-    if token is None:
-        token = make_dashboard_token(service.config.secret_key, time.time())
-    response = RedirectResponse(DASHBOARD_PATH, status_code=303)
+
+    if is_json:
+        response = _json({"status": 1, "scope": scope, "redirect": DASHBOARD_PATH})
+    else:
+        response = RedirectResponse(DASHBOARD_PATH, status_code=303)
+
     response.set_cookie(
         DASHBOARD_COOKIE,
         token,
@@ -185,38 +219,40 @@ async def capture_recording(request: Request) -> Response:
 
 
 async def overview(request: Request) -> Response:
-    if not _authorized(request):
+    ok, scope = _authorized_scope(request)
+    if not ok:
         return _unauthorized()
-    return _json(_service().overview(dict(request.query_params)))
+    return _json(_service().overview(dict(request.query_params), authorized_scope=scope))
 
 
 async def session_detail(request: Request) -> Response:
-    if not _authorized(request):
+    ok, scope = _authorized_scope(request)
+    if not ok:
         return _unauthorized()
-    detail = _service().session_detail(request.path_params["session_id"])
+    detail = _service().session_detail(request.path_params["session_id"], authorized_scope=scope)
     if detail is None:
         return _json({"status": 0, "error": "Session not found"}, status=404)
     return _json(detail)
 
 
 async def session_recording(request: Request) -> Response:
-    if not _authorized(request):
+    ok, scope = _authorized_scope(request)
+    if not ok:
         return _unauthorized()
-    body = _service().recording(request.path_params["session_id"], dict(request.query_params))
+    body = _service().recording(request.path_params["session_id"], dict(request.query_params), authorized_scope=scope)
     if body is None:
         return _json({"status": 0, "error": "Session not found"}, status=404)
     return _api_response(Response(body, media_type="application/json"))
 
 
 async def events_feed(request: Request) -> Response:
-    if not _authorized(request):
+    ok, scope = _authorized_scope(request)
+    if not ok:
         return _unauthorized()
-    return _json(_service().events_feed(dict(request.query_params)))
+    return _json(_service().events_feed(dict(request.query_params), authorized_scope=scope))
 
 
 async def sites_endpoint(request: Request) -> Response:
-    if not _authorized(request):
-        return _unauthorized()
     service = _service()
     if request.method == "POST":
         try:
@@ -225,17 +261,45 @@ async def sites_endpoint(request: Request) -> Response:
             payload = {}
         name = str(payload.get("name") or "").strip()
         domain = str(payload.get("domain") or "").strip()
+        confirmation_key = str(payload.get("confirmation_key") or "").strip() or None
         if not domain:
             return _json({"status": 0, "error": "domain is required"}, status=400)
-        site = service.create_site(name or domain, domain)
-        return _json({"status": 1, "site": site})
-    return _json({"status": 1, "sites": service.list_sites()})
+        ok, res = service.create_site(name or domain, domain, confirmation_key=confirmation_key)
+        if not ok:
+            return _json({"status": 0, "error": str(res)}, status=409)
+
+        token = service.login(res.get("secret_key"), domain=res.get("domain")) if isinstance(res, dict) else None
+        response = _json({"status": 1, "site": res, "token": token})
+        if token:
+            response.set_cookie(
+                DASHBOARD_COOKIE,
+                token,
+                max_age=TOKEN_TTL_SECONDS,
+                httponly=True,
+                samesite="lax",
+                secure=request.url.scheme == "https",
+                path="/",
+            )
+        return response
+
+    ok, scope = _authorized_scope(request)
+    if not ok:
+        return _unauthorized()
+    return _json({"status": 1, "sites": service.list_sites(authorized_scope=scope)})
 
 
 async def site_delete_endpoint(request: Request) -> Response:
-    if not _authorized(request):
+    ok, scope = _authorized_scope(request)
+    if not ok:
         return _unauthorized()
+    service = _service()
     site_id = request.path_params.get("site_id", "")
+    if scope != "*":
+        site = service.store.get_site_by_domain(scope)
+        if not site or site.get("id") != site_id:
+            return _json({"status": 0, "error": "Unauthorized to delete this site"}, status=403)
+    ok_del = service.delete_site(site_id)
+    return _json({"status": 1 if ok_del else 0})
     ok = _service().delete_site(site_id)
     return _json({"status": 1 if ok else 0})
 

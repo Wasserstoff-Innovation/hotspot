@@ -840,7 +840,27 @@ def compute_breakdowns(summaries: Sequence[Mapping[str, Any]]) -> dict[str, dict
     return result
 
 
-def build_overview(store: SessionStore, query: OverviewQuery, config: HotspotConfig, now: float) -> dict[str, Any]:
+def build_overview(
+    store: SessionStore,
+    query: OverviewQuery,
+    config: HotspotConfig,
+    now: float,
+    authorized_scope: str = "*",
+) -> dict[str, Any]:
+    if authorized_scope != "*":
+        query = OverviewQuery(
+            hours=query.hours,
+            site=authorized_scope,
+            device_type=query.device_type,
+            browser=query.browser,
+            os=query.os,
+            status=query.status,
+            search=query.search,
+            funnel=query.funnel,
+            conversion_event=query.conversion_event,
+            limit=query.limit,
+            tz_offset=query.tz_offset,
+        )
     stored = store.sessions(limit=MAX_SESSIONS_ANALYZED)
     in_range = stored
     if query.hours:
@@ -896,6 +916,16 @@ def build_overview(store: SessionStore, query: OverviewQuery, config: HotspotCon
     recent_events = store.recent_events(limit=config.max_events)
 
     all_sites = store.sites()
+    if authorized_scope != "*":
+        target = authorized_scope.lower()
+        all_sites = [
+            s
+            for s in all_sites
+            if (s.get("domain") or "").lower() == target
+            or (s.get("id") or "").lower() == target
+            or (s.get("api_key") or "").lower() == target
+        ]
+
     sites_data = []
     for s in all_sites:
         s_domain = s.get("domain", "").lower()
@@ -916,19 +946,22 @@ def build_overview(store: SessionStore, query: OverviewQuery, config: HotspotCon
             [float(sum_item.get("last_seen") or 0) for sum_item in matching_sessions],
             default=s.get("created_at", now),
         )
-        sites_data.append(
-            {
-                "id": s.get("id"),
-                "name": s.get("name"),
-                "domain": s.get("domain"),
-                "api_key": s.get("api_key"),
-                "total_sessions": len(matching_sessions),
-                "active_visitors": active_now,
-                "last_seen": last_seen_time,
-                "created_at": s.get("created_at"),
-                "snippet": f'<script src="{config.sdk_url}" data-api-host="{config.site_url}" data-api-key="{s.get("api_key")}" defer></script>',
-            }
-        )
+        site_entry = {
+            "id": s.get("id"),
+            "name": s.get("name"),
+            "domain": s.get("domain"),
+            "api_key": s.get("api_key"),
+            "total_sessions": len(matching_sessions),
+            "active_visitors": active_now,
+            "last_seen": last_seen_time,
+            "created_at": s.get("created_at"),
+            "snippet": f'<script src="{config.sdk_url}" data-api-host="{config.site_url}" data-api-key="{s.get("api_key")}" defer></script>',
+        }
+        # Only expose secret key to the owner of this site or master admin
+        if authorized_scope == "*" or (s.get("domain") or "").lower() == authorized_scope.lower():
+            site_entry["secret_key"] = s.get("secret_key")
+
+        sites_data.append(site_entry)
 
     return {
         "status": 1,
@@ -943,6 +976,8 @@ def build_overview(store: SessionStore, query: OverviewQuery, config: HotspotCon
             "os": query.os,
             "status": query.status,
             "search": query.search,
+            "is_admin": authorized_scope == "*",
+            "authorized_site": None if authorized_scope == "*" else authorized_scope,
             "sessions_analyzed": len(summaries),
             "sessions_in_range": len(in_range),
             "sessions_stored": len(stored),

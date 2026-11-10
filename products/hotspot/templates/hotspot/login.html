@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex">
-    <title>Hotspot • Sign In &amp; Script SDK</title>
+    <title>Hotspot • Sign In &amp; Register Website</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='9' fill='none' stroke='%232563EB' stroke-width='2.75'/%3E%3Ccircle cx='12' cy='12' r='3' fill='%2310B981'/%3E%3C/svg%3E">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -25,8 +25,13 @@
             --border-medium: #CBD5E1;
             --success: #10B981;
             --success-light: #ECFDF5;
+            --success-border: #A7F3D0;
             --danger: #EF4444;
             --danger-light: #FEF2F2;
+            --danger-border: #FECACA;
+            --warning: #F59E0B;
+            --warning-light: #FFFBEB;
+            --warning-border: #FDE68A;
             --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             --font-mono: 'JetBrains Mono', ui-monospace, monospace;
             --shadow-card: 0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
@@ -50,7 +55,7 @@
 
         .auth-container {
             width: 100%;
-            max-width: 460px;
+            max-width: 480px;
             display: flex;
             flex-direction: column;
             gap: 1.25rem;
@@ -161,20 +166,37 @@
             margin-bottom: 1.25rem;
         }
 
-        .alert-error {
-            background: var(--danger-light);
-            border: 1px solid #FECACA;
-            color: var(--danger);
+        .alert {
             font-size: 0.8125rem;
             font-weight: 500;
-            padding: 0.65rem 0.85rem;
+            padding: 0.75rem 0.85rem;
             border-radius: 8px;
             margin-bottom: 1rem;
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             gap: 0.5rem;
+            line-height: 1.4;
         }
-        .alert-error:empty { display: none; }
+
+        .alert-error {
+            background: var(--danger-light);
+            border: 1px solid var(--danger-border);
+            color: var(--danger);
+        }
+
+        .alert-warning {
+            background: var(--warning-light);
+            border: 1px solid var(--warning-border);
+            color: #92400E;
+        }
+
+        .alert-success {
+            background: var(--success-light);
+            border: 1px solid var(--success-border);
+            color: #065F46;
+        }
+
+        .alert:empty, .alert[hidden] { display: none; }
 
         /* Form Controls */
         .form-group {
@@ -184,10 +206,21 @@
             margin-bottom: 1rem;
         }
 
+        .form-label-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
         .form-label {
             font-size: 0.8125rem;
             font-weight: 600;
             color: var(--text-secondary);
+        }
+
+        .form-hint {
+            font-size: 0.75rem;
+            color: var(--text-muted);
         }
 
         .form-input {
@@ -200,6 +233,11 @@
             font-size: 0.875rem;
             color: var(--text-primary);
             transition: border-color 0.15s, box-shadow 0.15s;
+        }
+
+        .form-input.mono {
+            font-family: var(--font-mono);
+            font-size: 0.8125rem;
         }
 
         .form-input:focus {
@@ -234,63 +272,42 @@
             transform: scale(0.99);
         }
 
-        .btn-guest {
-            width: 100%;
-            height: 40px;
-            background: var(--bg-subtle);
+        .btn-submit:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn-ghost-toggle {
+            background: transparent;
+            border: none;
             color: var(--text-secondary);
-            border: 1px solid var(--border-light);
-            border-radius: 8px;
-            font-size: 0.8125rem;
-            font-weight: 600;
+            font-size: 0.78125rem;
+            font-weight: 500;
             cursor: pointer;
+            padding: 0.35rem 0;
+            text-align: center;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 0.45rem;
-            transition: background 0.15s, color 0.15s;
+            gap: 0.35rem;
             margin-top: 0.75rem;
+            transition: color 0.15s;
         }
 
-        .btn-guest:hover {
-            background: #E2E8F0;
-            color: var(--text-primary);
+        .btn-ghost-toggle:hover {
+            color: var(--brand-primary);
         }
 
-        .divider {
-            display: flex;
-            align-items: center;
-            text-align: center;
-            margin: 1.25rem 0 0.5rem;
-            color: var(--text-muted);
-            font-size: 0.75rem;
-            font-weight: 500;
-        }
-
-        .divider::before, .divider::after {
-            content: '';
-            flex: 1;
-            border-bottom: 1px solid var(--border-light);
-        }
-
-        .divider span {
-            padding: 0 0.75rem;
-        }
-
-        /* Tab 2: Get Script SDK Snippet */
-        .script-pane {
-            display: none;
-        }
-
-        .code-box-wrap {
+        /* Code & Key Presentation Boxes */
+        .key-box-wrap {
             background: #0B0F17;
             border: 1px solid #1E293B;
             border-radius: 10px;
             overflow: hidden;
-            margin-bottom: 1.25rem;
+            margin-bottom: 1rem;
         }
 
-        .code-box-head {
+        .key-box-head {
             background: #111827;
             padding: 0.5rem 0.85rem;
             border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -299,12 +316,13 @@
             justify-content: space-between;
         }
 
-        .code-lang-tag {
+        .key-box-title {
             font-family: var(--font-mono);
             font-size: 0.6875rem;
             font-weight: 600;
             color: #94A3B8;
             text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
 
         .btn-copy-code {
@@ -328,50 +346,25 @@
 
         .btn-copy-code svg { width: 12px; height: 12px; }
 
-        .code-content {
-            padding: 1rem 1rem;
+        .key-box-content {
+            padding: 0.85rem 1rem;
+            font-family: var(--font-mono);
+            font-size: 0.8125rem;
+            color: #38BDF8;
+            line-height: 1.5;
+            word-break: break-all;
+            user-select: all;
+        }
+
+        .code-box-content {
+            padding: 0.85rem 1rem;
             font-family: var(--font-mono);
             font-size: 0.75rem;
             color: #E2E8F0;
-            line-height: 1.6;
+            line-height: 1.55;
             overflow-x: auto;
             white-space: pre-wrap;
             word-break: break-all;
-        }
-
-        .code-content .tag { color: #60A5FA; }
-        .code-content .attr { color: #34D399; }
-        .code-content .val { color: #FCD34D; }
-
-        .steps-list {
-            display: flex;
-            flex-direction: column;
-            gap: 0.65rem;
-            margin-bottom: 1.25rem;
-        }
-
-        .step-item {
-            display: flex;
-            align-items: flex-start;
-            gap: 0.65rem;
-            font-size: 0.8125rem;
-            color: var(--text-secondary);
-            line-height: 1.4;
-        }
-
-        .step-num {
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            background: var(--brand-light);
-            color: var(--brand-primary);
-            font-weight: 700;
-            font-size: 0.6875rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-            margin-top: 1px;
         }
 
         .footer-nav {
@@ -410,53 +403,65 @@
             </svg>
         </div>
         <span class="brand-logo-text">Hotspot</span>
-        <span class="brand-badge">v3.1 Pro</span>
+        <span class="brand-badge">Zero-Knowledge</span>
     </a>
 
     <!-- Main Auth Card -->
     <main class="auth-card">
-        <!-- Tab Switcher -->
+        <!-- Segmented Tab Switcher -->
         <div class="tab-switcher" role="tablist">
             <button class="tab-btn active" id="tab-btn-signin" type="button" role="tab">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                <span>Sign In to Console</span>
+                <span>Sign In (Domain + Key)</span>
             </button>
-            <button class="tab-btn" id="tab-btn-sdk" type="button" role="tab">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-                <span>Get Script Tag (JS)</span>
+            <button class="tab-btn" id="tab-btn-register" type="button" role="tab">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                <span>Register Website</span>
             </button>
         </div>
 
         <!-- TAB 1: Sign In -->
         <div class="card-body" id="pane-signin">
-            <h1 class="card-title">Sign in to your workspace</h1>
-            <p class="card-subtitle">View incoming telemetry, inspect user dropoff funnels, and watch session replays.</p>
+            <h1 class="card-title">Sign in to your dashboard</h1>
+            <p class="card-subtitle">Passwordless &amp; private. Enter your website domain and your private Site Secret Key.</p>
 
-            <div class="alert-error" role="alert">{{ error }}</div>
+            <div class="alert alert-error" id="signin-alert" role="alert">{{ error }}</div>
 
-            <form method="post" action="/dashboard/login/" id="authForm">
-                <div class="form-group">
-                    <label class="form-label" for="email">Work Email</label>
-                    <input class="form-input" id="email" name="email" type="email" placeholder="you@company.com" autocomplete="email" autofocus>
+            <!-- Standard Site Owner Login -->
+            <form method="post" action="/dashboard/login/" id="form-site-login">
+                <div class="form-group" id="group-signin-domain">
+                    <div class="form-label-row">
+                        <label class="form-label" for="signin-domain">Website Domain</label>
+                        <span class="form-hint">e.g. buxa.ai</span>
+                    </div>
+                    <input class="form-input" id="signin-domain" name="domain" type="text" placeholder="yourdomain.com" autocomplete="url" autofocus>
                 </div>
-                <div class="form-group">
-                    <label class="form-label" for="password">Password or Workspace Key</label>
-                    <input class="form-input" id="password" name="password" type="password" placeholder="••••••••" autocomplete="current-password">
+
+                <div class="form-group" id="group-signin-secret">
+                    <div class="form-label-row">
+                        <label class="form-label" for="signin-secret">Site Secret Key</label>
+                        <span class="form-hint">hs_sec_...</span>
+                    </div>
+                    <input class="form-input mono" id="signin-secret" name="secret_key" type="password" placeholder="hs_sec_••••••••••••••••" autocomplete="current-password">
                 </div>
 
-                <button type="submit" class="btn-submit">
-                    <span>Sign In to Dashboard</span>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                <!-- Admin Mode Input (toggled via button) -->
+                <div class="form-group" id="group-admin-pass" style="display: none;">
+                    <div class="form-label-row">
+                        <label class="form-label" for="admin-password">Server Master Admin Key</label>
+                        <span class="form-hint">HOTSPOT_DASHBOARD_PASSWORD</span>
+                    </div>
+                    <input class="form-input mono" id="admin-password" name="password" type="password" placeholder="Enter server admin key...">
+                </div>
+
+                <button type="submit" class="btn-submit" id="btn-submit-signin">
+                    <span>Sign In to Dashboard →</span>
                 </button>
             </form>
 
-            <div class="divider">
-                <span>or explore immediately</span>
-            </div>
-
-            <button type="button" class="btn-guest" id="btn-guest-access">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                <span>Continue to Live Dashboard as Guest</span>
+            <button type="button" class="btn-ghost-toggle" id="btn-toggle-admin-mode">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5z"/></svg>
+                <span id="label-toggle-admin">Server Admin? Sign in with Master Key</span>
             </button>
 
             <div class="footer-nav">
@@ -464,60 +469,101 @@
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
                     <span>Back to Home</span>
                 </a>
-                <a href="/demo/">
-                    <span>Explore Demo Site</span>
+                <a href="#" id="link-switch-to-register">
+                    <span>Need to register a site? Register here</span>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
                 </a>
             </div>
         </div>
 
-        <!-- TAB 2: Get Script SDK Snippet -->
-        <div class="card-body script-pane" id="pane-sdk">
-            <h2 class="card-title">1-Line Embed Tracking Script</h2>
-            <p class="card-subtitle">Drop this snippet into any website or web application to capture clicks, rage clicks, and session replays.</p>
+        <!-- TAB 2: Register Website -->
+        <div class="card-body" id="pane-register" style="display: none;">
+            <h2 class="card-title">Register website &amp; get script</h2>
+            <p class="card-subtitle">Receive your 1-line tracking snippet and your private Site Secret Key for dashboard access.</p>
 
-            <div class="code-box-wrap">
-                <div class="code-box-head">
-                    <span class="code-lang-tag">HTML Tag</span>
-                    <button class="btn-copy-code" id="btnCopyCode" type="button">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-                        <span id="copyLabelText">Copy Script</span>
-                    </button>
+            <div class="alert alert-error" id="reg-error-alert" role="alert" style="display: none;"></div>
+            <div class="alert alert-warning" id="reg-warn-alert" role="alert" style="display: none;"></div>
+
+            <!-- Registration Form -->
+            <form id="form-register-site">
+                <div class="form-group">
+                    <div class="form-label-row">
+                        <label class="form-label" for="reg-domain">Website URL / Domain</label>
+                        <span class="form-hint">e.g. buxa.ai or https://myapp.com</span>
+                    </div>
+                    <input class="form-input" id="reg-domain" type="text" placeholder="https://yourdomain.com" required>
                 </div>
-                <div class="code-content" id="rawScriptSnippet">&lt;script 
-    src="{{ sdk_url }}" 
-    data-api-host="{{ site_url }}" 
-    data-api-key="{{ api_key }}" 
-    defer&gt;
-&lt;/script&gt;</div>
+
+                <div class="form-group">
+                    <div class="form-label-row">
+                        <label class="form-label" for="reg-name">Site Name (Optional)</label>
+                        <span class="form-hint">Display name</span>
+                    </div>
+                    <input class="form-input" id="reg-name" type="text" placeholder="e.g. Production Web App">
+                </div>
+
+                <!-- Confirmation key (Only displayed if domain is already registered and owner confirms) -->
+                <div class="form-group" id="group-confirmation-key" style="display: none;">
+                    <div class="form-label-row">
+                        <label class="form-label" for="reg-confirm-key">Owner Confirmation Secret Key</label>
+                        <span class="form-hint">Existing Secret Key</span>
+                    </div>
+                    <input class="form-input mono" id="reg-confirm-key" type="password" placeholder="Enter existing secret key to rotate...">
+                    <div class="form-hint" style="color: #B45309; margin-top: 4px;">
+                        This domain is registered. Verifying with your existing Secret Key will generate fresh keys.
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-submit" id="btn-submit-register">
+                    <span>Generate Keys &amp; Script Tag →</span>
+                </button>
+            </form>
+
+            <!-- Registration Success Box (Revealed after successful creation) -->
+            <div id="register-success-view" style="display: none; margin-top: 0.5rem;">
+                <div class="alert alert-success">
+                    ✓ Website registered successfully! Save your Site Secret Key securely below.
+                </div>
+
+                <!-- 1. Private Site Secret Key -->
+                <div class="key-box-wrap">
+                    <div class="key-box-head">
+                        <span class="key-box-title">Private Site Secret Key (For Login)</span>
+                        <button class="btn-copy-code" id="btn-copy-secret" type="button">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                            <span id="label-copy-secret">Copy Secret</span>
+                        </button>
+                    </div>
+                    <div class="key-box-content" id="display-secret-key">hs_sec_...</div>
+                </div>
+                <p style="font-size: 0.75rem; color: #DC2626; margin-bottom: 1rem; line-height: 1.4;">
+                    <strong>Important:</strong> Save this Secret Key in your password manager now. You will use this key + your domain to sign in. We do not store passwords.
+                </p>
+
+                <!-- 2. Tracking Script -->
+                <div class="key-box-wrap">
+                    <div class="key-box-head">
+                        <span class="key-box-title">1-Line Embed Script Tag</span>
+                        <button class="btn-copy-code" id="btn-copy-script" type="button">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                            <span id="label-copy-script">Copy Script</span>
+                        </button>
+                    </div>
+                    <div class="code-box-content" id="display-script-snippet"></div>
+                </div>
+
+                <button type="button" class="btn-submit" id="btn-enter-dashboard">
+                    <span>Enter Dashboard Now →</span>
+                </button>
             </div>
-
-            <div class="steps-list">
-                <div class="step-item">
-                    <span class="step-num">1</span>
-                    <span>Paste into the <code>&lt;head&gt;</code> or before <code>&lt;/body&gt;</code> of your website.</span>
-                </div>
-                <div class="step-item">
-                    <span class="step-num">2</span>
-                    <span>Reload your site to capture the first real-time telemetry event.</span>
-                </div>
-                <div class="step-item">
-                    <span class="step-num">3</span>
-                    <span>Open the dashboard to inspect dropoff corridors and DOM session replays.</span>
-                </div>
-            </div>
-
-            <button type="button" class="btn-submit" id="btn-sdk-to-dashboard">
-                <span>Open Hotspot Dashboard →</span>
-            </button>
 
             <div class="footer-nav">
                 <a href="/">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
                     <span>Back to Home</span>
                 </a>
-                <a href="#" id="link-switch-signin">
-                    <span>Sign In to Account</span>
+                <a href="#" id="link-switch-to-signin">
+                    <span>Already registered? Sign In</span>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
                 </a>
             </div>
@@ -526,76 +572,222 @@
 </div>
 
 <script nonce="{{ csp_nonce }}">
+    let adminMode = false;
+
     function switchAuthTab(tab) {
         const btnSignin = document.getElementById('tab-btn-signin');
-        const btnSdk = document.getElementById('tab-btn-sdk');
+        const btnReg = document.getElementById('tab-btn-register');
         const paneSignin = document.getElementById('pane-signin');
-        const paneSdk = document.getElementById('pane-sdk');
+        const paneReg = document.getElementById('pane-register');
 
-        if (tab === 'sdk') {
+        if (tab === 'register') {
             btnSignin.classList.remove('active');
-            btnSdk.classList.add('active');
+            btnReg.classList.add('active');
             paneSignin.style.display = 'none';
-            paneSdk.style.display = 'flex';
+            paneReg.style.display = 'flex';
         } else {
-            btnSdk.classList.remove('active');
+            btnReg.classList.remove('active');
             btnSignin.classList.add('active');
-            paneSdk.style.display = 'none';
+            paneReg.style.display = 'none';
             paneSignin.style.display = 'flex';
         }
     }
 
-    function copySnippetCode() {
-        const snippetEl = document.getElementById('rawScriptSnippet');
-        const text = snippetEl ? snippetEl.innerText.trim() : '';
+    function toggleAdminMode() {
+        adminMode = !adminMode;
+        const grpDomain = document.getElementById('group-signin-domain');
+        const grpSecret = document.getElementById('group-signin-secret');
+        const grpAdmin = document.getElementById('group-admin-pass');
+        const toggleLabel = document.getElementById('label-toggle-admin');
+        const domainInput = document.getElementById('signin-domain');
+        const secretInput = document.getElementById('signin-secret');
+        const adminInput = document.getElementById('admin-password');
+
+        if (adminMode) {
+            grpDomain.style.display = 'none';
+            grpSecret.style.display = 'none';
+            grpAdmin.style.display = 'flex';
+            toggleLabel.textContent = 'Site Owner? Sign in with Domain + Secret Key';
+            domainInput.value = '';
+            secretInput.value = '';
+            adminInput.focus();
+        } else {
+            grpDomain.style.display = 'flex';
+            grpSecret.style.display = 'flex';
+            grpAdmin.style.display = 'none';
+            toggleLabel.textContent = 'Server Admin? Sign in with Master Key';
+            adminInput.value = '';
+            domainInput.focus();
+        }
+    }
+
+    function copyToClipboard(text, labelElement, defaultText) {
         navigator.clipboard.writeText(text).then(() => {
-            const label = document.getElementById('copyLabelText');
-            if (label) {
-                label.textContent = 'Copied! ✓';
-                setTimeout(() => { label.textContent = 'Copy Script'; }, 2000);
-            }
+            labelElement.textContent = 'Copied! ✓';
+            setTimeout(() => { labelElement.textContent = defaultText; }, 2000);
         }).catch(() => {
-            const label = document.getElementById('copyLabelText');
-            if (label) {
-                label.textContent = 'Copied! ✓';
-                setTimeout(() => { label.textContent = 'Copy Script'; }, 2000);
-            }
+            labelElement.textContent = 'Copied! ✓';
+            setTimeout(() => { labelElement.textContent = defaultText; }, 2000);
         });
     }
 
-    function quickGuestAccess() {
-        const form = document.getElementById('authForm');
-        let passInput = document.getElementById('password');
-        let emailInput = document.getElementById('email');
-        if (emailInput && !emailInput.value) emailInput.value = 'admin@hotspot.local';
-        if (passInput && !passInput.value) passInput.value = 'admin';
-        if (form) form.submit();
+    async function handleRegistration(e) {
+        e.preventDefault();
+        const errAlert = document.getElementById('reg-error-alert');
+        const warnAlert = document.getElementById('reg-warn-alert');
+        const submitBtn = document.getElementById('btn-submit-register');
+        const formEl = document.getElementById('form-register-site');
+        const confirmGrp = document.getElementById('group-confirmation-key');
+        const confirmInput = document.getElementById('reg-confirm-key');
+
+        errAlert.style.display = 'none';
+        warnAlert.style.display = 'none';
+
+        const domainVal = document.getElementById('reg-domain').value.trim();
+        const nameVal = document.getElementById('reg-name').value.trim();
+        const confirmationKey = confirmInput.value.trim();
+
+        if (!domainVal) {
+            errAlert.textContent = 'Please enter a valid website domain.';
+            errAlert.style.display = 'flex';
+            return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.querySelector('span').textContent = 'Registering & Generating Keys...';
+
+        try {
+            const resp = await fetch('/hotspot/api/sites/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    name: nameVal,
+                    domain: domainVal,
+                    confirmation_key: confirmationKey || null
+                })
+            });
+
+            const data = await resp.json();
+            submitBtn.disabled = false;
+            submitBtn.querySelector('span').textContent = 'Generate Keys & Script Tag →';
+
+            if (resp.status === 409 || data.status === 0) {
+                // Domain collision or confirmation required!
+                errAlert.textContent = data.error || 'Registration failed. This domain is already registered.';
+                errAlert.style.display = 'flex';
+                confirmGrp.style.display = 'flex';
+                confirmInput.focus();
+                return;
+            }
+
+            if (data.status === 1 && data.site) {
+                formEl.style.display = 'none';
+                const successView = document.getElementById('register-success-view');
+                successView.style.display = 'block';
+
+                document.getElementById('display-secret-key').textContent = data.site.secret_key;
+                const snippet = data.site.snippet || ('<script src="{{ sdk_url }}" data-api-host="{{ site_url }}" data-api-key="' + data.site.api_key + '" defer><' + '/script>');
+                document.getElementById('display-script-snippet').textContent = snippet;
+
+                const copySecBtn = document.getElementById('btn-copy-secret');
+                copySecBtn.onclick = () => copyToClipboard(data.site.secret_key, document.getElementById('label-copy-secret'), 'Copy Secret');
+
+                const copyScrBtn = document.getElementById('btn-copy-script');
+                copyScrBtn.onclick = () => copyToClipboard(snippet, document.getElementById('label-copy-script'), 'Copy Script');
+
+                const enterDashBtn = document.getElementById('btn-enter-dashboard');
+                enterDashBtn.onclick = () => {
+                    window.location.href = '/dashboard/';
+                };
+            }
+        } catch (err) {
+            submitBtn.disabled = false;
+            submitBtn.querySelector('span').textContent = 'Generate Keys & Script Tag →';
+            errAlert.textContent = 'Network error while registering. Please try again.';
+            errAlert.style.display = 'flex';
+        }
+    }
+
+    async function handleSignIn(e) {
+        // Enhance sign-in with JSON fetch for instant inline error handling
+        e.preventDefault();
+        const signinAlert = document.getElementById('signin-alert');
+        const submitBtn = document.getElementById('btn-submit-signin');
+        signinAlert.style.display = 'none';
+
+        const domainVal = document.getElementById('signin-domain').value.trim();
+        const secretVal = document.getElementById('signin-secret').value.trim();
+        const adminVal = document.getElementById('admin-password').value.trim();
+
+        const payload = {};
+        if (adminMode) {
+            if (!adminVal) {
+                signinAlert.textContent = 'Please enter the server master admin key.';
+                signinAlert.style.display = 'flex';
+                return;
+            }
+            payload.password = adminVal;
+        } else {
+            if (!domainVal || !secretVal) {
+                signinAlert.textContent = 'Please enter both your domain and your Site Secret Key.';
+                signinAlert.style.display = 'flex';
+                return;
+            }
+            payload.domain = domainVal;
+            payload.secret_key = secretVal;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.querySelector('span').textContent = 'Authenticating...';
+
+        try {
+            const resp = await fetch('/dashboard/login/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await resp.json();
+            if (resp.status === 200 && data.status === 1) {
+                window.location.href = data.redirect || '/dashboard/';
+                return;
+            }
+            submitBtn.disabled = false;
+            submitBtn.querySelector('span').textContent = 'Sign In to Dashboard →';
+            signinAlert.textContent = data.error || 'Invalid domain or secret key. Try again.';
+            signinAlert.style.display = 'flex';
+        } catch (err) {
+            // Fallback to traditional form submission
+            document.getElementById('form-site-login').submit();
+        }
     }
 
     document.addEventListener('DOMContentLoaded', () => {
         const btnSignin = document.getElementById('tab-btn-signin');
-        const btnSdk = document.getElementById('tab-btn-sdk');
-        const btnGuest = document.getElementById('btn-guest-access');
-        const btnSdkDash = document.getElementById('btn-sdk-to-dashboard');
-        const btnCopy = document.getElementById('btnCopyCode');
-        const linkSignin = document.getElementById('link-switch-signin');
+        const btnReg = document.getElementById('tab-btn-register');
+        const btnAdminToggle = document.getElementById('btn-toggle-admin-mode');
+        const linkToReg = document.getElementById('link-switch-to-register');
+        const linkToSignin = document.getElementById('link-switch-to-signin');
+        const formReg = document.getElementById('form-register-site');
+        const formSignin = document.getElementById('form-site-login');
 
         if (btnSignin) btnSignin.addEventListener('click', () => switchAuthTab('signin'));
-        if (btnSdk) btnSdk.addEventListener('click', () => switchAuthTab('sdk'));
-        if (btnGuest) btnGuest.addEventListener('click', quickGuestAccess);
-        if (btnSdkDash) btnSdkDash.addEventListener('click', quickGuestAccess);
-        if (btnCopy) btnCopy.addEventListener('click', copySnippetCode);
-        if (linkSignin) {
-            linkSignin.addEventListener('click', (e) => {
-                e.preventDefault();
-                switchAuthTab('signin');
-            });
-        }
+        if (btnReg) btnReg.addEventListener('click', () => switchAuthTab('register'));
+        if (btnAdminToggle) btnAdminToggle.addEventListener('click', toggleAdminMode);
+        if (linkToReg) linkToReg.addEventListener('click', (e) => { e.preventDefault(); switchAuthTab('register'); });
+        if (linkToSignin) linkToSignin.addEventListener('click', (e) => { e.preventDefault(); switchAuthTab('signin'); });
+        if (formReg) formReg.addEventListener('submit', handleRegistration);
+        if (formSignin) formSignin.addEventListener('submit', handleSignIn);
 
-        // Auto-switch to SDK tab if hash is #sdk or query param has tab=sdk
         const urlParams = new URLSearchParams(window.location.search);
-        if (window.location.hash === '#sdk' || urlParams.get('tab') === 'sdk') {
-            switchAuthTab('sdk');
+        if (window.location.hash === '#register' || urlParams.get('tab') === 'register') {
+            switchAuthTab('register');
         }
     });
 </script>

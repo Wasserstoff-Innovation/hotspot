@@ -8,6 +8,7 @@ processes; the in-memory backend keeps a single process working without it.
 from __future__ import annotations
 
 import re
+import hmac
 import json
 import time
 import zlib
@@ -19,6 +20,7 @@ from collections.abc import Callable, Iterable, Mapping
 from typing import Any, Protocol
 from urllib.parse import urlsplit
 
+from products.hotspot.backend.auth import password_matches
 from products.hotspot.backend.config import HotspotConfig
 from products.hotspot.backend.ingestion import CapturedEvent, RecordingChunk
 
@@ -322,13 +324,6 @@ class SessionStore:
         by_session: dict[str, list[CapturedEvent]] = {}
         for event in ordered:
             by_session.setdefault(event.session_id, []).append(event)
-            host = event.properties.get("$host")
-            if host and isinstance(host, str):
-                host_clean = host.strip().lower().split(":")[0]
-                if host_clean and host_clean not in ("localhost", "127.0.0.1"):
-                    registered = [s.get("domain") for s in self._backend.get_sites()]
-                    if host_clean not in registered:
-                        self.save_site(host_clean, host_clean, event.project_id)
 
         for session_id, session_events in by_session.items():
             events_json = [json.dumps(event.to_dict(), separators=(",", ":")) for event in session_events]
@@ -386,21 +381,98 @@ class SessionStore:
     def clear(self) -> None:
         self._backend.clear()
 
-    def save_site(self, name: str, domain: str, api_key: str | None = None) -> dict[str, Any]:
-        domain_clean = (
-            domain.strip().lower().removeprefix("http://").removeprefix("https://").split("/")[0].split(":")[0]
-        )
+    def get_site_by_domain(self, domain: str) -> dict[str, Any] | None:
+        clean = _clean_domain(domain)
+        for s in self._backend.get_sites():
+            if s.get("domain") == clean:
+                return s
+        return None
+
+    def get_site_by_secret_key(self, secret_key: str) -> dict[str, Any] | None:
+        key = (secret_key or "").strip()
+        if not key:
+            return None
+        for s in self._backend.get_sites():
+            sec = s.get("secret_key")
+            if sec and hmac.compare_digest(sec, key):
+                return s
+        return None
+
+    def authenticate_site(self, domain: str, secret_key: str) -> dict[str, Any] | None:
+        site = self.get_site_by_domain(domain)
+        if not site:
+            return None
+        expected = site.get("secret_key")
+        candidate = (secret_key or "").strip()
+        if expected and candidate and hmac.compare_digest(expected, candidate):
+            return site
+        return None
+
+    def save_site(
+        self,
+        name: str,
+        domain: str,
+        api_key: str | None = None,
+        secret_key: str | None = None,
+    ) -> dict[str, Any]:
+        domain_clean = _clean_domain(domain)
         site_id = _slugify(domain_clean)
         key = api_key or generate_api_key(domain_clean)
+        sec = secret_key or generate_secret_key(domain_clean)
         site = {
             "id": site_id,
             "name": name.strip() or domain_clean,
             "domain": domain_clean,
             "api_key": key,
+            "secret_key": sec,
             "created_at": time.time(),
         }
         self._backend.save_site(site)
         return site
+
+    def create_site_safely(
+        self,
+        name: str,
+        domain: str,
+        confirmation_key: str | None = None,
+    ) -> tuple[bool, dict[str, Any] | str]:
+        domain_clean = _clean_domain(domain)
+        if not domain_clean:
+            return False, "Domain is required."
+        existing = self.get_site_by_domain(domain_clean)
+        if existing:
+            conf = (confirmation_key or "").strip()
+            if not conf:
+                return (
+                    False,
+                    f"Domain '{domain_clean}' is already registered. If you own this site, please sign in with your Site Secret Key.",
+                )
+            # Verify confirmation key - must match site secret_key or master admin password
+            is_valid_owner = False
+            if existing.get("secret_key") and hmac.compare_digest(existing["secret_key"], conf):
+                is_valid_owner = True
+            elif password_matches(self._config.dashboard_password, conf):
+                is_valid_owner = True
+
+            if not is_valid_owner:
+                return (
+                    False,
+                    f"Domain '{domain_clean}' is already registered. The confirmation secret key provided is invalid.",
+                )
+
+            # Owner confirmed! Rotate credentials to issue fresh keys
+            new_api_key = generate_api_key(domain_clean)
+            new_secret_key = generate_secret_key(domain_clean)
+            existing["name"] = name.strip() or existing.get("name") or domain_clean
+            existing["api_key"] = new_api_key
+            existing["secret_key"] = new_secret_key
+            existing["rotated_at"] = time.time()
+            self._backend.save_site(existing)
+            return True, existing
+
+        # Brand new domain
+        site = self.save_site(name, domain_clean)
+        return True, site
 
     def sites(self) -> list[dict[str, Any]]:
         existing = self._backend.get_sites()
@@ -420,10 +492,15 @@ class SessionStore:
         return frozenset(keys)
 
     def ensure_default_sites(self) -> None:
-        self.save_site("Buxa AI", "buxa.ai", "hs_live_buxa_ai")
+        self.save_site("Buxa AI", "buxa.ai", "hs_live_buxa_ai", "hs_sec_buxa_ai_root")
         host = urlsplit(self._config.site_url).hostname
         if host and host != "buxa.ai":
-            self.save_site("Hotspot Console", host, self._config.api_key_for_pages)
+            self.save_site("Hotspot Console", host, self._config.api_key_for_pages, "hs_sec_console_root")
+
+
+def _clean_domain(domain: str) -> str:
+    cleaned = domain.strip().lower().removeprefix("http://").removeprefix("https://").split("/")[0].split(":")[0]
+    return cleaned
 
 
 def _slugify(text: str) -> str:
@@ -435,6 +512,12 @@ def generate_api_key(domain: str) -> str:
     slug = _slugify(domain.replace(".", "-"))[:15]
     rand = secrets.token_hex(4)
     return f"hs_live_{slug}_{rand}"
+
+
+def generate_secret_key(domain: str) -> str:
+    slug = _slugify(domain.replace(".", "-"))[:15]
+    rand = secrets.token_hex(8)
+    return f"hs_sec_{slug}_{rand}"
 
 
 def _build_mutator(events: list[CapturedEvent], config: HotspotConfig) -> SessionMutator:

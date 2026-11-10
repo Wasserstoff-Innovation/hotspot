@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 from collections.abc import Callable, Mapping
 from typing import Any
 
@@ -10,7 +11,7 @@ from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed, HttpR
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 
-from products.hotspot.backend.auth import DASHBOARD_COOKIE, TOKEN_TTL_SECONDS
+from products.hotspot.backend.auth import DASHBOARD_COOKIE, TOKEN_TTL_SECONDS, verify_dashboard_token
 from products.hotspot.backend.security import (
     API_CSP,
     CAPTURE_CORS_HEADERS,
@@ -59,12 +60,32 @@ def login(request: HttpRequest) -> HttpResponse:
         return HttpResponseNotAllowed(["GET", "POST"])
     if not is_same_site_form_post(request.headers):
         return HttpResponse("Cross-site form posts are refused.", status=403, content_type="text/plain")
-    token = service.login(request.POST.get("password"))
+
+    secret_or_password = request.POST.get("password") or request.POST.get("secret_key")
+    domain = request.POST.get("domain")
+    if not secret_or_password and request.body:
+        try:
+            payload = json.loads(request.body.decode("utf-8"))
+            secret_or_password = payload.get("password") or payload.get("secret_key")
+            domain = payload.get("domain")
+        except Exception:
+            pass
+
+    token = service.login(secret_or_password, domain)
     if token is None:
-        response = _page(request, "login", error="That password is not right. Try again.")
+        if request.headers.get("Accept") == "application/json" or request.content_type == "application/json":
+            return _json({"status": 0, "error": "Invalid domain or secret key. Try again."}, status=401)
+        response = _page(request, "login", error="Invalid domain or secret key. Try again.")
         response.status_code = 401
         return response
-    response = HttpResponseRedirect(DASHBOARD_PATH)
+
+    scope = verify_dashboard_token(service.config.secret_key, token, time.time()) or "*"
+
+    if request.headers.get("Accept") == "application/json" or request.content_type == "application/json":
+        response = _json({"status": 1, "scope": scope, "redirect": DASHBOARD_PATH})
+    else:
+        response = HttpResponseRedirect(DASHBOARD_PATH)
+
     response.set_cookie(
         DASHBOARD_COOKIE,
         token,
@@ -127,15 +148,14 @@ def capture_recording(request: HttpRequest) -> HttpResponse:
 
 
 def overview(request: HttpRequest) -> HttpResponse:
-    if not _authorized(request):
+    ok, scope = _authorized_scope(request)
+    if not ok:
         return _unauthorized()
-    return _json(get_service().overview(_params(request)))
+    return _json(get_service().overview(_params(request), authorized_scope=scope))
 
 
 @csrf_exempt
 def sites_endpoint(request: HttpRequest) -> HttpResponse:
-    if not _authorized(request):
-        return _unauthorized()
     service = get_service()
     if request.method == "POST":
         try:
@@ -144,43 +164,73 @@ def sites_endpoint(request: HttpRequest) -> HttpResponse:
             payload = {}
         name = str(payload.get("name") or "").strip()
         domain = str(payload.get("domain") or "").strip()
+        confirmation_key = str(payload.get("confirmation_key") or "").strip() or None
         if not domain:
             return _json({"status": 0, "error": "domain is required"}, status=400)
-        site = service.create_site(name or domain, domain)
-        return _json({"status": 1, "site": site})
-    return _json({"status": 1, "sites": service.list_sites()})
+        ok, res = service.create_site(name or domain, domain, confirmation_key=confirmation_key)
+        if not ok:
+            return _json({"status": 0, "error": str(res)}, status=409)
+
+        # Generate immediate session cookie so creator can jump straight into their dashboard
+        token = service.login(res.get("secret_key"), domain=res.get("domain")) if isinstance(res, dict) else None
+        response = _json({"status": 1, "site": res, "token": token})
+        if token:
+            response.set_cookie(
+                DASHBOARD_COOKIE,
+                token,
+                max_age=TOKEN_TTL_SECONDS,
+                httponly=True,
+                samesite="Lax",
+                secure=request.is_secure(),
+                path="/",
+            )
+        return response
+
+    ok, scope = _authorized_scope(request)
+    if not ok:
+        return _unauthorized()
+    return _json({"status": 1, "sites": service.list_sites(authorized_scope=scope)})
 
 
 @csrf_exempt
 def site_delete_endpoint(request: HttpRequest, site_id: str) -> HttpResponse:
-    if not _authorized(request):
+    ok, scope = _authorized_scope(request)
+    if not ok:
         return _unauthorized()
-    ok = get_service().delete_site(site_id)
-    return _json({"status": 1 if ok else 0})
+    service = get_service()
+    if scope != "*":
+        site = service.store.get_site_by_domain(scope)
+        if not site or site.get("id") != site_id:
+            return _json({"status": 0, "error": "Unauthorized to delete this site"}, status=403)
+    ok_del = service.delete_site(site_id)
+    return _json({"status": 1 if ok_del else 0})
 
 
 def session_detail(request: HttpRequest, session_id: str) -> HttpResponse:
-    if not _authorized(request):
+    ok, scope = _authorized_scope(request)
+    if not ok:
         return _unauthorized()
-    detail = get_service().session_detail(session_id)
+    detail = get_service().session_detail(session_id, authorized_scope=scope)
     if detail is None:
         return _json({"status": 0, "error": "Session not found"}, status=404)
     return _json(detail)
 
 
 def session_recording(request: HttpRequest, session_id: str) -> HttpResponse:
-    if not _authorized(request):
+    ok, scope = _authorized_scope(request)
+    if not ok:
         return _unauthorized()
-    body = get_service().recording(session_id, _params(request))
+    body = get_service().recording(session_id, _params(request), authorized_scope=scope)
     if body is None:
         return _json({"status": 0, "error": "Session not found"}, status=404)
     return _api_response(HttpResponse(body, content_type="application/json"))
 
 
 def events_feed(request: HttpRequest) -> HttpResponse:
-    if not _authorized(request):
+    ok, scope = _authorized_scope(request)
+    if not ok:
         return _unauthorized()
-    return _json(get_service().events_feed(_params(request)))
+    return _json(get_service().events_feed(_params(request), authorized_scope=scope))
 
 
 def _capture(request: HttpRequest, handle: Callable[[], tuple[int, dict[str, Any]]]) -> HttpResponse:
@@ -205,9 +255,15 @@ def _page(request: HttpRequest, page: str, replay: bool = False, **extra: str) -
     return response
 
 
-def _authorized(request: HttpRequest) -> bool:
+def _authorized_scope(request: HttpRequest) -> tuple[bool, str]:
     service: HotspotService = get_service()
-    return service.is_authorized(request.COOKIES.get(DASHBOARD_COOKIE), request.headers.get("Authorization"))
+    ok, scope = service.authorized_scope(request.COOKIES.get(DASHBOARD_COOKIE), request.headers.get("Authorization"))
+    return ok, scope or "*"
+
+
+def _authorized(request: HttpRequest) -> bool:
+    ok, _ = _authorized_scope(request)
+    return ok
 
 
 def _unauthorized() -> HttpResponse:

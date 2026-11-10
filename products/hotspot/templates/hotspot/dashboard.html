@@ -1947,9 +1947,16 @@
                 throw unauthorized;
             }
             if (!response.ok) {
-                var failure = new Error('The server answered ' + response.status);
-                failure.status = response.status;
-                throw failure;
+                return response.json().then(function (data) {
+                    var failure = new Error(data.error || ('The server answered ' + response.status));
+                    failure.status = response.status;
+                    throw failure;
+                }).catch(function (err) {
+                    if (err.status) throw err;
+                    var failure = new Error('The server answered ' + response.status);
+                    failure.status = response.status;
+                    throw failure;
+                });
             }
             return response.json();
         });
@@ -4135,11 +4142,36 @@
     // ---------- Sites & Setup ----------
 
     function renderSiteSwitcher(sites, currentSite) {
-        currentSite = currentSite || state.site || 'all';
+        var isAdmin = !(state.overview && state.overview.scope && state.overview.scope.is_admin === false);
+        var switcherBtn = $('siteSwitcherBtn');
+        var switcherChevron = switcherBtn ? switcherBtn.querySelector('svg:last-child') : null;
+        var topbarAddBtn = $('topbarAddSiteBtn');
+
+        if (!isAdmin) {
+            if (switcherChevron) switcherChevron.style.display = 'none';
+            if (switcherBtn) switcherBtn.style.cursor = 'default';
+            if (topbarAddBtn) topbarAddBtn.style.display = 'none';
+        } else {
+            if (switcherChevron) switcherChevron.style.display = '';
+            if (switcherBtn) switcherBtn.style.cursor = 'pointer';
+            if (topbarAddBtn) topbarAddBtn.style.display = '';
+        }
+
         var nameNode = $('currentSiteName');
         var domainNode = $('currentSiteDomain');
         var siteDot = $('siteDot');
         var listNode = $('siteMenuList');
+
+        if (!isAdmin && sites && sites.length) {
+            var mySite = sites[0];
+            if (nameNode) nameNode.textContent = mySite.name;
+            if (domainNode) domainNode.textContent = mySite.domain;
+            if (siteDot) siteDot.className = 'dot' + (mySite.active_visitors > 0 ? '' : ' inactive');
+            if (listNode) clear(listNode);
+            return;
+        }
+
+        currentSite = currentSite || state.site || 'all';
 
         var selectedObj = (sites || []).filter(function (s) {
             return s.domain === currentSite || s.id === currentSite;
@@ -4241,16 +4273,32 @@
                             el('div', { class: 'muted', style: 'font-size: 11px;' }, 'Created ' + (s.created_at ? fmtDay(s.created_at) : 'recently'))
                         ]),
                         el('td', null, el('span', { class: 'mono', style: 'color: var(--brand); font-weight: 500;' }, s.domain)),
-                        el('td', null, el('div', { class: 'site-api-key-box' }, [
-                            el('span', { text: s.api_key }),
-                            el('button', {
-                                class: 'btn ghost icon xs',
-                                type: 'button',
-                                title: 'Copy API Key',
-                                'aria-label': 'Copy API Key',
-                                style: 'padding: 1px 4px; height: auto;'
-                            }, icon('copy'))
-                        ])),
+                        el('td', null, el('div', { style: 'display: flex; flex-direction: column; gap: 4px;' }, [
+                            el('div', { class: 'site-api-key-box', title: 'Public Script Tracking Key' }, [
+                                el('span', { text: s.api_key }),
+                                el('button', {
+                                    class: 'btn ghost icon xs btn-copy-api',
+                                    type: 'button',
+                                    title: 'Copy Public Tracking Key',
+                                    'aria-label': 'Copy Public Tracking Key',
+                                    style: 'padding: 1px 4px; height: auto;'
+                                }, icon('copy'))
+                            ]),
+                            (s.secret_key ? el('div', {
+                                class: 'site-api-key-box',
+                                style: 'background: rgba(37,99,235,0.06); border-color: rgba(37,99,235,0.22); color: var(--brand);',
+                                title: 'Private Site Secret Key (Used for login)'
+                            }, [
+                                el('span', { text: '••••••••••••••••' }),
+                                el('button', {
+                                    class: 'btn ghost icon xs btn-copy-sec',
+                                    type: 'button',
+                                    title: 'Copy Private Secret Key',
+                                    'aria-label': 'Copy Private Secret Key',
+                                    style: 'padding: 1px 4px; height: auto;'
+                                }, icon('copy'))
+                            ]) : null)
+                        ].filter(Boolean))),
                         el('td', null, el('span', {
                             class: 'site-status-pill ' + (s.active_visitors > 0 || hasData ? 'active' : 'waiting')
                         }, [
@@ -4274,11 +4322,18 @@
                         ])
                     ]);
 
-                    var copyKeyBtn = row.querySelector('.site-api-key-box button');
-                    if (copyKeyBtn) {
-                        copyKeyBtn.addEventListener('click', function (e) {
+                    var copyApiBtn = row.querySelector('.btn-copy-api');
+                    if (copyApiBtn) {
+                        copyApiBtn.addEventListener('click', function (e) {
                             e.stopPropagation();
-                            copyText(s.api_key, copyKeyBtn);
+                            copyText(s.api_key, copyApiBtn);
+                        });
+                    }
+                    var copySecBtn = row.querySelector('.btn-copy-sec');
+                    if (copySecBtn && s.secret_key) {
+                        copySecBtn.addEventListener('click', function (e) {
+                            e.stopPropagation();
+                            copyText(s.secret_key, copySecBtn);
                         });
                     }
 
@@ -4414,6 +4469,8 @@
         var switcherMenu = $('siteDropdownMenu');
         if (switcherBtn && switcherMenu) {
             switcherBtn.addEventListener('click', function (e) {
+                var isAdmin = !(state.overview && state.overview.scope && state.overview.scope.is_admin === false);
+                if (!isAdmin) return;
                 e.stopPropagation();
                 var isHidden = switcherMenu.hidden;
                 switcherMenu.hidden = !isHidden;

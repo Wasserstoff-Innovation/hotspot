@@ -96,24 +96,61 @@ class HotspotService:
         stored = self.store.record_recording(chunk, now=moment)
         return 200, {"status": 1, "received": chunk.event_count, "stored": stored}
 
-    def list_sites(self) -> list[dict[str, Any]]:
-        return self.store.sites()
+    def list_sites(self, authorized_scope: str = "*") -> list[dict[str, Any]]:
+        all_sites = self.store.sites()
+        if authorized_scope == "*":
+            return all_sites
+        return [s for s in all_sites if s.get("domain") == authorized_scope or s.get("id") == authorized_scope]
 
-    def create_site(self, name: str, domain: str, api_key: str | None = None) -> dict[str, Any]:
-        return self.store.save_site(name, domain, api_key)
+    def create_site(
+        self,
+        name: str,
+        domain: str,
+        confirmation_key: str | None = None,
+    ) -> tuple[bool, dict[str, Any] | str]:
+        ok, res = self.store.create_site_safely(name, domain, confirmation_key)
+        if ok and isinstance(res, dict):
+            res["snippet"] = (
+                f'<script src="{self.config.sdk_url}" data-api-host="{self.config.site_url}" '
+                f'data-api-key="{res.get("api_key")}" defer></script>'
+            )
+        return ok, res
 
     def delete_site(self, site_id: str) -> bool:
         return self.store.delete_site(site_id)
 
-    def overview(self, params: Mapping[str, str], now: float | None = None) -> dict[str, Any]:
+    def overview(
+        self,
+        params: Mapping[str, str],
+        authorized_scope: str = "*",
+        now: float | None = None,
+    ) -> dict[str, Any]:
         moment = time.time() if now is None else now
-        return build_overview(self.store, OverviewQuery.from_params(params), self.config, moment)
+        query = OverviewQuery.from_params(params)
+        return build_overview(
+            self.store,
+            query,
+            self.config,
+            moment,
+            authorized_scope=authorized_scope,
+        )
 
-    def session_detail(self, session_id: str, now: float | None = None) -> dict[str, Any] | None:
+    def session_detail(
+        self,
+        session_id: str,
+        authorized_scope: str = "*",
+        now: float | None = None,
+    ) -> dict[str, Any] | None:
         moment = time.time() if now is None else now
         detail = self.store.session(session_id)
         if detail is None:
             return None
+        if authorized_scope != "*":
+            target = authorized_scope.lower()
+            host = (detail.get("host") or "").lower()
+            proj = (detail.get("project_id") or "").lower()
+            if host != target and not host.endswith("." + target) and proj != target:
+                return None
         events = sorted(detail.pop("events", []), key=lambda event: float(event.get("timestamp") or 0))
         return {
             "status": 1,
@@ -128,11 +165,22 @@ class HotspotService:
             ],
         }
 
-    def recording(self, session_id: str, params: Mapping[str, str]) -> str | None:
+    def recording(
+        self,
+        session_id: str,
+        params: Mapping[str, str],
+        authorized_scope: str = "*",
+    ) -> str | None:
         """The recording as JSON text. Chunks are spliced in as stored, so megabytes of events are not re-parsed."""
         summary = self.store.summary(session_id)
         if summary is None:
             return None
+        if authorized_scope != "*":
+            target = authorized_scope.lower()
+            host = (summary.get("host") or "").lower()
+            proj = (summary.get("project_id") or "").lower()
+            if host != target and not host.endswith("." + target) and proj != target:
+                return None
         start = _int_param(params.get("from"), default=0, low=0, high=MAX_RECORDING_CURSOR)
         chunks = self.store.recording_chunks(session_id, start)
         parts = []
@@ -153,11 +201,25 @@ class HotspotService:
         )
         return f'{head[:-1]},"events":[{",".join(parts)}]}}'
 
-    def events_feed(self, params: Mapping[str, str], now: float | None = None) -> dict[str, Any]:
+    def events_feed(
+        self,
+        params: Mapping[str, str],
+        authorized_scope: str = "*",
+        now: float | None = None,
+    ) -> dict[str, Any]:
         moment = time.time() if now is None else now
         since = _float_param(params.get("since"))
         limit = _int_param(params.get("limit"), default=100, low=1, high=MAX_FEED_EVENTS)
         events = self.store.recent_events(limit=limit, since=since)
+        if authorized_scope != "*":
+            target = authorized_scope.lower()
+            events = [
+                e
+                for e in events
+                if (e.get("properties", {}).get("$host") or "").lower() == target
+                or (e.get("properties", {}).get("$host") or "").lower().endswith("." + target)
+                or (e.get("project_id") or "").lower() == target
+            ]
         return {
             "status": 1,
             "now": moment,
@@ -173,24 +235,73 @@ class HotspotService:
             ],
         }
 
-    def login(self, password: str | None, now: float | None = None) -> str | None:
+    def login(
+        self,
+        secret_or_password: str | None,
+        domain: str | None = None,
+        now: float | None = None,
+    ) -> str | None:
         moment = time.time() if now is None else now
-        if not self.config.dashboard_protected:
-            return make_dashboard_token(self.config.secret_key, moment)
-        if password_matches(self.config.dashboard_password, password):
-            return make_dashboard_token(self.config.secret_key, moment)
-        if password in self.config.api_keys or password in ("admin", "buxa2026!", "demo", "guest", "hotspot"):
-            return make_dashboard_token(self.config.secret_key, moment)
+        candidate = (secret_or_password or "").strip()
+        domain_clean = (
+            domain.strip().lower().removeprefix("http://").removeprefix("https://").split("/")[0].split(":")[0]
+            if domain
+            else ""
+        )
+
+        # 1. Master admin password check
+        if password_matches(self.config.dashboard_password, candidate):
+            return make_dashboard_token(self.config.secret_key, moment, scope="*")
+
+        # 2. Domain + Secret Key sign-in
+        if domain_clean and candidate:
+            site = self.store.authenticate_site(domain_clean, candidate)
+            if site:
+                return make_dashboard_token(self.config.secret_key, moment, scope=site["domain"])
+
+        # 3. Direct Secret Key sign-in (domain omitted)
+        if candidate and not domain_clean:
+            site = self.store.get_site_by_secret_key(candidate)
+            if site:
+                return make_dashboard_token(self.config.secret_key, moment, scope=site["domain"])
+
+        # 4. Fallback for unconfigured dev setups
+        if not self.config.dashboard_protected and candidate in ("admin", "guest", "demo", "buxa2026!"):
+            return make_dashboard_token(self.config.secret_key, moment, scope="*")
+
         return None
 
-    def is_authorized(self, cookie_token: str | None, authorization: str | None, now: float | None = None) -> bool:
-        if not self.config.dashboard_protected:
-            return True
+    def authorized_scope(
+        self,
+        cookie_token: str | None,
+        authorization: str | None,
+        now: float | None = None,
+    ) -> tuple[bool, str | None]:
         moment = time.time() if now is None else now
-        if verify_dashboard_token(self.config.secret_key, cookie_token, moment):
-            return True
+        if cookie_token:
+            scope = verify_dashboard_token(self.config.secret_key, cookie_token, moment)
+            if scope:
+                return True, scope
         scheme, _, credential = (authorization or "").partition(" ")
-        return scheme.lower() == "bearer" and password_matches(self.config.dashboard_password, credential.strip())
+        if scheme.lower() == "bearer" and credential:
+            cred = credential.strip()
+            if password_matches(self.config.dashboard_password, cred):
+                return True, "*"
+            site = self.store.get_site_by_secret_key(cred)
+            if site:
+                return True, site["domain"]
+        if not self.config.dashboard_protected:
+            return True, "*"
+        return False, None
+
+    def is_authorized(
+        self,
+        cookie_token: str | None,
+        authorization: str | None,
+        now: float | None = None,
+    ) -> bool:
+        ok, _ = self.authorized_scope(cookie_token, authorization, now=now)
+        return ok
 
     def page_context(self, page: str, nonce: str, **extra: str) -> dict[str, str]:
         context = {

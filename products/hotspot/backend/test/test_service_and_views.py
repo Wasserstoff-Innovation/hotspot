@@ -180,3 +180,84 @@ def test_sites_management_and_scoping(protected_service: HotspotService) -> None
         views.overview(factory.get("/hotspot/api/overview/?site=other.com", headers=auth)).content
     )
     assert overview_other["metrics"]["sessions"] == 0
+
+
+def test_domain_secret_key_auth_and_collision_protection(protected_service: HotspotService) -> None:
+    factory = RequestFactory()
+
+    # 1. Public user registers a domain without prior authentication
+    reg_res = views.sites_endpoint(
+        factory.post(
+            "/hotspot/api/sites/",
+            data=json.dumps({"name": "Acme SaaS", "domain": "acme.com"}),
+            content_type="application/json",
+        )
+    )
+    assert reg_res.status_code == 200
+    site_data = json.loads(reg_res.content)["site"]
+    assert site_data["domain"] == "acme.com"
+    secret_key = site_data["secret_key"]
+    api_key = site_data["api_key"]
+    assert secret_key.startswith("hs_sec_")
+    assert api_key.startswith("hs_live_")
+    assert DASHBOARD_COOKIE in reg_res.cookies
+
+    # 2. Collision protection: Second user attempts to register the same domain
+    hijack_res = views.sites_endpoint(
+        factory.post(
+            "/hotspot/api/sites/",
+            data=json.dumps({"name": "Attacker", "domain": "https://acme.com"}),
+            content_type="application/json",
+        )
+    )
+    assert hijack_res.status_code == 409
+    err = json.loads(hijack_res.content)["error"]
+    assert "already registered" in err
+
+    # 3. Collision protection: Attacker provides wrong confirmation key
+    fail_confirm = views.sites_endpoint(
+        factory.post(
+            "/hotspot/api/sites/",
+            data=json.dumps({"name": "Acme SaaS", "domain": "acme.com", "confirmation_key": "wrong-key"}),
+            content_type="application/json",
+        )
+    )
+    assert fail_confirm.status_code == 409
+    assert "invalid" in json.loads(fail_confirm.content)["error"]
+
+    # 4. Legitimate owner provides correct secret key -> credential rotation succeeds
+    rotate_res = views.sites_endpoint(
+        factory.post(
+            "/hotspot/api/sites/",
+            data=json.dumps({"name": "Acme SaaS Rotated", "domain": "acme.com", "confirmation_key": secret_key}),
+            content_type="application/json",
+        )
+    )
+    assert rotate_res.status_code == 200
+    rotated_site = json.loads(rotate_res.content)["site"]
+    new_secret_key = rotated_site["secret_key"]
+    assert new_secret_key != secret_key
+
+    # 5. User signs in with domain + secret key
+    login_req = factory.post(
+        "/dashboard/login/",
+        data=json.dumps({"domain": "acme.com", "secret_key": new_secret_key}),
+        content_type="application/json",
+    )
+    login_res = views.login(login_req)
+    assert login_res.status_code == 200
+    login_data = json.loads(login_res.content)
+    assert login_data["status"] == 1
+    assert login_data["scope"] == "acme.com"
+    token = login_res.cookies[DASHBOARD_COOKIE].value
+
+    # 6. Tenant isolation: Scoped user overview only shows acme.com
+    scoped_overview_req = factory.get("/hotspot/api/overview/")
+    scoped_overview_req.COOKIES[DASHBOARD_COOKIE] = token
+    overview_res = views.overview(scoped_overview_req)
+    overview_data = json.loads(overview_res.content)
+    assert overview_data["status"] == 1
+    assert overview_data["scope"]["is_admin"] is False
+    assert overview_data["scope"]["authorized_site"] == "acme.com"
+    assert len(overview_data["sites"]) == 1
+    assert overview_data["sites"][0]["domain"] == "acme.com"
