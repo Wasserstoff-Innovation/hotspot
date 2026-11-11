@@ -12,9 +12,11 @@ from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 
 from products.hotspot.backend.auth import DASHBOARD_COOKIE, TOKEN_TTL_SECONDS, verify_dashboard_token
+from products.hotspot.backend.mcp import McpAuthError, handle_mcp_http_payload, mcp_discovery_document, resolve_mcp_auth
 from products.hotspot.backend.security import (
     API_CSP,
     CAPTURE_CORS_HEADERS,
+    MCP_CORS_HEADERS,
     NO_STORE_HEADERS,
     generate_nonce,
     is_same_site_form_post,
@@ -287,3 +289,49 @@ def _params(request: HttpRequest) -> dict[str, str]:
 def _apply(response: HttpResponse, headers: Mapping[str, str]) -> None:
     for name, value in headers.items():
         response[name] = value
+
+
+@csrf_exempt
+def mcp_endpoint(request: HttpRequest) -> HttpResponse:
+    """Streamable HTTP MCP endpoint for Django deployments."""
+    headers = {**MCP_CORS_HEADERS, **NO_STORE_HEADERS}
+    if request.method == "OPTIONS":
+        return HttpResponse(status=204, headers=MCP_CORS_HEADERS)
+
+    service = get_service()
+    if request.method == "DELETE":
+        return JsonResponse({"status": 1, "closed": True}, headers=headers)
+
+    if request.method == "GET":
+        try:
+            resolve_mcp_auth(service, headers=request.headers, query_params=request.GET, require=False)
+        except McpAuthError as exc:
+            err_headers = {**headers, "WWW-Authenticate": 'Bearer realm="hotspot-mcp"'}
+            return JsonResponse(
+                {"jsonrpc": "2.0", "error": {"code": -32001, "message": str(exc)}, "id": None},
+                status=401,
+                headers=err_headers,
+            )
+        accept = (request.headers.get("accept") or "").lower()
+        if "text/event-stream" in accept and "application/json" not in accept and "text/html" not in accept:
+            return HttpResponse(status=405, headers={"Allow": "POST, OPTIONS", **MCP_CORS_HEADERS})
+        return JsonResponse(mcp_discovery_document(service), headers=headers)
+
+    if request.method != "POST":
+        return HttpResponse(status=405, headers={"Allow": "GET, POST, DELETE, OPTIONS", **MCP_CORS_HEADERS})
+
+    status, payload = handle_mcp_http_payload(
+        request.body,
+        service=service,
+        headers=request.headers,
+        query_params=request.GET,
+    )
+    if status == 401:
+        headers = {**headers, "WWW-Authenticate": 'Bearer realm="hotspot-mcp"'}
+    if status == 202 or payload is None:
+        return HttpResponse(status=202, headers=headers)
+    accept = (request.headers.get("accept") or "").lower()
+    if status == 200 and "text/event-stream" in accept and "application/json" not in accept:
+        body = f"event: message\ndata: {json.dumps(payload, default=str)}\n\n"
+        return HttpResponse(body, status=200, content_type="text/event-stream; charset=utf-8", headers=headers)
+    return JsonResponse(payload, status=status, safe=False, headers=headers)

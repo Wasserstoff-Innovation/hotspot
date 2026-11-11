@@ -8,15 +8,28 @@ from __future__ import annotations
 
 import os
 import sys
+import json
 import time
-from collections.abc import Callable
+import uuid
+import asyncio
+from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 from typing import Any
 
 from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
+from starlette.responses import (
+    HTMLResponse,
+    JSONResponse,
+    PlainTextResponse,
+    RedirectResponse,
+    Response,
+    StreamingResponse,
+)
 from starlette.routing import Route
+
+from products.hotspot.backend.mcp import McpAuthError, handle_mcp_http_payload, mcp_discovery_document, resolve_mcp_auth
+from products.hotspot.backend.security import MCP_CORS_HEADERS, NO_STORE_HEADERS
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(REPO_ROOT) not in sys.path:
@@ -26,7 +39,6 @@ from products.hotspot.backend.auth import DASHBOARD_COOKIE, TOKEN_TTL_SECONDS, v
 from products.hotspot.backend.security import (  # noqa: E402
     API_CSP,
     CAPTURE_CORS_HEADERS,
-    NO_STORE_HEADERS,
     generate_nonce,
     is_same_site_form_post,
     page_csp,
@@ -308,6 +320,162 @@ def _unauthorized() -> Response:
     return _json({"status": 0, "error": "Sign in to the dashboard first"}, status=401)
 
 
+_MCP_SSE_QUEUES: dict[str, tuple[Any, dict[str, str], dict[str, str]]] = {}
+
+
+async def mcp_endpoint(request: Request) -> Response:
+    """Streamable HTTP MCP endpoint (`/mcp`)."""
+    headers = {**MCP_CORS_HEADERS, **NO_STORE_HEADERS}
+    if request.method == "OPTIONS":
+        return Response(status_code=204, headers=MCP_CORS_HEADERS)
+
+    service = _service()
+    if request.method == "DELETE":
+        return JSONResponse({"status": 1, "closed": True}, headers=headers)
+
+    req_headers = dict(request.headers)
+    req_query = dict(request.query_params)
+
+    if request.method == "GET":
+        try:
+            resolve_mcp_auth(service, headers=req_headers, query_params=req_query, require=False)
+        except McpAuthError as exc:
+            return JSONResponse(
+                {"jsonrpc": "2.0", "error": {"code": -32001, "message": str(exc)}, "id": None},
+                status_code=401,
+                headers={**headers, "WWW-Authenticate": 'Bearer realm="hotspot-mcp"'},
+            )
+        accept = (request.headers.get("accept") or "").lower()
+        if "text/event-stream" in accept and "text/html" not in accept:
+            return Response(status_code=405, headers={"Allow": "POST, OPTIONS", **MCP_CORS_HEADERS})
+        return JSONResponse(mcp_discovery_document(service), headers=headers)
+
+    body = await request.body()
+    status, payload = handle_mcp_http_payload(
+        body,
+        service=service,
+        headers=req_headers,
+        query_params=req_query,
+    )
+    if status == 401:
+        headers = {**headers, "WWW-Authenticate": 'Bearer realm="hotspot-mcp"'}
+    if status == 202 or payload is None:
+        return Response(status_code=202, headers=headers)
+
+    accept = (request.headers.get("accept") or "").lower()
+    if status == 200 and "text/event-stream" in accept and "application/json" not in accept:
+        sse_body = f"event: message\ndata: {json.dumps(payload, default=str)}\n\n"
+        return Response(
+            content=sse_body,
+            status_code=200,
+            media_type="text/event-stream",
+            headers={**headers, "Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+    return JSONResponse(payload, status_code=status, headers=headers)
+
+
+async def mcp_sse_endpoint(request: Request) -> Response:
+    """Legacy SSE MCP stream endpoint (`/mcp/sse`)."""
+    if request.method == "OPTIONS":
+        return Response(status_code=204, headers=MCP_CORS_HEADERS)
+
+    service = _service()
+    req_headers = dict(request.headers)
+    req_query = dict(request.query_params)
+    try:
+        resolve_mcp_auth(service, headers=req_headers, query_params=req_query, require=False)
+    except McpAuthError as exc:
+        return JSONResponse(
+            {"jsonrpc": "2.0", "error": {"code": -32001, "message": str(exc)}, "id": None},
+            status_code=401,
+            headers={**MCP_CORS_HEADERS, **NO_STORE_HEADERS, "WWW-Authenticate": 'Bearer realm="hotspot-mcp"'},
+        )
+
+    if len(_MCP_SSE_QUEUES) >= 512:
+        oldest_sid = next(iter(_MCP_SSE_QUEUES))
+        old_q, _, _ = _MCP_SSE_QUEUES.pop(oldest_sid)
+        try:
+            old_q.put_nowait(None)
+        except asyncio.QueueFull:
+            pass
+
+    session_id = uuid.uuid4().hex
+    queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=256)
+    _MCP_SSE_QUEUES[session_id] = (queue, req_headers, req_query)
+    endpoint_uri = f"/mcp/messages/?session_id={session_id}"
+
+    async def _stream() -> AsyncIterator[str]:
+        try:
+            yield f"event: endpoint\ndata: {endpoint_uri}\n\n"
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    msg = await asyncio.wait_for(queue.get(), timeout=20.0)
+                except TimeoutError:
+                    yield ": ping\n\n"
+                    continue
+                if msg is None:
+                    break
+                yield f"event: message\ndata: {msg}\n\n"
+        finally:
+            _MCP_SSE_QUEUES.pop(session_id, None)
+
+    return StreamingResponse(
+        _stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+            **MCP_CORS_HEADERS,
+        },
+    )
+
+
+async def mcp_messages_endpoint(request: Request) -> Response:
+    """Legacy SSE MCP POST messages endpoint (`/mcp/messages/`)."""
+    headers = {**MCP_CORS_HEADERS, **NO_STORE_HEADERS}
+    if request.method == "OPTIONS":
+        return Response(status_code=204, headers=MCP_CORS_HEADERS)
+
+    session_id = (request.query_params.get("session_id") or "").strip()
+    entry = _MCP_SSE_QUEUES.get(session_id)
+    if entry is None:
+        return JSONResponse(
+            {"error": "Unknown or expired MCP SSE session_id"},
+            status_code=404,
+            headers=headers,
+        )
+
+    queue, conn_headers, conn_query = entry
+    post_headers = dict(request.headers)
+    merged_headers = {**conn_headers}
+    for key in ("authorization", "x-hotspot-secret-key", "x-api-key", "accept", "content-type"):
+        if key in post_headers:
+            merged_headers[key] = post_headers[key]
+    merged_query = {**conn_query, **dict(request.query_params)}
+
+    body = await request.body()
+    status, payload = handle_mcp_http_payload(
+        body,
+        service=_service(),
+        headers=merged_headers,
+        query_params=merged_query,
+    )
+    if status == 401:
+        return JSONResponse(
+            payload,
+            status_code=401,
+            headers={**headers, "WWW-Authenticate": 'Bearer realm="hotspot-mcp"'},
+        )
+    if status == 400:
+        return JSONResponse(payload, status_code=400, headers=headers)
+    if payload is not None:
+        await queue.put(json.dumps(payload, default=str))
+    return Response(status_code=202, headers=headers)
+
+
 routes = [
     Route("/", landing),
     Route("/login/", login, methods=["GET", "POST", "HEAD"]),
@@ -335,6 +503,12 @@ routes = [
     Route("/hotspot/api/sessions/{session_id}/", session_detail),
     Route("/hotspot/api/sessions/{session_id}/recording/", session_recording),
     Route("/hotspot/api/events/", events_feed),
+    Route("/mcp", mcp_endpoint, methods=["GET", "POST", "DELETE", "OPTIONS"]),
+    Route("/mcp/", mcp_endpoint, methods=["GET", "POST", "DELETE", "OPTIONS"]),
+    Route("/mcp/sse", mcp_sse_endpoint, methods=["GET", "OPTIONS"]),
+    Route("/mcp/sse/", mcp_sse_endpoint, methods=["GET", "OPTIONS"]),
+    Route("/mcp/messages/", mcp_messages_endpoint, methods=["POST", "OPTIONS"]),
+    Route("/mcp/messages", mcp_messages_endpoint, methods=["POST", "OPTIONS"]),
 ]
 
 app = Starlette(routes=routes)

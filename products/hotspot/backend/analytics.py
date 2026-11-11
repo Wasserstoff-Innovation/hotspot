@@ -21,7 +21,9 @@ MAX_LIST_ROWS = 25
 TREND_MAX_BUCKETS = 91
 FLOW_DEPTH = 5
 FLOW_NODES_PER_STEP = 6
-STATUS_FILTERS = frozenset({"all", "converted", "rage", "error", "bounced", "engaged", "active", "identified", "dead"})
+STATUS_FILTERS = frozenset(
+    {"all", "converted", "rage", "error", "bounced", "engaged", "active", "identified", "dead", "broken"}
+)
 STEP_KINDS = frozenset({"path", "event", "click", "text"})
 CLICK_EVENTS = frozenset({"$autocapture", "$rageclick"})
 # Referrer hosts are grouped into the channels a marketing report uses. A label match ("google" in
@@ -1146,6 +1148,9 @@ def _matches_session_filter(summary: Mapping[str, Any], query: OverviewQuery, no
             return False
     elif wanted == "dead":
         if not summary.get("dead_click_count"):
+            return False
+    elif wanted == "broken":
+        if not (summary.get("rage_click_count") or summary.get("dead_click_count") or summary.get("error_count")):
             return False
     elif wanted != "all" and status != wanted:
         return False

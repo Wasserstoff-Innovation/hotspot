@@ -32,4 +32,6 @@ urlpatterns = [
     re_path(rf"^hotspot/api/sessions/{SESSION_ID}/?$", views.session_detail, name="hotspot_api_session"),
     re_path(rf"^hotspot/api/sessions/{SESSION_ID}/recording/?$", views.session_recording, name="hotspot_api_recording"),
     re_path(r"^hotspot/api/events/?$", views.events_feed, name="hotspot_api_events"),
+    re_path(r"^mcp/?$", views.mcp_endpoint, name="hotspot_mcp"),
+    re_path(r"^hotspot/mcp/?$", views.mcp_endpoint, name="hotspot_prefixed_mcp"),
 ]

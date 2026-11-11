@@ -1751,6 +1751,54 @@
                     </div>
                 </div>
 
+                <!-- 2b. Full MCP Suite for AI Coding & Analytics -->
+                <div class="card install-embed-card" style="margin-bottom: 18px;">
+                    <div class="card-head">
+                        <div>
+                            <h3>AI &amp; Full MCP Suite</h3>
+                            <p class="muted" style="font-size: 12.5px; margin-top: 2px;">Let AI assistants read setup instructions, wire Hotspot into code, run synthetic test sessions, and pull chart-ready data scoped to your Secret Key.</p>
+                        </div>
+                        <span class="chip" style="background: var(--blue-bg); color: var(--blue); border-color: rgba(37,99,235,0.2);">Streamable HTTP + SSE + stdio</span>
+                    </div>
+                    <div class="card-body">
+                        <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; font-size: 12px;">
+                            <div style="flex: 1; min-width: 220px; padding: 10px 12px; background: var(--subtle); border: 1px solid var(--border); border-radius: 8px;">
+                                <div class="muted" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;">Streamable HTTP URL</div>
+                                <code id="mcpStreamUrlText" style="word-break: break-all;">{{ site_url }}/mcp</code>
+                            </div>
+                            <div style="flex: 1; min-width: 220px; padding: 10px 12px; background: var(--subtle); border: 1px solid var(--border); border-radius: 8px;">
+                                <div class="muted" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;">Legacy SSE URL</div>
+                                <code id="mcpSseUrlText" style="word-break: break-all;">{{ site_url }}/mcp/sse</code>
+                            </div>
+                        </div>
+
+                        <div class="code-box-card">
+                            <div class="code-box-card-head">
+                                <span class="code-box-tag">MCP Client Config (Claude Code / Cursor / Antigravity)</span>
+                                <button class="btn sm" type="button" id="btnCopyMcpConfig">
+                                    <span class="ico" data-icon="copy"></span>
+                                    <span>Copy MCP Config</span>
+                                </button>
+                            </div>
+                            <div class="code-box-card-content"><pre style="margin: 0; white-space: pre-wrap; word-break: break-all; font: inherit;"><code id="snippetMcpConfig">{
+  "mcpServers": {
+    "hotspot": {
+      "type": "http",
+      "url": "{{ site_url }}/mcp",
+      "headers": {
+        "Authorization": "Bearer &lt;YOUR_HOTSPOT_SECRET_KEY&gt;"
+      }
+    }
+  }
+}</code></pre></div>
+                        </div>
+
+                        <p class="muted" style="font-size: 12px; margin-top: 12px; line-height: 1.5;">
+                            <strong>Includes 17 tools &amp; 4 guides:</strong> <code>get_important_instructions</code>, <code>register_site</code>, <code>get_site_setup</code>, <code>verify_connection</code>, <code>send_test_session</code>, <code>get_chart_data</code>, <code>get_funnel_analysis</code>, <code>get_user_flows</code>, <code>get_breakage_and_errors</code>, <code>get_pages_and_vitals</code>, <code>get_referrers_and_ai_traffic</code>, <code>get_realtime_snapshot</code>, <code>list_sessions</code>, <code>get_session_detail</code>, and <code>get_live_events</code>. Never put your Secret Key (<code>hs_sec_...</code>) inside client-side website HTML.
+                        </p>
+                    </div>
+                </div>
+
                 <!-- 3. Reference Options -->
                 <div class="ref">
                     <details>
@@ -4927,6 +4975,32 @@
         if (copyBtn) {
             copyBtn.onclick = function () {
                 copyText(snippetCode, copyBtn);
+            };
+        }
+
+        var mcpBase = (CONFIG.siteUrl || window.location.origin || '').replace(/\/+$/, '');
+        var activeSecret = (activeSiteObj && activeSiteObj.secret_key) ? activeSiteObj.secret_key : '<YOUR_HOTSPOT_SECRET_KEY>';
+        var mcpStreamEl = $('mcpStreamUrlText');
+        if (mcpStreamEl) mcpStreamEl.textContent = mcpBase + '/mcp';
+        var mcpSseEl = $('mcpSseUrlText');
+        if (mcpSseEl) mcpSseEl.textContent = mcpBase + '/mcp/sse';
+        var mcpConfigText = JSON.stringify({
+            mcpServers: {
+                hotspot: {
+                    type: 'http',
+                    url: mcpBase + '/mcp',
+                    headers: {
+                        Authorization: 'Bearer ' + activeSecret
+                    }
+                }
+            }
+        }, null, 2);
+        var mcpConfigEl = $('snippetMcpConfig');
+        if (mcpConfigEl) mcpConfigEl.textContent = mcpConfigText;
+        var copyMcpBtn = $('btnCopyMcpConfig');
+        if (copyMcpBtn) {
+            copyMcpBtn.onclick = function () {
+                copyText(mcpConfigText, copyMcpBtn);
             };
         }
     }

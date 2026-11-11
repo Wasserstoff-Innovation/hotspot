@@ -56,3 +56,15 @@ def is_same_site_form_post(headers: Mapping[str, str]) -> bool:
     lowered = {key.lower(): value for key, value in headers.items()}
     site = lowered.get("sec-fetch-site")
     return site is None or site in ("same-origin", "same-site", "none")
+
+
+MCP_CORS_HEADERS: dict[str, str] = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": (
+        "Content-Type, Authorization, X-Hotspot-Secret-Key, X-API-Key, Accept, "
+        "Mcp-Session-Id, Mcp-Protocol-Version, Last-Event-ID"
+    ),
+    "Access-Control-Expose-Headers": "Mcp-Session-Id, Mcp-Protocol-Version",
+    "Access-Control-Max-Age": "86400",
+}

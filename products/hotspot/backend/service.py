@@ -346,6 +346,9 @@ class HotspotService:
             f"- Script: {self.config.sdk_url}\n"
             f"- Capture endpoint: {self.config.site_url}/hotspot/batch/\n"
             f"- Recording endpoint: {self.config.site_url}/hotspot/replay/\n"
+            f"- MCP Streamable HTTP endpoint: {self.config.site_url}/mcp\n"
+            f"- MCP Legacy SSE endpoint: {self.config.site_url}/mcp/sse\n"
+            "- MCP Auth: pass your site's private Secret Key (hs_sec_...) via `Authorization: Bearer hs_sec_...`\n"
         )
 
 
