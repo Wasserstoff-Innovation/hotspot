@@ -394,7 +394,8 @@
             color: #E2E8F0;
             overflow-x: auto;
             white-space: pre-wrap;
-            word-break: break-all;
+            word-break: normal;
+            overflow-wrap: anywhere;
         }
 
         /* Modal */
@@ -1220,7 +1221,7 @@
         .wsteps button.active .n { background: var(--brand); border-color: var(--brand); color: #fff; }
         .wsteps button.done .n { background: var(--success); border-color: var(--success); color: #fff; }
         .step { margin-top: 0; }
-        .step .sbody { padding: 16px 20px 18px; min-width: 0; }
+        .sbody, .step .sbody { padding: 16px 20px 18px; min-width: 0; }
         .step h2 { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
         .step .lead { color: var(--text-2); font-size: 13px; margin-top: 4px; line-height: 1.55; }
         .step .lead code, .step p code { font-family: var(--mono); font-size: 12px; background: var(--subtle); border: 1px solid var(--border); padding: 0 4px; border-radius: 4px; }
@@ -1238,7 +1239,7 @@
         .step textarea { width: 100%; min-height: 150px; margin-top: 10px; padding: 10px 12px; border: 1px solid var(--border-2); border-radius: 8px; font-family: var(--mono); font-size: 12px; line-height: 1.5; color: var(--text-2); background: var(--subtle); resize: vertical; }
         .wfoot { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
         .wfoot .spacer { flex: 1; }
-        .ref { max-width: 980px; margin-top: 16px; }
+        .ref { margin-top: 16px; }
         .ref details { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow-sm); }
         .ref details + details { margin-top: 10px; }
         .ref summary { padding: 11px 16px; font-size: 13.5px; font-weight: 600; cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px; }
@@ -2043,15 +2044,14 @@
 
                 <!-- 2. Installation Guide for Selected Site -->
                 <div class="card mb-20" id="installGuideCard" style="margin-bottom: 20px;">
-                    <div class="sbody">
-                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
-                            <div>
-                                <h2 style="font-size: 16px; font-weight: 600; margin: 0;">1-Line Embed Script for <span id="installSiteLabel" style="color: var(--brand);">Current Site</span></h2>
-                                <p class="lead" style="margin-top: 4px;">Paste this tag into the <code>&lt;head&gt;</code> of your website. Clicks, rage clicks, session replays, and dropoffs are recorded automatically.</p>
-                            </div>
+                    <div class="card-head">
+                        <div>
+                            <h2 style="font-size: 15px; font-weight: 600; margin: 0;">1-Line Embed Script for <span id="installSiteLabel" style="color: var(--brand);">Current Site</span></h2>
+                            <p class="muted" style="font-size: 12.5px; margin: 3px 0 0;">Paste this tag into the <code>&lt;head&gt;</code> of your website. Clicks, rage clicks, session replays, and dropoffs are recorded automatically.</p>
                         </div>
-
-                        <div class="code-box-card">
+                    </div>
+                    <div class="card-body">
+                        <div class="code-box-card" style="margin-top: 0;">
                             <div class="code-box-card-head">
                                 <span class="code-box-tag">HTML Tracking Snippet</span>
                                 <button class="btn sm" type="button" id="btnCopyInstallDynamic">
