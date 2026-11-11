@@ -6,9 +6,11 @@ import json
 import time
 import zlib
 import logging
+import secrets
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlencode, urlsplit, urlunsplit
 
 from products.hotspot import __version__
 from products.hotspot.backend.analytics import OverviewQuery, build_overview, format_session, setup_info
@@ -21,6 +23,9 @@ logger = logging.getLogger(__name__)
 
 PRODUCT_PATH = Path(__file__).resolve().parent.parent
 SDK_PATH = PRODUCT_PATH / "sdk" / "hotspot.js"
+SKILL_PATH = PRODUCT_PATH / "skill" / "SKILL.md"
+_CONNECT_TTL_SECONDS = 600
+_CONNECT_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 # The files served under /hotspot/assets/: the rrweb recorder the script loads on visitors' pages, the
 # player the dashboard uses and the world map it draws. This allowlist is the only way a request
 # reaches the vendor directory.
@@ -44,6 +49,7 @@ PAGE_TITLES = {
     "dashboard": "Hotspot dashboard",
     "demo": "Sample site for testing Hotspot",
     "login": "Sign in to the Hotspot dashboard",
+    "connect": "Authorize AI Assistant or CLI - Hotspot",
 }
 
 
@@ -542,21 +548,424 @@ class HotspotService:
         return self._assets[name], content_type
 
     def llms_txt(self) -> str:
+        base = self.config.site_url.rstrip("/")
         return (
             "# Hotspot\n"
             "> Self-hosted product telemetry: one script tag captures page views, clicks, rage clicks, "
             "dead clicks, scroll depth, form submits, JavaScript errors, web vitals and a DOM recording of "
             "each session. The dashboard replays sessions with console and network activity, and shows "
             "funnels, paths, friction, pages, referrers and errors.\n\n"
-            f"- Dashboard: {self.config.site_url}/dashboard/\n"
-            f"- Sample site: {self.config.site_url}/demo/\n"
+            f"- Skill file (downloadable Markdown for coding agents): {base}/skill.md\n"
+            f"- Dashboard: {base}/dashboard/\n"
+            f"- Browser agent login / connect page: {base}/connect/\n"
+            f"- Sample site: {base}/demo/\n"
             f"- Script: {self.config.sdk_url}\n"
-            f"- Capture endpoint: {self.config.site_url}/hotspot/batch/\n"
-            f"- Recording endpoint: {self.config.site_url}/hotspot/replay/\n"
-            f"- MCP Streamable HTTP endpoint: {self.config.site_url}/mcp\n"
-            f"- MCP Legacy SSE endpoint: {self.config.site_url}/mcp/sse\n"
+            f"- Capture endpoint: {base}/hotspot/batch/\n"
+            f"- Recording endpoint: {base}/hotspot/replay/\n"
+            f"- Register website API: POST {base}/hotspot/api/sites/\n"
+            f"- Automated device connect API: POST {base}/hotspot/api/connect/start/ -> poll POST {base}/hotspot/api/connect/token/\n"
+            f"- MCP Streamable HTTP endpoint: {base}/mcp\n"
+            f"- MCP Legacy SSE endpoint: {base}/mcp/sse\n"
             "- MCP Auth: pass your site's private Secret Key (hs_sec_...) via `Authorization: Bearer hs_sec_...`\n"
+            "- Local Secret Storage: save hs_sec_... only in gitignored local files (.env.hotspot.local or ~/.config/hotspot/credentials.json, chmod 600); never embed hs_sec_... in client JS/HTML.\n"
         )
+
+    def skill_markdown(self) -> str:
+        base = self.config.site_url.rstrip("/")
+        template = SKILL_PATH.read_text(encoding="utf-8")
+        return (
+            template.replace("{{ site_url }}", base)
+            .replace("{{ sdk_url }}", self.config.sdk_url)
+            .replace("{{ mcp_url }}", f"{base}/mcp")
+            .replace("{{ version }}", __version__)
+        )
+
+    @staticmethod
+    def _normalize_user_code(raw: str | None) -> str:
+        cleaned = "".join(ch for ch in (raw or "").upper() if ch.isalnum())
+        if len(cleaned) != 8:
+            return ""
+        return f"{cleaned[:4]}-{cleaned[4:]}"
+
+    @staticmethod
+    def _connect_dev_key(device_code: str) -> str:
+        return f"connect:dev:{device_code}"
+
+    @staticmethod
+    def _connect_usr_key(user_code: str) -> str:
+        return f"connect:usr:{user_code}"
+
+    def _public_site_summary(self, site: Mapping[str, Any]) -> dict[str, Any]:
+        return {
+            "id": site.get("id"),
+            "name": site.get("name"),
+            "domain": site.get("domain"),
+            "api_key": site.get("api_key"),
+            "created_at": site.get("created_at"),
+        }
+
+    def start_connect_session(
+        self,
+        *,
+        client_name: str = "AI Assistant",
+        domain_hint: str = "",
+        name_hint: str = "",
+        redirect_uri: str = "",
+        state: str = "",
+        now: float | None = None,
+    ) -> tuple[int, dict[str, Any]]:
+        clean_redirect = (redirect_uri or "").strip()
+        if clean_redirect and not is_safe_loopback_redirect(clean_redirect):
+            return 400, {
+                "status": 0,
+                "error": "redirect_uri must be an http://localhost:<port>/... or http://127.0.0.1:<port>/... callback URL.",
+            }
+        moment = time.time() if now is None else now
+        device_code = f"hs_dev_{secrets.token_urlsafe(24)}"
+        user_code = ""
+        for _ in range(8):
+            raw_code = "".join(secrets.choice(_CONNECT_CODE_ALPHABET) for _ in range(8))
+            candidate = f"{raw_code[:4]}-{raw_code[4:]}"
+            if self.store.get_ephemeral(self._connect_usr_key(candidate)) is None:
+                user_code = candidate
+                break
+        if not user_code:
+            return 503, {"status": 0, "error": "Could not allocate connect code. Retry shortly."}
+
+        clean_client = " ".join((client_name or "AI Assistant").split())[:64] or "AI Assistant"
+        record = {
+            "device_code": device_code,
+            "user_code": user_code,
+            "client_name": clean_client,
+            "domain_hint": domain_hint.strip()[:200],
+            "name_hint": name_hint.strip()[:100],
+            "redirect_uri": clean_redirect,
+            "state": state.strip()[:200],
+            "status": "pending",
+            "created_at": moment,
+            "expires_at": moment + _CONNECT_TTL_SECONDS,
+        }
+        self.store.set_ephemeral(self._connect_dev_key(device_code), record, _CONNECT_TTL_SECONDS)
+        self.store.set_ephemeral(self._connect_usr_key(user_code), {"device_code": device_code}, _CONNECT_TTL_SECONDS)
+
+        base = self.config.site_url.rstrip("/")
+        return 200, {
+            "status": 1,
+            "device_code": device_code,
+            "user_code": user_code,
+            "verification_uri": f"{base}/connect/?code={user_code}",
+            "verification_uri_base": f"{base}/connect/",
+            "expires_in": _CONNECT_TTL_SECONDS,
+            "interval": 2,
+        }
+
+    def connect_session_status(
+        self,
+        user_code: str,
+        *,
+        cookie_token: str | None = None,
+        authorization: str | None = None,
+        now: float | None = None,
+    ) -> tuple[int, dict[str, Any]]:
+        moment = time.time() if now is None else now
+        has_auth, scope = self.explicit_authorized_scope(cookie_token, authorization, now=moment)
+        if not has_auth and not self.config.dashboard_protected:
+            has_auth, scope = True, "*"
+        signed_sites = (
+            [self._public_site_summary(s) for s in self.list_sites(authorized_scope=scope or "*")]
+            if has_auth and scope
+            else []
+        )
+
+        norm = self._normalize_user_code(user_code)
+        session_info: dict[str, Any] | None = None
+        if norm:
+            ptr = self.store.get_ephemeral(self._connect_usr_key(norm))
+            record = self.store.get_ephemeral(self._connect_dev_key(str(ptr["device_code"]))) if ptr else None
+            if record and float(record.get("expires_at") or 0) > moment:
+                session_info = {
+                    "user_code": record["user_code"],
+                    "client_name": record.get("client_name") or "AI Assistant",
+                    "domain_hint": record.get("domain_hint") or "",
+                    "name_hint": record.get("name_hint") or "",
+                    "has_redirect_uri": bool(record.get("redirect_uri")),
+                    "status": record.get("status") or "pending",
+                    "expires_in": max(0, int(float(record["expires_at"]) - moment)),
+                }
+
+        return 200, {
+            "status": 1,
+            "session": session_info,
+            "signed_in": bool(has_auth),
+            "is_admin": scope == "*",
+            "dashboard_protected": self.config.dashboard_protected,
+            "sites": signed_sites,
+        }
+
+    def _resolve_approved_sites_and_token(
+        self,
+        *,
+        mode: str,
+        site_id: str | None,
+        domain: str,
+        name: str,
+        secret_key: str,
+        password: str,
+        confirmation_key: str | None,
+        key_mode: str,
+        source_site: str | None,
+        cookie_token: str | None,
+        authorization: str | None,
+        moment: float,
+    ) -> tuple[int, dict[str, Any], str | None, dict[str, Any] | None, str | None]:
+        """Resolve (status_code, error_body, grant_secret, primary_site, refreshed_cookie_token)."""
+        from products.hotspot.backend.analytics import site_in_scope  # noqa: PLC0415
+
+        clean_mode = (mode or "existing").strip().lower()
+        if clean_mode == "register":
+            status_code, body = self.create_site_for_session(
+                name,
+                domain,
+                confirmation_key=confirmation_key,
+                key_mode=key_mode,
+                source_site=source_site,
+                cookie_token=cookie_token,
+                authorization=authorization,
+                now=moment,
+            )
+            if status_code != 200:
+                return status_code, body, None, None, None
+            created = body["site"]
+            return 200, {}, str(created["secret_key"]), created, str(body.get("token") or "")
+
+        if clean_mode == "login":
+            cred = (password or secret_key or "").strip()
+            token = self.login(cred, domain or None, now=moment)
+            if token is None:
+                return 401, {"status": 0, "error": "Invalid domain or secret key. Try again."}, None, None, None
+            login_scope = verify_dashboard_token(self.config.secret_key, token, moment) or "*"
+            owned = self.list_sites(authorized_scope=login_scope)
+            chosen: dict[str, Any] | None = None
+            target = (site_id or domain or "").strip().lower()
+            if target:
+                for site in owned:
+                    if target in {str(site.get("id") or "").lower(), str(site.get("domain") or "").lower()}:
+                        chosen = site
+                        break
+            elif owned:
+                chosen = owned[0]
+            if login_scope == "*" and password_matches(self.config.dashboard_password, cred):
+                grant_secret = str(chosen["secret_key"]) if chosen and chosen.get("secret_key") else cred
+                return 200, {}, grant_secret, chosen, token
+            return 200, {}, cred, chosen, token
+
+        if clean_mode == "existing":
+            has_auth, scope = self.explicit_authorized_scope(cookie_token, authorization, now=moment)
+            if not has_auth and not self.config.dashboard_protected:
+                has_auth, scope = True, "*"
+            if not has_auth or not scope:
+                return 401, {"status": 0, "error": "Sign in before authorizing an existing site."}, None, None, None
+
+            owned = self.list_sites(authorized_scope=scope)
+            target = (site_id or domain or "").strip().lower()
+            chosen_site: dict[str, Any] | None = None
+            if target and target != "__admin__":
+                for site in owned:
+                    if target in {str(site.get("id") or "").lower(), str(site.get("domain") or "").lower()}:
+                        chosen_site = site
+                        break
+                if chosen_site is None or (scope != "*" and not site_in_scope(chosen_site, scope)):
+                    return 403, {"status": 0, "error": "Selected site is outside your session scope."}, None, None, None
+            elif target != "__admin__" and owned:
+                chosen_site = owned[0]
+
+            if chosen_site and chosen_site.get("secret_key"):
+                return 200, {}, str(chosen_site["secret_key"]), chosen_site, None
+            if scope == "*" and self.config.dashboard_protected and self.config.dashboard_password:
+                return 200, {}, self.config.dashboard_password, chosen_site, None
+            return 400, {"status": 0, "error": "No secret key found for the selected site."}, None, None, None
+
+        return 400, {"status": 0, "error": "Invalid approval mode."}, None, None, None
+
+    def approve_connect_session(
+        self,
+        user_code: str,
+        *,
+        mode: str = "existing",
+        site_id: str | None = None,
+        domain: str = "",
+        name: str = "",
+        secret_key: str = "",
+        password: str = "",
+        confirmation_key: str | None = None,
+        key_mode: str = "new",
+        source_site: str | None = None,
+        cookie_token: str | None = None,
+        authorization: str | None = None,
+        now: float | None = None,
+    ) -> tuple[int, dict[str, Any]]:
+        moment = time.time() if now is None else now
+        norm = self._normalize_user_code(user_code)
+        if not norm:
+            return 400, {"status": 0, "error": "Enter a valid 8-character connect code (e.g. ABCD-1234)."}
+
+        ptr = self.store.get_ephemeral(self._connect_usr_key(norm))
+        device_code = str(ptr.get("device_code") or "") if ptr else ""
+        record = self.store.get_ephemeral(self._connect_dev_key(device_code)) if device_code else None
+        if not record or float(record.get("expires_at") or 0) <= moment:
+            return 404, {
+                "status": 0,
+                "error": "Connect code is invalid or expired. Generate a new one from your CLI or agent.",
+            }
+        if record.get("status") != "pending":
+            return 409, {"status": 0, "error": "This connect code has already been authorized."}
+
+        err_status, err_body, grant_secret, primary_site, refreshed_token = self._resolve_approved_sites_and_token(
+            mode=mode,
+            site_id=site_id,
+            domain=domain,
+            name=name,
+            secret_key=secret_key,
+            password=password,
+            confirmation_key=confirmation_key,
+            key_mode=key_mode,
+            source_site=source_site,
+            cookie_token=cookie_token,
+            authorization=authorization,
+            moment=moment,
+        )
+        if err_status != 200 or not grant_secret:
+            return err_status, err_body
+
+        matching_sites = self.store.get_sites_by_secret_key(grant_secret)
+        if primary_site and all(s.get("id") != primary_site.get("id") for s in matching_sites):
+            matching_sites = [primary_site, *matching_sites]
+        if not matching_sites and primary_site is None:
+            matching_sites = self.store.sites()
+
+        public_sites = [self._public_site_summary(s) for s in matching_sites]
+        chosen_summary = (
+            self._public_site_summary(primary_site) if primary_site else (public_sites[0] if public_sites else None)
+        )
+        primary_domain = (
+            str(chosen_summary.get("domain") or "")
+            if chosen_summary
+            else (self._unique_site_domains(matching_sites)[0] if matching_sites else "*")
+        )
+        primary_api_key = str((chosen_summary or {}).get("api_key") or self.config.api_key_for_pages)
+
+        updated_record = dict(record)
+        updated_record.update(
+            {
+                "status": "approved",
+                "approved_at": moment,
+                "grant": {
+                    "domain": primary_domain,
+                    "domains": self._unique_site_domains(matching_sites)
+                    or ([primary_domain] if primary_domain != "*" else []),
+                    "site": chosen_summary,
+                    "sites": public_sites,
+                    "api_key": primary_api_key,
+                    "secret_key": grant_secret,
+                },
+            }
+        )
+        remaining_ttl = max(180, int(float(record["expires_at"]) - moment))
+        self.store.set_ephemeral(self._connect_dev_key(device_code), updated_record, remaining_ttl)
+        self.store.set_ephemeral(self._connect_usr_key(norm), {"device_code": device_code}, remaining_ttl)
+
+        redirect_to = _build_loopback_callback_url(
+            str(record.get("redirect_uri") or ""),
+            device_code=device_code,
+            state=str(record.get("state") or ""),
+        )
+        response_payload: dict[str, Any] = {
+            "status": 1,
+            "approved": True,
+            "user_code": norm,
+            "client_name": record.get("client_name") or "AI Assistant",
+            "domain": primary_domain,
+            "domains": updated_record["grant"]["domains"],
+            "site": chosen_summary,
+            "sites": public_sites,
+            "redirect_to": redirect_to,
+        }
+        if mode.strip().lower() == "register" and primary_site:
+            response_payload["created_site"] = dict(primary_site)
+        if refreshed_token:
+            response_payload["token"] = refreshed_token
+        return 200, response_payload
+
+    def exchange_connect_token(self, device_code: str, *, now: float | None = None) -> tuple[int, dict[str, Any]]:
+        moment = time.time() if now is None else now
+        code = (device_code or "").strip()
+        if not code:
+            return 400, {"status": 0, "error": "device_code is required."}
+        dev_key = self._connect_dev_key(code)
+        record = self.store.get_ephemeral(dev_key)
+        if not record or float(record.get("expires_at") or 0) <= moment:
+            return 404, {"status": 0, "error": "expired_or_invalid_code"}
+        if record.get("status") != "approved":
+            return 202, {
+                "status": 0,
+                "pending": True,
+                "error": "authorization_pending",
+                "expires_in": max(0, int(float(record["expires_at"]) - moment)),
+            }
+
+        consumed = self.store.pop_ephemeral(dev_key)
+        if not consumed:
+            return 404, {"status": 0, "error": "code_already_used"}
+        norm_usr = self._normalize_user_code(str(consumed.get("user_code") or ""))
+        if norm_usr:
+            self.store.pop_ephemeral(self._connect_usr_key(norm_usr))
+
+        grant = dict(consumed.get("grant") or {})
+        base = self.config.site_url.rstrip("/")
+        secret_key = str(grant.get("secret_key") or "")
+        api_key = str(grant.get("api_key") or "")
+        domain = str(grant.get("domain") or "")
+        domains = list(grant.get("domains") or [])
+        mcp_config = {
+            "mcpServers": {
+                "hotspot": {
+                    "type": "http",
+                    "url": f"{base}/mcp",
+                    "headers": {"Authorization": f"Bearer {secret_key}"},
+                }
+            }
+        }
+        env_lines = (
+            f"HOTSPOT_HOST={base}\n"
+            f"HOTSPOT_DOMAIN={domain}\n"
+            f"HOTSPOT_API_KEY={api_key}\n"
+            f"HOTSPOT_SECRET_KEY={secret_key}\n"
+        )
+        credentials_json = {
+            "site_url": base,
+            "sdk_url": self.config.sdk_url,
+            "mcp_url": f"{base}/mcp",
+            "mcp_sse_url": f"{base}/mcp/sse",
+            "skill_url": f"{base}/skill.md",
+            "domain": domain,
+            "domains": domains,
+            "api_key": api_key,
+            "secret_key": secret_key,
+        }
+        return 200, {
+            "status": 1,
+            "authorized": True,
+            "client_name": consumed.get("client_name") or "AI Assistant",
+            **grant,
+            "site_url": base,
+            "sdk_url": self.config.sdk_url,
+            "mcp_url": f"{base}/mcp",
+            "mcp_sse_url": f"{base}/mcp/sse",
+            "skill_url": f"{base}/skill.md",
+            "mcp_config": mcp_config,
+            "env_lines": env_lines,
+            "credentials_json": credentials_json,
+        }
 
 
 _service: HotspotService | None = None
@@ -586,3 +995,38 @@ def _int_param(value: str | None, default: int, low: int, high: int) -> int:
         return min(high, max(low, int(value))) if value else default
     except ValueError:
         return default
+
+
+def is_safe_loopback_redirect(uri: str) -> bool:
+    """Only allow explicit http://127.0.0.1:<port>/... or http://localhost:<port>/... loopback callbacks."""
+    candidate = (uri or "").strip()
+    if not candidate or any(ch.isspace() or ch == "\\" for ch in candidate):
+        return False
+    try:
+        parsed = urlsplit(candidate)
+    except ValueError:
+        return False
+    if parsed.scheme.lower() != "http":
+        return False
+    if parsed.username is not None or parsed.password is not None:
+        return False
+    host = (parsed.hostname or "").lower()
+    if host not in {"127.0.0.1", "localhost"}:
+        return False
+    try:
+        port = parsed.port
+    except ValueError:
+        return False
+    return port is not None and 1 <= port <= 65535
+
+
+def _build_loopback_callback_url(redirect_uri: str, *, device_code: str, state: str = "") -> str | None:
+    if not redirect_uri or not is_safe_loopback_redirect(redirect_uri):
+        return None
+    parsed = urlsplit(redirect_uri)
+    params: list[tuple[str, str]] = [("code", device_code)]
+    if state:
+        params.append(("state", state))
+    existing_query = f"{parsed.query}&" if parsed.query else ""
+    new_query = f"{existing_query}{urlencode(params)}"
+    return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, new_query, ""))

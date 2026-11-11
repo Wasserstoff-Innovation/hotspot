@@ -2,19 +2,24 @@ from __future__ import annotations
 
 import gzip
 import json
+import stat
 import time
 from collections.abc import Iterator
 from typing import Any
 
 import pytest
 
-from django.test import RequestFactory
+from django.test import Client, RequestFactory
+
+from starlette.testclient import TestClient
 
 from products.hotspot.backend import views
 from products.hotspot.backend.auth import DASHBOARD_COOKIE, make_dashboard_token, verify_dashboard_token
 from products.hotspot.backend.service import HotspotService, reset_service
 from products.hotspot.backend.templating import render_string
 from products.hotspot.backend.test.helpers import batch_body, event_item, make_service
+from products.hotspot.mcp import save_credentials_bundle
+from products.hotspot.standalone import server as standalone_server
 
 NOW = 1_700_000_000.0
 
@@ -446,5 +451,193 @@ def test_add_more_sites_without_logout_same_or_new_secret_key() -> None:
         admin_payload = json.loads(admin_res.content)
         assert admin_payload["scope"] == "*"
         assert admin_payload["site"]["secret_key"] == site_a["secret_key"]
+    finally:
+        reset_service(None)
+
+
+def test_skill_md_download_and_llms_txt() -> None:
+    service = make_service(HOTSPOT_SITE_URL="https://hotspot.example.com", HOTSPOT_DASHBOARD_PASSWORD="pw")
+    reset_service(service)
+    try:
+        django_client = Client()
+        sk = django_client.get("/skill.md")
+        assert sk.status_code == 200
+        assert "text/markdown" in sk["Content-Type"]
+        body = sk.content.decode("utf-8")
+        assert "https://hotspot.example.com/connect/" in body
+        assert ".env.hotspot.local" in body
+        assert "chmod 600" in body
+
+        dl = django_client.get("/hotspot/skill.md?download=1")
+        assert dl.status_code == 200
+        assert "hotspot-SKILL.md" in dl["Content-Disposition"]
+
+        llms = django_client.get("/llms.txt").content.decode("utf-8")
+        assert "https://hotspot.example.com/skill.md" in llms
+        assert "https://hotspot.example.com/connect/" in llms
+
+        st_client = TestClient(standalone_server.app)
+        st_sk = st_client.get("/skill.md?download=1")
+        assert st_sk.status_code == 200
+        assert "hotspot-SKILL.md" in st_sk.headers["content-disposition"]
+        assert "https://hotspot.example.com/mcp" in st_sk.text
+    finally:
+        reset_service(None)
+
+
+def test_browser_connect_flow_login_register_isolation_and_single_use(tmp_path: Any, monkeypatch: Any) -> None:
+    service = make_service(
+        HOTSPOT_SITE_URL="https://hotspot.example.com",
+        HOTSPOT_DASHBOARD_PASSWORD="master-password",
+    )
+    reset_service(service)
+    try:
+        django_client = Client()
+        st_client = TestClient(standalone_server.app)
+
+        # Reject unsafe redirect URIs (SSRF / open redirect guard)
+        for bad_uri in ("https://evil.example.com/cb", "http://localhost/no-port", "javascript:alert(1)"):
+            bad_res = django_client.post(
+                "/hotspot/api/connect/start/",
+                data=json.dumps({"client_name": "Evil", "redirect_uri": bad_uri}),
+                content_type="application/json",
+            )
+            assert bad_res.status_code == 400
+
+        # Pre-seed unrelated victim domain and owner domain
+        _, victim = service.create_site("Victim", "victim.connect.example.com")
+        _, owner = service.create_site("Owner App", "owner.connect.example.com")
+        assert isinstance(victim, dict) and isinstance(owner, dict)
+
+        # 1. Start Connect session with safe loopback redirect_uri
+        start = django_client.post(
+            "/hotspot/api/connect/start/",
+            data=json.dumps(
+                {
+                    "client_name": "Claude Code",
+                    "domain": "owner.connect.example.com",
+                    "redirect_uri": "http://127.0.0.1:43123/cb",
+                    "state": "nonce-99",
+                }
+            ),
+            content_type="application/json",
+        )
+        assert start.status_code == 200
+        start_data = start.json()
+        user_code = start_data["user_code"]
+        device_code = start_data["device_code"]
+        assert f"/connect/?code={user_code}" in start_data["verification_uri"]
+
+        # Browser page renders with CSP nonce & status hides secret_key
+        page = django_client.get(f"/connect/?code={user_code}")
+        assert page.status_code == 200
+        assert "Agent Connect" in page.content.decode("utf-8")
+
+        st_status = django_client.get(f"/hotspot/api/connect/status/?code={user_code}").json()
+        assert st_status["session"]["client_name"] == "Claude Code"
+        assert "secret_key" not in json.dumps(st_status)
+
+        # Pending token poll answers 202
+        pending = django_client.post(
+            "/hotspot/api/connect/token/",
+            data=json.dumps({"device_code": device_code}),
+            content_type="application/json",
+        )
+        assert pending.status_code == 202
+        assert pending.json()["pending"] is True
+
+        # Cross-tenant approval attempt while logged into owner MUST return 403
+        owner_token = make_dashboard_token(service.config.secret_key, time.time(), scope="owner.connect.example.com")
+        django_client.cookies[DASHBOARD_COOKIE] = owner_token
+        bad_scope = django_client.post(
+            "/hotspot/api/connect/approve/",
+            data=json.dumps({"code": user_code, "mode": "existing", "site_id": victim["id"]}),
+            content_type="application/json",
+        )
+        assert bad_scope.status_code == 403
+        django_client.cookies.clear()
+
+        # Approve via inline Domain + Secret Key login
+        approve = django_client.post(
+            "/hotspot/api/connect/approve/",
+            data=json.dumps(
+                {
+                    "code": user_code,
+                    "mode": "login",
+                    "domain": "owner.connect.example.com",
+                    "secret_key": owner["secret_key"],
+                }
+            ),
+            content_type="application/json",
+        )
+        assert approve.status_code == 200
+        app_data = approve.json()
+        assert app_data["approved"] is True
+        assert app_data["redirect_to"] == f"http://127.0.0.1:43123/cb?code={device_code}&state=nonce-99"
+        assert owner["secret_key"] not in app_data["redirect_to"]
+
+        # Double approval is blocked
+        re_approve = django_client.post(
+            "/hotspot/api/connect/approve/",
+            data=json.dumps({"code": user_code, "mode": "existing"}),
+            content_type="application/json",
+        )
+        assert re_approve.status_code == 409
+
+        # Token exchange succeeds ONCE cleanly, then second poll is rejected (single-use)
+        ex = django_client.post(
+            "/hotspot/api/connect/token/",
+            data=json.dumps({"device_code": device_code}),
+            content_type="application/json",
+        )
+        assert ex.status_code == 200
+        tok = ex.json()
+        assert tok["secret_key"] == owner["secret_key"]
+        assert tok["api_key"] == owner["api_key"]
+        assert tok["mcp_config"]["mcpServers"]["hotspot"]["headers"]["Authorization"] == f"Bearer {owner['secret_key']}"
+
+        replay_ex = django_client.post(
+            "/hotspot/api/connect/token/",
+            data=json.dumps({"device_code": device_code}),
+            content_type="application/json",
+        )
+        assert replay_ex.status_code == 404
+
+        # Verify secure local file storage (0600 permissions + .gitignore)
+        monkeypatch.chdir(tmp_path)
+        saved = save_credentials_bundle(
+            tok,
+            credentials_path=tmp_path / ".hotspot" / "credentials.json",
+            env_path=tmp_path / ".env.hotspot.local",
+            mcp_path=tmp_path / ".mcp.json",
+        )
+        assert set(saved) == {"credentials", "env", "mcp"}
+        assert stat.S_IMODE((tmp_path / ".env.hotspot.local").stat().st_mode) == 0o600
+        gitignore_text = (tmp_path / ".gitignore").read_text(encoding="utf-8")
+        assert ".hotspot/" in gitignore_text and ".env.hotspot.local" in gitignore_text
+
+        # 2. Standalone Starlette server parity: Register a brand-new site during /connect/
+        st_start = st_client.post("/hotspot/api/connect/start/", json={"client_name": "Starlette CLI"}).json()
+        st_code = st_start["user_code"]
+        st_dev = st_start["device_code"]
+
+        # Existing domain collision still requires confirmation_key (409)
+        coll = st_client.post(
+            "/hotspot/api/connect/approve/",
+            json={"code": st_code, "mode": "register", "name": "Hijack", "domain": "victim.connect.example.com"},
+        )
+        assert coll.status_code == 409
+
+        reg_ok = st_client.post(
+            "/hotspot/api/connect/approve/",
+            json={"code": st_code, "mode": "register", "name": "New Edge", "domain": "edge.connect.example.com"},
+        )
+        assert reg_ok.status_code == 200
+        assert reg_ok.json()["created_site"]["domain"] == "edge.connect.example.com"
+
+        st_tok = st_client.post("/hotspot/api/connect/token/", json={"device_code": st_dev})
+        assert st_tok.status_code == 200
+        assert st_tok.json()["domain"] == "edge.connect.example.com"
+        assert st_tok.json()["secret_key"].startswith("hs_sec_")
     finally:
         reset_service(None)

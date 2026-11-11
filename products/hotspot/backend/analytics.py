@@ -1116,10 +1116,14 @@ def build_overview(
 def setup_info(store: SessionStore, config: HotspotConfig) -> dict[str, Any]:
     from products.hotspot import __version__  # noqa: PLC0415 — avoids a package import cycle at module load
 
+    base = config.site_url.rstrip("/")
     return {
         "version": __version__,
         "site_url": config.site_url,
         "sdk_url": config.sdk_url,
+        "mcp_url": f"{base}/mcp",
+        "skill_url": f"{base}/skill.md",
+        "connect_url": f"{base}/connect/",
         "api_key": config.api_key_for_pages,
         "ingestion_keys_configured": bool(config.api_keys),
         "dashboard_protected": config.dashboard_protected,

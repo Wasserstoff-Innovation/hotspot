@@ -582,6 +582,19 @@
                     <div class="code-box-content" id="display-script-snippet"></div>
                 </div>
 
+                <div class="key-box-wrap" style="margin-bottom: 1rem;">
+                    <div class="key-box-head">
+                        <span class="key-box-title">Connect AI / MCP &amp; Local Secret Storage</span>
+                        <div style="display:flex;gap:6px;align-items:center;">
+                            <a class="btn-copy-code" href="/skill.md?download=1" download="hotspot-SKILL.md" style="text-decoration:none;">Download SKILL.md</a>
+                            <button class="btn-copy-code" id="btn-copy-mcp-reg" type="button">
+                                <span id="label-copy-mcp-reg">Copy MCP JSON</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="code-box-content" id="display-mcp-snippet"></div>
+                </div>
+
                 <button type="button" class="btn-submit" id="btn-enter-dashboard">
                     <span>Enter Dashboard Now →</span>
                 </button>
@@ -727,6 +740,23 @@
 
                 const copyScrBtn = document.getElementById('btn-copy-script');
                 copyScrBtn.onclick = () => copyToClipboard(snippet, document.getElementById('label-copy-script'), 'Copy Script');
+
+                const originBase = ('{{ site_url }}' || window.location.origin).replace(/\/+$/, '');
+                const mcpJson = JSON.stringify({
+                    mcpServers: {
+                        hotspot: {
+                            type: 'http',
+                            url: originBase + '/mcp',
+                            headers: { Authorization: 'Bearer ' + data.site.secret_key }
+                        }
+                    }
+                }, null, 2);
+                const mcpEl = document.getElementById('display-mcp-snippet');
+                if (mcpEl) mcpEl.textContent = mcpJson;
+                const copyMcpBtn = document.getElementById('btn-copy-mcp-reg');
+                if (copyMcpBtn) {
+                    copyMcpBtn.onclick = () => copyToClipboard(mcpJson, document.getElementById('label-copy-mcp-reg'), 'Copy MCP JSON');
+                }
 
                 const enterDashBtn = document.getElementById('btn-enter-dashboard');
                 enterDashBtn.onclick = () => {

@@ -110,9 +110,43 @@ Give your AI coding assistant this instruction to add it to a project:
 
 > Add `<script src="https://YOUR_HOTSPOT_HOST/hotspot.js" data-api-key="YOUR_API_KEY" defer></script>` to the `<head>` of the root layout (Next.js `app/layout.tsx`, Vite `index.html`, SvelteKit `app.html`, Astro layout). Do not add other analytics tags. Call `window.hotspot.identify(userId, { email, name })` after sign-in. Put `data-hotspot-mask` on elements that show personal data you do not want in session replays.
 
+## AI Agents, MCP Suite & Automated Service Login
+
+Hotspot ships a built-in Model Context Protocol (MCP) server, a downloadable agent skill file, and a browser-based Connect Flow so coding agents, CLIs, and automated services can log in or register sites cleanly and store Secret Keys safely in local files.
+
+### Downloadable Skill (`SKILL.md`)
+
+- Hosted dynamically for each server at `/skill.md` (`/skill.md?download=1` triggers file download), `/llms.txt`, and MCP resource `hotspot://skill`.
+- Checked into [`products/hotspot/skill/SKILL.md`](skill/SKILL.md).
+- Install directly into an agent workspace:
+
+```bash
+mkdir -p .claude/skills/hotspot .agents/skills/hotspot
+curl -fsSL https://YOUR_HOTSPOT_HOST/skill.md -o .claude/skills/hotspot/SKILL.md
+cp .claude/skills/hotspot/SKILL.md .agents/skills/hotspot/SKILL.md
+```
+
+### Connecting via MCP
+
+- **Streamable HTTP**: `https://YOUR_HOTSPOT_HOST/mcp`
+- **Legacy SSE**: `https://YOUR_HOTSPOT_HOST/mcp/sse`
+- **Stdio**: `python -m products.hotspot.mcp`
+- Pass the site's private Secret Key (`hs_sec_...`) in `Authorization: Bearer hs_sec_...` (or `X-Hotspot-Secret-Key`). Never embed `hs_sec_...` in frontend JavaScript/HTML or git commits; keep it in gitignored `.env.hotspot.local` or `~/.config/hotspot/credentials.json` (`chmod 600`).
+
+### Automated Browser Login / Device Connect Flow
+
+1. Start a session: `POST /hotspot/api/connect/start/` with `{"client_name": "Your Tool", "domain": "optional.example.com"}` (optionally pass a loopback `"redirect_uri": "http://127.0.0.1:<port>/callback"`). Returns `device_code`, `user_code`, and `verification_uri` (`/connect/?code=XXXX-XXXX`).
+2. User opens `/connect/` in their browser to approve an existing site, sign in with Domain + Secret Key, or register a new site (`key_mode="same"` or `"new"`).
+3. Poll `POST /hotspot/api/connect/token/` with `{"device_code": "..."}`. Returns single-use credentials (`secret_key`, `api_key`, `domains`, `mcp_config`, `env_lines`, `credentials_json`).
+4. Or run the bundled CLI helper:
+
+```bash
+python -m products.hotspot.mcp connect --url https://YOUR_HOTSPOT_HOST --save-env .env.hotspot.local --save-mcp .mcp.json
+```
+
 ## HTTP API
 
-Pages: `/` landing, `/demo/` sample site, `/dashboard/` (redirects to `/dashboard/login/` when a password is set), `/hotspot.js`, `/llms.txt`. Assets: `/hotspot/assets/recorder.js`, `/hotspot/assets/replay.js`, `/hotspot/assets/replay.css`, `/hotspot/assets/world.json` (public, cached for a day).
+Pages: `/` landing, `/demo/` sample site, `/dashboard/` (redirects to `/dashboard/login/` when a password is set), `/connect/` browser connect authorization page, `/skill.md` downloadable AI skill, `/hotspot.js`, `/llms.txt`. Assets: `/hotspot/assets/recorder.js`, `/hotspot/assets/replay.js`, `/hotspot/assets/replay.css`, `/hotspot/assets/world.json` (public, cached for a day).
 
 The dashboard API accepts the sign-in cookie or `Authorization: Bearer <HOTSPOT_DASHBOARD_PASSWORD>`.
 

@@ -212,13 +212,19 @@ def _important_instructions_text(service: HotspotService, topic: str = "all") ->
     sections: dict[str, str] = {
         "security": f"""## 1. Security & Key Separation (CRITICAL)
 - **Public API Key (`hs_live_...`)**: Safe for client-side HTML/JS `<script data-api-key="...">`. It ONLY permits sending telemetry events and replay chunks.
-- **Private Secret Key (`hs_sec_...`)**: Grants full read access to analytics, session timelines, recordings, and setup verification for that single website/domain.
+- **Private Secret Key (`hs_sec_...`)**: Grants full read access to analytics, session timelines, recordings, and setup verification for that single website/domain (or multiple sites created with `key_mode="same"`).
   - **NEVER** put `hs_sec_...` into frontend HTML, React/Next.js client components, `NEXT_PUBLIC_*` env vars, or public git commits.
+  - **Local File Storage**: Save `hs_sec_...` only in a gitignored `.env.hotspot.local` or `~/.config/hotspot/credentials.json` (`chmod 600`), and ensure `.gitignore` ignores `.env.hotspot.local` and `.hotspot/` before creating files.
   - Provide `hs_sec_...` only via MCP client headers (`Authorization: Bearer hs_sec_...` or `X-Hotspot-Secret-Key`), `?secret_key=...`, `HOTSPOT_MCP_SECRET_KEY`, or the tool `secret_key` parameter during interactive analysis.
+- **Automated Service & Browser Connect Flow**:
+  - To let a user authenticate from the browser without pasting secrets into chat: `POST {site_url}/hotspot/api/connect/start/` -> ask user to open `{site_url}/connect/?code=XXXX-XXXX` -> poll `POST {site_url}/hotspot/api/connect/token/` to receive `secret_key`, `api_key`, `domains`, `mcp_config`, and `env_lines`.
+  - Downloadable AI skill file: `{site_url}/skill.md`.
 - **Domain Re-Registration Rule**: Calling `register_site` for a domain that already exists fails with a conflict error unless you supply the existing `confirmation_key` (`hs_sec_...`). This prevents anyone from hijacking another site's dashboard or keys.
 """,
         "integration": f"""## 2. Integrating Hotspot into a Codebase
-1. If the user does not have keys yet, call `register_site(name=..., domain=...)` once to generate `api_key` (`hs_live_...`) and `secret_key` (`hs_sec_...`). Save `secret_key` for MCP / dashboard login only.
+1. Obtain credentials:
+   - Existing site (browser approval): run the Connect Flow (`POST {site_url}/hotspot/api/connect/start/` -> open `/connect/` -> poll `/hotspot/api/connect/token/`), or run `python -m products.hotspot.mcp connect --url {site_url} --save-env .env.hotspot.local --save-mcp .mcp.json`.
+   - New site: call `register_site(name=..., domain=...)` once to generate `api_key` (`hs_live_...`) and `secret_key` (`hs_sec_...`), then save `secret_key` locally (`.env.hotspot.local` / `~/.config/hotspot/credentials.json`, `chmod 600`, gitignored). Use `key_mode="same"` when adding additional sites that should share your authenticated key.
 2. Call `get_site_setup(framework=...)` (`html`, `nextjs_app`, `nextjs_pages`, `react_vite`, `sveltekit`, `astro`, `django`) to get the exact code snippet for their stack.
 3. Add the `<script>` tag inside `<head>` with:
    - `src="{sdk_url}"`
@@ -1885,6 +1891,12 @@ _STATIC_RESOURCES: tuple[dict[str, str], ...] = (
         "description": "Authenticated site's setup snippet, configuration, and live 24h KPI snapshot (requires Secret Key).",
         "mimeType": "application/json",
     },
+    {
+        "uri": "hotspot://skill",
+        "name": "Downloadable Hotspot Agent Skill (SKILL.md)",
+        "description": "Complete Markdown skill file covering browser connect flow, local secret storage, SDK installation, testing, and MCP charting.",
+        "mimeType": "text/markdown",
+    },
 )
 
 _RESOURCE_TEMPLATES: tuple[dict[str, str], ...] = (
@@ -2178,6 +2190,19 @@ def _handle_single_message(
                         ]
                     },
                 )
+            if uri == "hotspot://skill":
+                return _jsonrpc_result(
+                    msg_id,
+                    {
+                        "contents": [
+                            {
+                                "uri": uri,
+                                "mimeType": "text/markdown",
+                                "text": service.skill_markdown(),
+                            }
+                        ]
+                    },
+                )
             if uri == "hotspot://site/current":
                 auth = resolve_mcp_auth(
                     service,
@@ -2294,6 +2319,14 @@ def mcp_discovery_document(service: HotspotService) -> dict[str, Any]:
             "streamable_http": f"{base}/mcp",
             "legacy_sse": f"{base}/mcp/sse",
             "stdio": "python -m products.hotspot.mcp",
+        },
+        "skill_url": f"{base}/skill.md",
+        "connect_url": f"{base}/connect/",
+        "connect_api": {
+            "start": f"{base}/hotspot/api/connect/start/",
+            "approve": f"{base}/hotspot/api/connect/approve/",
+            "token": f"{base}/hotspot/api/connect/token/",
+            "register_site": f"{base}/hotspot/api/sites/",
         },
         "auth": {
             "required_for_site_data": True,

@@ -661,6 +661,8 @@
             display: inline-flex;
             align-items: center;
             gap: 0.4rem;
+            flex-shrink: 0;
+            white-space: nowrap;
             padding: 0.4rem 0.6rem;
             border: 1px solid rgba(255, 255, 255, 0.14);
             border-radius: 7px;
@@ -1386,6 +1388,8 @@
 
         .ref {
             padding: 1.5rem;
+            min-width: 0;
+            overflow-wrap: anywhere;
         }
 
         .ref h3 {
@@ -1421,10 +1425,14 @@
             border-top: 1px solid var(--border);
             font-size: 0.85rem;
             color: var(--text-2);
+            overflow-wrap: anywhere;
         }
 
-        .ref .more code {
+        .ref .more code,
+        #ai-mcp code {
             font-size: 0.78rem;
+            overflow-wrap: anywhere;
+            word-break: break-word;
         }
 
         .install-block {
@@ -1519,7 +1527,7 @@
 
         @media (max-width: 767px) {
             .install-grid {
-                grid-template-columns: 1fr;
+                grid-template-columns: minmax(0, 1fr);
             }
         }
 
@@ -2315,6 +2323,73 @@
                     </div>
                 </div>
 
+                <div class="install-block" id="ai-mcp" data-reveal>
+                    <p>
+                        <strong>Connect AI Agents via MCP, Automated Login &amp; Downloadable Skill</strong> — install the standalone
+                        <a href="/skill.md?download=1" download="hotspot-SKILL.md" style="color:var(--brand);font-weight:600;text-decoration:none;">SKILL.md file</a>,
+                        authorize CLI tools from the browser via <a href="/connect/" style="color:var(--brand);font-weight:600;text-decoration:none;">/connect/</a>,
+                        or save your Secret Key (<code>hs_sec_...</code>) safely in gitignored local files.
+                    </p>
+                    <div class="install-grid" style="margin-top:0;">
+                        <article class="card ref">
+                            <h3>1. Download Agent Skill</h3>
+                            <p class="more" style="margin-top:0;padding-top:0;border-top:0;">
+                                Drop Hotspot's complete workflow into Claude Code, Codex, Antigravity, or Cursor so the agent reads docs, integrates the script, tests sessions, and builds charts.
+                            </p>
+                            <div class="code" style="margin-top:0.9rem;">
+                                <div class="code-head">
+                                    <span>SKILL.md install</span>
+                                    <button class="copy-btn" type="button" data-copy="snippet-skill-install">
+                                        <span class="copy-label">Copy</span>
+                                    </button>
+                                </div>
+                                <pre><code id="snippet-skill-install">mkdir -p .claude/skills/hotspot .agents/skills/hotspot &amp;&amp; curl -fsSL {{ site_url }}/skill.md -o .claude/skills/hotspot/SKILL.md &amp;&amp; cp .claude/skills/hotspot/SKILL.md .agents/skills/hotspot/SKILL.md</code></pre>
+                            </div>
+                            <p class="more">
+                                Direct file: <a href="/skill.md?download=1" download="hotspot-SKILL.md">Download SKILL.md</a> · Index: <a href="/llms.txt">/llms.txt</a>
+                            </p>
+                        </article>
+
+                        <article class="card ref d1">
+                            <h3>2. Browser Connect (CLIs &amp; Services)</h3>
+                            <p class="more" style="margin-top:0;padding-top:0;border-top:0;">
+                                Automated tools never ask you to paste secret keys in chat. Start a device connect session, approve or add a site in your browser at <code>/connect/</code>, and save to <code>0600</code> local files.
+                            </p>
+                            <div class="code" style="margin-top:0.9rem;">
+                                <div class="code-head">
+                                    <span>Browser Connect CLI</span>
+                                    <button class="copy-btn" type="button" data-copy="snippet-connect-cli">
+                                        <span class="copy-label">Copy</span>
+                                    </button>
+                                </div>
+                                <pre><code id="snippet-connect-cli">python -m products.hotspot.mcp connect --url {{ site_url }} --save-env .env.hotspot.local --save-mcp .mcp.json</code></pre>
+                            </div>
+                            <p class="more">
+                                HTTP API: <code>POST /hotspot/api/connect/start/</code> → open <code>/connect/</code> → poll <code>POST /hotspot/api/connect/token/</code>.
+                            </p>
+                        </article>
+
+                        <article class="card ref d2">
+                            <h3>3. MCP Endpoints &amp; Secret Hygiene</h3>
+                            <p class="more" style="margin-top:0;padding-top:0;border-top:0;">
+                                Authenticate <code>{{ site_url }}/mcp</code> (Streamable HTTP) or <code>/mcp/sse</code> with <code>Authorization: Bearer $HOTSPOT_SECRET_KEY</code>. Store secrets in gitignored <code>.env.hotspot.local</code> or <code>~/.config/hotspot/credentials.json</code> (<code>chmod 600</code>).
+                            </p>
+                            <div class="code" style="margin-top:0.9rem;">
+                                <div class="code-head">
+                                    <span>.mcp.json</span>
+                                    <button class="copy-btn" type="button" data-copy="snippet-landing-mcp">
+                                        <span class="copy-label">Copy</span>
+                                    </button>
+                                </div>
+                                <pre><code id="snippet-landing-mcp">{"mcpServers":{"hotspot":{"type":"http","url":"{{ site_url }}/mcp","headers":{"Authorization":"Bearer ${HOTSPOT_SECRET_KEY}"}}}}</code></pre>
+                            </div>
+                            <p class="more">
+                                <strong>Never</strong> place <code>hs_sec_...</code> inside website HTML/JS or git commits — use public <code>hs_live_...</code> in <code>&lt;script&gt;</code> tags only.
+                            </p>
+                        </article>
+                    </div>
+                </div>
+
                 <article class="card config" data-reveal>
                     <h3>Server configuration</h3>
                     <div class="config-grid">
@@ -2449,8 +2524,10 @@
                 </div>
                 <ul class="footer-links">
                     <li><a href="/dashboard/">Dashboard</a></li>
+                    <li><a href="/connect/">Agent Connect</a></li>
                     <li data-demo-link><a href="/demo/">Sample site</a></li>
                     <li><a href="/hotspot.js">Script</a></li>
+                    <li><a href="/skill.md">SKILL.md</a></li>
                     <li><a href="/llms.txt">llms.txt</a></li>
                 </ul>
             </div>

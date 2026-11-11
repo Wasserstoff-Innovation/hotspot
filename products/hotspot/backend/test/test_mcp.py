@@ -128,6 +128,7 @@ def test_mcp_initialize_discovery_resources_and_prompts(mcp_service: HotspotServ
         "hotspot://instructions/important",
         "hotspot://instructions/sdk-api",
         "hotspot://instructions/analytics-and-charts",
+        "hotspot://skill",
         "hotspot://site/current",
     } == uris
 
@@ -605,3 +606,20 @@ def test_mcp_multi_site_shared_secret_key_isolation(mcp_service: HotspotService)
 
     _, forbidden = _call_tool(mcp_service, "get_overview", {"site": "other.mcp.example.com"}, headers=headers)
     assert forbidden["result"]["isError"] is True
+
+    skill_status, skill_payload = handle_mcp_http_payload(
+        _rpc("resources/read", {"uri": "hotspot://skill"}, msg_id=91),
+        service=mcp_service,
+        headers=headers,
+    )
+    assert skill_status == 200
+    assert isinstance(skill_payload, dict)
+    skill_text = skill_payload["result"]["contents"][0]["text"]
+    assert "/hotspot/api/connect/start/" in skill_text
+    assert ".env.hotspot.local" in skill_text
+
+    disc_res = views.mcp_endpoint(RequestFactory().get("/mcp"))
+    disc = json.loads(disc_res.content)
+    assert disc["skill_url"].endswith("/skill.md")
+    assert disc["connect_url"].endswith("/connect/")
+    assert "start" in disc["connect_api"]

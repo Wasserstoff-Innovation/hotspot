@@ -199,9 +199,104 @@ async def asset(request: Request) -> Response:
     return response
 
 
+def _set_dashboard_cookie(response: Response, token: str, *, secure: bool) -> None:
+    response.set_cookie(
+        DASHBOARD_COOKIE,
+        token,
+        max_age=TOKEN_TTL_SECONDS,
+        httponly=True,
+        samesite="lax",
+        secure=secure,
+        path="/",
+    )
+
+
 async def llms_txt(request: Request) -> Response:
     response = PlainTextResponse(_service().llms_txt())
     response.headers["Cache-Control"] = ASSET_CACHE_CONTROL
+    return response
+
+
+async def skill_md(request: Request) -> Response:
+    response = Response(_service().skill_markdown(), media_type="text/markdown; charset=utf-8")
+    response.headers["Cache-Control"] = "public, max-age=300"
+    response.headers.update(MCP_CORS_HEADERS)
+    if (request.query_params.get("download") or "").lower() in ("1", "true", "yes"):
+        response.headers["Content-Disposition"] = 'attachment; filename="hotspot-SKILL.md"'
+    return response
+
+
+async def connect_page(request: Request) -> Response:
+    response = _page(request, "connect")
+    response.headers.update(NO_STORE_HEADERS)
+    return response
+
+
+async def _json_body(request: Request) -> dict[str, Any]:
+    try:
+        parsed = await request.json()
+        return parsed if isinstance(parsed, dict) else {}
+    except Exception:
+        return {}
+
+
+async def connect_start_endpoint(request: Request) -> Response:
+    if request.method == "OPTIONS":
+        return Response(status_code=204, headers=MCP_CORS_HEADERS)
+    payload = await _json_body(request)
+    status_code, body = _service().start_connect_session(
+        client_name=str(payload.get("client_name") or "AI Assistant"),
+        domain_hint=str(payload.get("domain") or ""),
+        name_hint=str(payload.get("name") or ""),
+        redirect_uri=str(payload.get("redirect_uri") or ""),
+        state=str(payload.get("state") or ""),
+    )
+    response = _json(body, status=status_code)
+    response.headers.update(MCP_CORS_HEADERS)
+    return response
+
+
+async def connect_status_endpoint(request: Request) -> Response:
+    status_code, body = _service().connect_session_status(
+        request.query_params.get("code") or "",
+        cookie_token=request.cookies.get(DASHBOARD_COOKIE),
+        authorization=request.headers.get("authorization"),
+    )
+    return _json(body, status=status_code)
+
+
+async def connect_approve_endpoint(request: Request) -> Response:
+    if not is_same_site_form_post(request.headers):
+        return _json({"status": 0, "error": "Cross-site connect approval requests are refused."}, status=403)
+    payload = await _json_body(request)
+    status_code, body = _service().approve_connect_session(
+        str(payload.get("code") or payload.get("user_code") or ""),
+        mode=str(payload.get("mode") or "existing"),
+        site_id=str(payload.get("site_id") or "") or None,
+        domain=str(payload.get("domain") or ""),
+        name=str(payload.get("name") or ""),
+        secret_key=str(payload.get("secret_key") or ""),
+        password=str(payload.get("password") or ""),
+        confirmation_key=str(payload.get("confirmation_key") or "") or None,
+        key_mode=str(payload.get("key_mode") or "new"),
+        source_site=str(payload.get("source_site") or "") or None,
+        cookie_token=request.cookies.get(DASHBOARD_COOKIE),
+        authorization=request.headers.get("authorization"),
+    )
+    token = body.pop("token", None) if status_code == 200 else None
+    response = _json(body, status=status_code)
+    if token:
+        _set_dashboard_cookie(response, str(token), secure=request.url.scheme == "https")
+    return response
+
+
+async def connect_token_endpoint(request: Request) -> Response:
+    if request.method == "OPTIONS":
+        return Response(status_code=204, headers=MCP_CORS_HEADERS)
+    payload = await _json_body(request)
+    status_code, body = _service().exchange_connect_token(str(payload.get("device_code") or ""))
+    response = _json(body, status=status_code)
+    response.headers.update(MCP_CORS_HEADERS)
     return response
 
 
@@ -496,6 +591,21 @@ routes = [
     Route("/hotspot.js", sdk),
     Route("/hotspot/assets/{name}", asset),
     Route("/llms.txt", llms_txt),
+    Route("/skill.md", skill_md),
+    Route("/SKILL.md", skill_md),
+    Route("/hotspot/skill.md", skill_md),
+    Route("/connect/", connect_page),
+    Route("/connect", connect_page),
+    Route("/dashboard/connect/", connect_page),
+    Route("/dashboard/connect", connect_page),
+    Route("/hotspot/api/connect/start/", connect_start_endpoint, methods=["POST", "OPTIONS"]),
+    Route("/hotspot/api/connect/start", connect_start_endpoint, methods=["POST", "OPTIONS"]),
+    Route("/hotspot/api/connect/status/", connect_status_endpoint, methods=["GET"]),
+    Route("/hotspot/api/connect/status", connect_status_endpoint, methods=["GET"]),
+    Route("/hotspot/api/connect/approve/", connect_approve_endpoint, methods=["POST"]),
+    Route("/hotspot/api/connect/approve", connect_approve_endpoint, methods=["POST"]),
+    Route("/hotspot/api/connect/token/", connect_token_endpoint, methods=["POST", "OPTIONS"]),
+    Route("/hotspot/api/connect/token", connect_token_endpoint, methods=["POST", "OPTIONS"]),
     Route("/favicon.ico", favicon),
     Route("/hotspot/batch/", capture, methods=["POST", "OPTIONS"]),
     Route("/hotspot/batch", capture, methods=["POST", "OPTIONS"]),

@@ -1859,50 +1859,108 @@
                     </div>
                 </div>
 
-                <!-- 2b. Full MCP Suite for AI Coding & Analytics -->
-                <div class="card install-embed-card" style="margin-bottom: 18px;">
-                    <div class="card-head">
-                        <div>
-                            <h3>AI &amp; Full MCP Suite</h3>
-                            <p class="muted" style="font-size: 12.5px; margin-top: 2px;">Let AI assistants read setup instructions, wire Hotspot into code, run synthetic test sessions, and pull chart-ready data scoped to your Secret Key.</p>
+                <!-- 2b. Full MCP Suite, Downloadable Skill & Automated Service Connect -->
+                <div class="card install-embed-card" style="margin-bottom: 18px;" id="mcpSuiteCard">
+                    <div class="card-head" style="flex-wrap: wrap; gap: 10px;">
+                        <div style="flex: 1; min-width: 240px;">
+                            <h3>AI, MCP Server &amp; Automated Service Connect</h3>
+                            <p class="muted" style="font-size: 12.5px; margin-top: 2px;">Give AI assistants the Hotspot skill, authenticate automated tools through browser connect, and pull live data/charts using your scoped Secret Key.</p>
                         </div>
-                        <span class="chip" style="background: var(--blue-bg); color: var(--blue); border-color: rgba(37,99,235,0.2);">Streamable HTTP + SSE + stdio</span>
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                            <a class="btn sm primary" href="/skill.md?download=1" download="hotspot-SKILL.md" id="btnDownloadSkill">Download SKILL.md</a>
+                            <button class="btn sm" type="button" id="btnCopySkillUrl">Copy Skill URL</button>
+                            <a class="btn sm" href="/connect/" target="_blank" rel="noopener">Open Browser Connect</a>
+                        </div>
                     </div>
                     <div class="card-body">
                         <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; font-size: 12px;">
-                            <div style="flex: 1; min-width: 220px; padding: 10px 12px; background: var(--subtle); border: 1px solid var(--border); border-radius: 8px;">
+                            <div style="flex: 1; min-width: 200px; padding: 10px 12px; background: var(--subtle); border: 1px solid var(--border); border-radius: 8px;">
                                 <div class="muted" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;">Streamable HTTP URL</div>
                                 <code id="mcpStreamUrlText" style="word-break: break-all;">{{ site_url }}/mcp</code>
                             </div>
-                            <div style="flex: 1; min-width: 220px; padding: 10px 12px; background: var(--subtle); border: 1px solid var(--border); border-radius: 8px;">
+                            <div style="flex: 1; min-width: 200px; padding: 10px 12px; background: var(--subtle); border: 1px solid var(--border); border-radius: 8px;">
                                 <div class="muted" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;">Legacy SSE URL</div>
                                 <code id="mcpSseUrlText" style="word-break: break-all;">{{ site_url }}/mcp/sse</code>
                             </div>
+                            <div style="flex: 1; min-width: 200px; padding: 10px 12px; background: var(--subtle); border: 1px solid var(--border); border-radius: 8px;">
+                                <div class="muted" style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;">Downloadable Skill &amp; llms.txt</div>
+                                <code id="mcpSkillUrlText" style="word-break: break-all;">{{ site_url }}/skill.md</code>
+                            </div>
                         </div>
 
-                        <div class="code-box-card">
-                            <div class="code-box-card-head">
-                                <span class="code-box-tag">MCP Client Config (Claude Code / Cursor / Antigravity)</span>
-                                <button class="btn sm" type="button" id="btnCopyMcpConfig">
-                                    <span class="ico" data-icon="copy"></span>
-                                    <span>Copy MCP Config</span>
-                                </button>
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 12px;">
+                            <div class="breakage-tabs" role="tablist" aria-label="MCP &amp; Automated Setup Modes">
+                                <button class="b-tab active" type="button" id="mcpTabConfig" data-mcp-tab="config">MCP Config (JSON)</button>
+                                <button class="b-tab" type="button" id="mcpTabSkill" data-mcp-tab="skill">Skill &amp; CLI</button>
+                                <button class="b-tab" type="button" id="mcpTabConnect" data-mcp-tab="connect">Browser Connect &amp; Local Files</button>
                             </div>
-                            <div class="code-box-card-content"><pre style="margin: 0; white-space: pre-wrap; word-break: break-all; font: inherit;"><code id="snippetMcpConfig">{
-  "mcpServers": {
-    "hotspot": {
-      "type": "http",
-      "url": "{{ site_url }}/mcp",
-      "headers": {
-        "Authorization": "Bearer &lt;YOUR_HOTSPOT_SECRET_KEY&gt;"
-      }
-    }
-  }
-}</code></pre></div>
+                            <label class="toggle" id="mcpIncludeSecretWrap" style="font-size: 12px;">
+                                <input type="checkbox" id="mcpIncludeSecretToggle">
+                                <span>Include active site Secret Key in snippets</span>
+                            </label>
+                        </div>
+
+                        <div id="mcpPaneConfig">
+                            <div class="code-box-card">
+                                <div class="code-box-card-head">
+                                    <span class="code-box-tag">MCP Client Config (.mcp.json / Cursor / Antigravity / Claude)</span>
+                                    <button class="btn sm" type="button" id="btnCopyMcpConfig">
+                                        <span class="ico" data-icon="copy"></span>
+                                        <span>Copy MCP Config</span>
+                                    </button>
+                                </div>
+                                <div class="code-box-card-content"><pre style="margin: 0; white-space: pre-wrap; word-break: break-all; font: inherit;"><code id="snippetMcpConfig"></code></pre></div>
+                            </div>
+                        </div>
+
+                        <div id="mcpPaneSkill" hidden>
+                            <div class="code-box-card" style="margin-bottom: 12px;">
+                                <div class="code-box-card-head">
+                                    <span class="code-box-tag">Install Skill into Agent Project (.claude / .agents / .cursor)</span>
+                                    <button class="btn sm" type="button" id="btnCopySkillInstall">
+                                        <span class="ico" data-icon="copy"></span>
+                                        <span>Copy Command</span>
+                                    </button>
+                                </div>
+                                <div class="code-box-card-content"><pre style="margin: 0; white-space: pre-wrap; word-break: break-all; font: inherit;"><code id="snippetSkillInstall"></code></pre></div>
+                            </div>
+                            <div class="code-box-card">
+                                <div class="code-box-card-head">
+                                    <span class="code-box-tag">One-Shot Automated Browser Connect CLI (Saves ~/.config/hotspot &amp; .mcp.json)</span>
+                                    <button class="btn sm" type="button" id="btnCopyConnectCli">
+                                        <span class="ico" data-icon="copy"></span>
+                                        <span>Copy CLI</span>
+                                    </button>
+                                </div>
+                                <div class="code-box-card-content"><pre style="margin: 0; white-space: pre-wrap; word-break: break-all; font: inherit;"><code id="snippetConnectCli"></code></pre></div>
+                            </div>
+                        </div>
+
+                        <div id="mcpPaneConnect" hidden>
+                            <div class="code-box-card" style="margin-bottom: 12px;">
+                                <div class="code-box-card-head">
+                                    <span class="code-box-tag">Save Secret Key Safely in Gitignored Local Files (chmod 600)</span>
+                                    <button class="btn sm" type="button" id="btnCopyLocalSecretCmd">
+                                        <span class="ico" data-icon="copy"></span>
+                                        <span>Copy Commands</span>
+                                    </button>
+                                </div>
+                                <div class="code-box-card-content"><pre style="margin: 0; white-space: pre-wrap; word-break: break-all; font: inherit;"><code id="snippetLocalSecretCmd"></code></pre></div>
+                            </div>
+                            <div class="code-box-card">
+                                <div class="code-box-card-head">
+                                    <span class="code-box-tag">Automated Device / Service Login API (No Password Prompt in Chat)</span>
+                                    <button class="btn sm" type="button" id="btnCopyDeviceApi">
+                                        <span class="ico" data-icon="copy"></span>
+                                        <span>Copy Flow</span>
+                                    </button>
+                                </div>
+                                <div class="code-box-card-content"><pre style="margin: 0; white-space: pre-wrap; word-break: break-all; font: inherit;"><code id="snippetDeviceApi"></code></pre></div>
+                            </div>
                         </div>
 
                         <p class="muted" style="font-size: 12px; margin-top: 12px; line-height: 1.5;">
-                            <strong>Includes 17 tools &amp; 4 guides:</strong> <code>get_important_instructions</code>, <code>register_site</code>, <code>get_site_setup</code>, <code>verify_connection</code>, <code>send_test_session</code>, <code>get_chart_data</code>, <code>get_funnel_analysis</code>, <code>get_user_flows</code>, <code>get_breakage_and_errors</code>, <code>get_pages_and_vitals</code>, <code>get_referrers_and_ai_traffic</code>, <code>get_realtime_snapshot</code>, <code>list_sessions</code>, <code>get_session_detail</code>, and <code>get_live_events</code>. Never put your Secret Key (<code>hs_sec_...</code>) inside client-side website HTML.
+                            <strong>Includes 17 tools &amp; 4 guides:</strong> <code>get_important_instructions</code>, <code>register_site</code> (supports <code>key_mode="same"|"new"</code>), <code>get_site_setup</code>, <code>verify_connection</code>, <code>send_test_session</code>, <code>get_chart_data</code>, <code>get_funnel_analysis</code>, <code>get_user_flows</code>, <code>get_breakage_and_errors</code>, <code>get_pages_and_vitals</code>, <code>get_referrers_and_ai_traffic</code>, <code>get_realtime_snapshot</code>, <code>list_sessions</code>, <code>get_session_detail</code>, and <code>get_live_events</code>. <strong>Never</strong> put <code>hs_sec_...</code> inside website HTML or commit it to git.
                         </p>
                     </div>
                 </div>
@@ -5153,11 +5211,20 @@
         }
 
         var mcpBase = (CONFIG.siteUrl || window.location.origin || '').replace(/\/+$/, '');
-        var activeSecret = (activeSiteObj && activeSiteObj.secret_key) ? activeSiteObj.secret_key : '<YOUR_HOTSPOT_SECRET_KEY>';
+        var hasOwnedSecret = Boolean(activeSiteObj && activeSiteObj.secret_key);
+        var secretToggle = $('mcpIncludeSecretToggle');
+        var secretWrap = $('mcpIncludeSecretWrap');
+        if (secretWrap) secretWrap.hidden = !hasOwnedSecret;
+        var useActiveSecret = Boolean(hasOwnedSecret && secretToggle && secretToggle.checked);
+        var activeSecret = useActiveSecret ? activeSiteObj.secret_key : '${HOTSPOT_SECRET_KEY}';
+
         var mcpStreamEl = $('mcpStreamUrlText');
         if (mcpStreamEl) mcpStreamEl.textContent = mcpBase + '/mcp';
         var mcpSseEl = $('mcpSseUrlText');
         if (mcpSseEl) mcpSseEl.textContent = mcpBase + '/mcp/sse';
+        var mcpSkillEl = $('mcpSkillUrlText');
+        if (mcpSkillEl) mcpSkillEl.textContent = mcpBase + '/skill.md';
+
         var mcpConfigText = JSON.stringify({
             mcpServers: {
                 hotspot: {
@@ -5169,13 +5236,82 @@
                 }
             }
         }, null, 2);
+        var skillInstallText = [
+            '# Claude Code / Codex / Antigravity agent skill install',
+            'mkdir -p .claude/skills/hotspot .agents/skills/hotspot',
+            'curl -fsSL ' + mcpBase + '/skill.md -o .claude/skills/hotspot/SKILL.md',
+            'cp .claude/skills/hotspot/SKILL.md .agents/skills/hotspot/SKILL.md'
+        ].join('\n');
+        var connectCliText = [
+            '# Opens ' + mcpBase + '/connect/ so the user authorizes in browser & writes local files (chmod 600)',
+            'python -m products.hotspot.mcp connect --url ' + mcpBase + ' --save-env .env.hotspot.local --save-mcp .mcp.json',
+            '',
+            '# Or register directly via Claude Code CLI:',
+            'claude mcp add --transport http hotspot ' + mcpBase + '/mcp --header "Authorization: Bearer ' + activeSecret + '"'
+        ].join('\n');
+        var domainExample = (activeSiteObj && activeSiteObj.domain) ? activeSiteObj.domain : 'app.example.com';
+        var localSecretText = [
+            'grep -qxF \'.env.hotspot.local\' .gitignore 2>/dev/null || printf \'\\n.env.hotspot.local\\n.hotspot/\\n\' >> .gitignore',
+            'cat <<\'EOF\' > .env.hotspot.local',
+            'HOTSPOT_HOST=' + mcpBase,
+            'HOTSPOT_DOMAIN=' + domainExample,
+            'HOTSPOT_API_KEY=' + activeKey,
+            'HOTSPOT_SECRET_KEY=' + activeSecret,
+            'EOF',
+            'chmod 600 .env.hotspot.local'
+        ].join('\n');
+        var deviceApiText = [
+            '# 1) Start browser connect session -> returns verification_uri + device_code',
+            'curl -sS -X POST "' + mcpBase + '/hotspot/api/connect/start/" -H "Content-Type: application/json" -d \'{"client_name":"AI Service"}\'',
+            '# 2) Ask user to open verification_uri (/connect/?code=XXXX-XXXX) and approve/login/add site',
+            '# 3) Poll until status==1 -> returns secret_key, api_key, mcp_config & env_lines (single-use)',
+            'curl -sS -X POST "' + mcpBase + '/hotspot/api/connect/token/" -H "Content-Type: application/json" -d \'{"device_code":"<device_code>"}\''
+        ].join('\n');
+
         var mcpConfigEl = $('snippetMcpConfig');
         if (mcpConfigEl) mcpConfigEl.textContent = mcpConfigText;
-        var copyMcpBtn = $('btnCopyMcpConfig');
-        if (copyMcpBtn) {
-            copyMcpBtn.onclick = function () {
-                copyText(mcpConfigText, copyMcpBtn);
-            };
+        var skillInstallEl = $('snippetSkillInstall');
+        if (skillInstallEl) skillInstallEl.textContent = skillInstallText;
+        var connectCliEl = $('snippetConnectCli');
+        if (connectCliEl) connectCliEl.textContent = connectCliText;
+        var localSecretEl = $('snippetLocalSecretCmd');
+        if (localSecretEl) localSecretEl.textContent = localSecretText;
+        var deviceApiEl = $('snippetDeviceApi');
+        if (deviceApiEl) deviceApiEl.textContent = deviceApiText;
+
+        var copyBind = function (btnId, txt) {
+            var b = $(btnId);
+            if (b) b.onclick = function () { copyText(txt, b); };
+        };
+        copyBind('btnCopyMcpConfig', mcpConfigText);
+        copyBind('btnCopySkillUrl', mcpBase + '/skill.md');
+        copyBind('btnCopySkillInstall', skillInstallText);
+        copyBind('btnCopyConnectCli', connectCliText);
+        copyBind('btnCopyLocalSecretCmd', localSecretText);
+        copyBind('btnCopyDeviceApi', deviceApiText);
+
+        if (secretToggle && !secretToggle.dataset.bound) {
+            secretToggle.dataset.bound = '1';
+            secretToggle.addEventListener('change', function () {
+                var o = state.overview || {};
+                renderSitesTab(o.sites || [], o.current_site || state.site, o.setup || {});
+            });
+        }
+        var tabBtns = document.querySelectorAll('[data-mcp-tab]');
+        for (var mi = 0; mi < tabBtns.length; mi++) {
+            if (!tabBtns[mi].dataset.bound) {
+                tabBtns[mi].dataset.bound = '1';
+                tabBtns[mi].addEventListener('click', function () {
+                    var target = this.getAttribute('data-mcp-tab');
+                    var allBtns = document.querySelectorAll('[data-mcp-tab]');
+                    for (var bi = 0; bi < allBtns.length; bi++) {
+                        allBtns[bi].classList.toggle('active', allBtns[bi].getAttribute('data-mcp-tab') === target);
+                    }
+                    if ($('mcpPaneConfig')) $('mcpPaneConfig').hidden = target !== 'config';
+                    if ($('mcpPaneSkill')) $('mcpPaneSkill').hidden = target !== 'skill';
+                    if ($('mcpPaneConnect')) $('mcpPaneConnect').hidden = target !== 'connect';
+                });
+            }
         }
     }
 

@@ -133,6 +133,114 @@ def llms_txt(request: HttpRequest) -> HttpResponse:
     return response
 
 
+def skill_md(request: HttpRequest) -> HttpResponse:
+    response = HttpResponse(get_service().skill_markdown(), content_type="text/markdown; charset=utf-8")
+    response["Cache-Control"] = "public, max-age=300"
+    _apply(response, MCP_CORS_HEADERS)
+    if (request.GET.get("download") or "").lower() in ("1", "true", "yes"):
+        response["Content-Disposition"] = 'attachment; filename="hotspot-SKILL.md"'
+    return response
+
+
+def connect_page(request: HttpRequest) -> HttpResponse:
+    response = _page(request, "connect")
+    _apply(response, NO_STORE_HEADERS)
+    return response
+
+
+def _json_body(request: HttpRequest) -> dict[str, Any]:
+    if not request.body:
+        return {}
+    try:
+        parsed = json.loads(request.body.decode("utf-8"))
+        return parsed if isinstance(parsed, dict) else {}
+    except Exception:
+        return {}
+
+
+def _set_dashboard_cookie(response: HttpResponse, token: str, *, secure: bool) -> None:
+    response.set_cookie(
+        DASHBOARD_COOKIE,
+        token,
+        max_age=TOKEN_TTL_SECONDS,
+        httponly=True,
+        samesite="Lax",
+        secure=secure,
+        path="/",
+    )
+
+
+@csrf_exempt
+def connect_start_endpoint(request: HttpRequest) -> HttpResponse:
+    if request.method == "OPTIONS":
+        return HttpResponse(status=204, headers=MCP_CORS_HEADERS)
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST", "OPTIONS"])
+    payload = _json_body(request)
+    status_code, body = get_service().start_connect_session(
+        client_name=str(payload.get("client_name") or "AI Assistant"),
+        domain_hint=str(payload.get("domain") or ""),
+        name_hint=str(payload.get("name") or ""),
+        redirect_uri=str(payload.get("redirect_uri") or ""),
+        state=str(payload.get("state") or ""),
+    )
+    response = _json(body, status=status_code)
+    _apply(response, MCP_CORS_HEADERS)
+    return response
+
+
+def connect_status_endpoint(request: HttpRequest) -> HttpResponse:
+    if request.method != "GET":
+        return HttpResponseNotAllowed(["GET"])
+    status_code, body = get_service().connect_session_status(
+        request.GET.get("code") or "",
+        cookie_token=request.COOKIES.get(DASHBOARD_COOKIE),
+        authorization=request.headers.get("Authorization"),
+    )
+    return _json(body, status=status_code)
+
+
+@csrf_exempt
+def connect_approve_endpoint(request: HttpRequest) -> HttpResponse:
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+    if not is_same_site_form_post(request.headers):
+        return _json({"status": 0, "error": "Cross-site connect approval requests are refused."}, status=403)
+    payload = _json_body(request)
+    status_code, body = get_service().approve_connect_session(
+        str(payload.get("code") or payload.get("user_code") or ""),
+        mode=str(payload.get("mode") or "existing"),
+        site_id=str(payload.get("site_id") or "") or None,
+        domain=str(payload.get("domain") or ""),
+        name=str(payload.get("name") or ""),
+        secret_key=str(payload.get("secret_key") or ""),
+        password=str(payload.get("password") or ""),
+        confirmation_key=str(payload.get("confirmation_key") or "") or None,
+        key_mode=str(payload.get("key_mode") or "new"),
+        source_site=str(payload.get("source_site") or "") or None,
+        cookie_token=request.COOKIES.get(DASHBOARD_COOKIE),
+        authorization=request.headers.get("Authorization"),
+    )
+    token = body.pop("token", None) if status_code == 200 else None
+    response = _json(body, status=status_code)
+    if token:
+        _set_dashboard_cookie(response, str(token), secure=request.is_secure())
+    return response
+
+
+@csrf_exempt
+def connect_token_endpoint(request: HttpRequest) -> HttpResponse:
+    if request.method == "OPTIONS":
+        return HttpResponse(status=204, headers=MCP_CORS_HEADERS)
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST", "OPTIONS"])
+    payload = _json_body(request)
+    status_code, body = get_service().exchange_connect_token(str(payload.get("device_code") or ""))
+    response = _json(body, status=status_code)
+    _apply(response, MCP_CORS_HEADERS)
+    return response
+
+
 def favicon(request: HttpRequest) -> HttpResponse:
     response = HttpResponse(FAVICON_SVG, content_type="image/svg+xml")
     response["Cache-Control"] = ASSET_CACHE_CONTROL

@@ -1,0 +1,760 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex">
+    <title>{{ page_title }}</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='9' fill='none' stroke='%232563EB' stroke-width='2.75'/%3E%3Ccircle cx='12' cy='12' r='3' fill='%2310B981'/%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Satisfy&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --brand-primary: #2563EB;
+            --brand-hover: #1D4ED8;
+            --brand-light: #EFF6FF;
+            --brand-border: #BFDBFE;
+            --bg-page: #F8FAFC;
+            --bg-surface: #FFFFFF;
+            --bg-subtle: #F1F5F9;
+            --text-primary: #0F172A;
+            --text-secondary: #475569;
+            --text-muted: #94A3B8;
+            --border-light: #E2E8F0;
+            --border-medium: #CBD5E1;
+            --success: #10B981;
+            --success-light: #ECFDF5;
+            --success-border: #A7F3D0;
+            --danger: #EF4444;
+            --danger-light: #FEF2F2;
+            --danger-border: #FECACA;
+            --warning: #F59E0B;
+            --warning-light: #FFFBEB;
+            --warning-border: #FDE68A;
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+            --shadow-card: 0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        [hidden] { display: none !important; }
+
+        body {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--bg-page);
+            background-image: radial-gradient(#E2E8F0 1.2px, transparent 1.2px);
+            background-size: 28px 28px;
+            font-family: var(--font-sans);
+            color: var(--text-primary);
+            padding: 1.5rem;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .connect-container {
+            width: 100%;
+            max-width: 500px;
+            display: flex;
+            flex-direction: column;
+            gap: 1.15rem;
+        }
+
+        .brand-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.85rem;
+            text-decoration: none;
+            user-select: none;
+        }
+
+        .brand-cursive {
+            display: inline-flex;
+            align-items: center;
+            font-family: 'Satisfy', cursive;
+            font-size: 2.25rem;
+            font-weight: 400;
+            line-height: 1;
+            color: var(--text-primary);
+            text-decoration: none;
+        }
+
+        .brand-cursive .brand-h { font-size: 1.12em; margin-right: -0.06em; font-family: 'Satisfy', cursive; }
+        .brand-cursive .brand-ring { position: relative; top: 0.08em; width: 0.62em; height: 0.62em; margin-right: -0.02em; display: inline-flex; }
+        .brand-cursive .brand-ring svg { width: 100%; height: 100%; display: block; }
+        .brand-cursive .brand-tail { font-family: 'Satisfy', cursive; }
+
+        .brand-badge {
+            font-family: var(--font-sans);
+            font-size: 0.65rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            padding: 0.2rem 0.55rem;
+            background: var(--brand-light);
+            color: var(--brand-primary);
+            border: 1px solid var(--brand-border);
+            border-radius: 9999px;
+        }
+
+        .card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-light);
+            border-radius: 16px;
+            box-shadow: var(--shadow-card);
+            overflow: hidden;
+        }
+
+        .banner {
+            padding: 1rem 1.35rem;
+            background: var(--brand-light);
+            border-bottom: 1px solid var(--brand-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .banner-title { font-size: 0.875rem; font-weight: 700; color: var(--text-primary); }
+        .banner-sub { font-size: 0.78rem; color: var(--text-secondary); margin-top: 2px; }
+        .code-pill {
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            color: var(--brand-primary);
+            background: #FFFFFF;
+            border: 1px solid var(--brand-border);
+            border-radius: 8px;
+            padding: 0.35rem 0.7rem;
+        }
+
+        .tab-switcher {
+            display: flex;
+            background: var(--bg-subtle);
+            border-bottom: 1px solid var(--border-light);
+            padding: 6px;
+            gap: 4px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 0.55rem 0.75rem;
+            border: none;
+            background: transparent;
+            border-radius: 9px;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .tab-btn.active {
+            background: var(--bg-surface);
+            color: var(--brand-primary);
+            box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+        }
+
+        .card-body { padding: 1.45rem 1.55rem; display: flex; flex-direction: column; gap: 0.95rem; }
+        .card-title { font-size: 1.05rem; font-weight: 700; color: var(--text-primary); letter-spacing: -0.01em; }
+        .card-sub { font-size: 0.82rem; color: var(--text-secondary); line-height: 1.45; }
+
+        .form-group { display: flex; flex-direction: column; gap: 0.35rem; }
+        .form-label-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+        .form-label { font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); }
+        .form-hint { font-size: 0.72rem; color: var(--text-muted); }
+
+        .form-input, .form-select {
+            width: 100%;
+            height: 40px;
+            padding: 0 0.85rem;
+            background: #FFFFFF;
+            border: 1px solid var(--border-medium);
+            border-radius: 8px;
+            font-size: 0.86rem;
+            color: var(--text-primary);
+        }
+
+        .form-input.mono { font-family: var(--font-mono); font-size: 0.8125rem; }
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: var(--brand-primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+        }
+
+        .btn-submit {
+            width: 100%;
+            height: 42px;
+            background: var(--brand-primary);
+            color: #FFFFFF;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.45rem;
+        }
+        .btn-submit:hover { background: var(--brand-hover); }
+        .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .btn-outline {
+            height: 36px;
+            padding: 0 0.9rem;
+            background: #FFFFFF;
+            border: 1px solid var(--border-medium);
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.35rem;
+        }
+        .btn-outline:hover { background: var(--bg-subtle); }
+
+        .btn-ghost {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 0.78rem;
+            font-weight: 500;
+            cursor: pointer;
+            padding: 0.25rem 0;
+            text-align: left;
+        }
+        .btn-ghost:hover { color: var(--brand-primary); }
+
+        .alert {
+            padding: 0.72rem 0.9rem;
+            border-radius: 8px;
+            font-size: 0.8125rem;
+            line-height: 1.45;
+        }
+        .alert-error { background: var(--danger-light); border: 1px solid var(--danger-border); color: #B91C1C; }
+        .alert-success { background: var(--success-light); border: 1px solid var(--success-border); color: #065F46; }
+        .alert-info { background: var(--brand-light); border: 1px solid var(--brand-border); color: #1E40AF; }
+
+        .key-box-wrap {
+            background: #0B0F17;
+            border: 1px solid #1E293B;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .key-box-head {
+            background: #111827;
+            padding: 0.45rem 0.8rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        .key-box-title {
+            font-family: var(--font-mono);
+            font-size: 0.68rem;
+            font-weight: 600;
+            color: #94A3B8;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .btn-copy-code {
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            background: rgba(255, 255, 255, 0.08);
+            color: #F8FAFC;
+            border-radius: 6px;
+            padding: 0.22rem 0.55rem;
+            font-size: 0.72rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .key-box-content {
+            padding: 0.75rem 0.9rem;
+            font-family: var(--font-mono);
+            font-size: 0.76rem;
+            color: #38BDF8;
+            line-height: 1.5;
+            word-break: break-all;
+            user-select: all;
+        }
+        .key-box-content.code { color: #E2E8F0; white-space: pre-wrap; }
+
+        .radio-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .radio-card {
+            border: 1.5px solid var(--border-medium);
+            border-radius: 8px;
+            padding: 0.55rem 0.7rem;
+            cursor: pointer;
+            font-size: 0.78rem;
+        }
+        .radio-card.selected {
+            border-color: var(--brand-primary);
+            background: var(--brand-light);
+        }
+
+        .footer-nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            padding-top: 0.35rem;
+        }
+        .footer-nav a { color: var(--brand-primary); text-decoration: none; font-weight: 500; }
+        .footer-nav a:hover { text-decoration: underline; }
+
+        @media (max-width: 520px) {
+            body { padding: 0.85rem; }
+            .card-body { padding: 1.15rem; }
+            .radio-row { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+<div class="connect-container">
+    <a class="brand-header" href="/" aria-label="Hotspot Home">
+        <span class="brand-cursive">
+            <span class="brand-h">H</span><span class="brand-ring" aria-hidden="true"><svg viewBox="0 0 26 26"><circle cx="13" cy="13" r="10.5" fill="none" stroke="#2563EB" stroke-width="2.6"/><circle cx="13" cy="13" r="4" fill="#10B981"/></svg></span><span class="brand-tail">tspot</span>
+        </span>
+        <span class="brand-badge">Agent Connect</span>
+    </a>
+
+    <main class="card">
+        <div class="banner" id="sessionBanner" hidden>
+            <div>
+                <div class="banner-title"><span id="clientNameLabel">AI Assistant</span> requests Hotspot access</div>
+                <div class="banner-sub" id="sessionExpiryLabel">Expires in 10m · Scoped to the site key you choose below</div>
+            </div>
+            <span class="code-pill" id="userCodePill">----</span>
+        </div>
+
+        <!-- Lookup / No-code Entry -->
+        <div class="card-body" id="codeEntryView">
+            <h1 class="card-title">Authorize an automated service or AI assistant</h1>
+            <p class="card-sub">
+                Enter the 8-character connect code printed by your CLI or AI tool, or download the Hotspot agent skill so your coding assistant can register or connect automatically.
+            </p>
+            <div class="alert alert-error" id="lookupError" hidden></div>
+            <form id="codeLookupForm" style="display:flex;flex-direction:column;gap:0.75rem;">
+                <div class="form-group">
+                    <div class="form-label-row">
+                        <label class="form-label" for="codeInput">Connect Code</label>
+                        <span class="form-hint">e.g. K7P4-M9X2</span>
+                    </div>
+                    <input class="form-input mono" id="codeInput" name="code" placeholder="XXXX-XXXX" autocomplete="off">
+                </div>
+                <button class="btn-submit" type="submit" id="btnLookupCode">Continue with Code →</button>
+            </form>
+            <div class="key-box-wrap">
+                <div class="key-box-head">
+                    <span class="key-box-title">Start via CLI or Agent</span>
+                    <a class="btn-copy-code" href="/skill.md?download=1" download="hotspot-SKILL.md" style="text-decoration:none;">Download SKILL.md</a>
+                </div>
+                <div class="key-box-content code">python -m products.hotspot.mcp connect --url {{ site_url }} --save-env .env.hotspot.local --save-mcp .mcp.json</div>
+            </div>
+            <div class="footer-nav">
+                <a href="/dashboard/">Open Dashboard</a>
+                <a href="/skill.md" target="_blank" rel="noopener">View SKILL.md Docs</a>
+            </div>
+        </div>
+
+        <!-- Active Pending Connect Approval -->
+        <div id="approvalView" hidden>
+            <div class="tab-switcher" id="connectTabs">
+                <button class="tab-btn active" type="button" id="tabExistingBtn">Existing Site</button>
+                <button class="tab-btn" type="button" id="tabRegisterBtn">Add New Website</button>
+            </div>
+
+            <div class="card-body">
+                <div class="alert alert-error" id="approveError" hidden></div>
+
+                <!-- Pane 1: Existing site (either already signed in or login inline) -->
+                <div id="paneExisting" style="display:flex;flex-direction:column;gap:0.9rem;">
+                    <div id="alreadySignedBox" hidden style="display:flex;flex-direction:column;gap:0.75rem;">
+                        <div class="alert alert-info">
+                            Signed in cleanly. Pick which tracked site's Secret Key to grant to <strong id="signedClientName">your client</strong>:
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="signedSiteSelect">Authorized Website</label>
+                            <select class="form-select" id="signedSiteSelect"></select>
+                        </div>
+                        <button class="btn-submit" type="button" id="btnApproveSigned">Authorize Selected Site →</button>
+                        <button class="btn-ghost" type="button" id="btnShowInlineLogin">Or sign in with a different Domain &amp; Secret Key</button>
+                    </div>
+
+                    <form id="inlineLoginForm" style="display:flex;flex-direction:column;gap:0.85rem;">
+                        <div class="form-group" id="loginDomainGroup">
+                            <div class="form-label-row">
+                                <label class="form-label" for="loginDomain">Website Domain</label>
+                                <span class="form-hint">e.g. app.example.com</span>
+                            </div>
+                            <input class="form-input" id="loginDomain" type="text" placeholder="yourdomain.com">
+                        </div>
+                        <div class="form-group" id="loginSecretGroup">
+                            <div class="form-label-row">
+                                <label class="form-label" for="loginSecret">Site Secret Key</label>
+                                <span class="form-hint">hs_sec_...</span>
+                            </div>
+                            <input class="form-input mono" id="loginSecret" type="password" placeholder="hs_sec_••••••••••••••••">
+                        </div>
+                        <div class="form-group" id="loginAdminGroup" hidden>
+                            <div class="form-label-row">
+                                <label class="form-label" for="loginAdminPassword">Server Master Admin Key</label>
+                                <span class="form-hint">HOTSPOT_DASHBOARD_PASSWORD</span>
+                            </div>
+                            <input class="form-input mono" id="loginAdminPassword" type="password" placeholder="Enter admin password...">
+                        </div>
+                        <button class="btn-submit" type="submit" id="btnApproveLogin">Sign In &amp; Authorize →</button>
+                        <button class="btn-ghost" type="button" id="btnToggleConnectAdmin">Server Admin? Sign in with Master Key</button>
+                    </form>
+                </div>
+
+                <!-- Pane 2: Register new website on the spot -->
+                <div id="paneRegister" hidden>
+                    <form id="connectRegisterForm" style="display:flex;flex-direction:column;gap:0.85rem;">
+                        <div class="form-group">
+                            <div class="form-label-row">
+                                <label class="form-label" for="regSiteDomain">Website URL or Domain</label>
+                                <span class="form-hint">e.g. app.example.com</span>
+                            </div>
+                            <input class="form-input" id="regSiteDomain" type="text" placeholder="https://app.example.com" required>
+                        </div>
+                        <div class="form-group">
+                            <div class="form-label-row">
+                                <label class="form-label" for="regSiteName">Display Name</label>
+                                <span class="form-hint">Optional</span>
+                            </div>
+                            <input class="form-input" id="regSiteName" type="text" placeholder="Production Web App">
+                        </div>
+                        <div id="connectKeyModeBox" hidden style="display:flex;flex-direction:column;gap:0.45rem;">
+                            <span class="form-label">Secret Key Mode</span>
+                            <div class="radio-row">
+                                <label class="radio-card selected" id="connectKeySameCard">
+                                    <input type="radio" name="connectKeyMode" value="same" checked> <strong>Same secret key</strong>
+                                    <div class="form-hint" style="margin-top:2px;">Share one login &amp; MCP key</div>
+                                </label>
+                                <label class="radio-card" id="connectKeyNewCard">
+                                    <input type="radio" name="connectKeyMode" value="new"> <strong>New secret key</strong>
+                                    <div class="form-hint" style="margin-top:2px;">Separate isolated key</div>
+                                </label>
+                            </div>
+                            <select class="form-select" id="connectSourceSiteSelect" hidden></select>
+                        </div>
+                        <div class="form-group" id="connectConfirmGroup" hidden>
+                            <div class="form-label-row">
+                                <label class="form-label" for="connectConfirmKey">Existing Owner Secret Key</label>
+                                <span class="form-hint">Required for registered domains</span>
+                            </div>
+                            <input class="form-input mono" id="connectConfirmKey" type="password" placeholder="Enter existing hs_sec_... to confirm">
+                        </div>
+                        <button class="btn-submit" type="submit" id="btnApproveRegister">Create Site &amp; Authorize →</button>
+                    </form>
+                </div>
+
+                <div class="footer-nav">
+                    <a href="/login/">Standard Login</a>
+                    <a href="/skill.md?download=1" download="hotspot-SKILL.md">Download SKILL.md</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Approved Success Screen -->
+        <div class="card-body" id="approvedSuccessView" hidden>
+            <div class="alert alert-success" id="approvedAlert">
+                Authorized! Your automated service or AI assistant now has scoped access.
+            </div>
+            <p class="card-sub" id="approvedSummary">
+                Access granted for <strong id="approvedDomainsText"></strong>. You can close this window or return to your terminal.
+            </p>
+            <div id="createdSiteSecretsBox" hidden style="display:flex;flex-direction:column;gap:0.75rem;">
+                <div class="key-box-wrap">
+                    <div class="key-box-head">
+                        <span class="key-box-title">Private Secret Key (Save to .env.hotspot.local, NOT client JS)</span>
+                        <button class="btn-copy-code" type="button" id="btnCopyCreatedSecret">Copy Secret</button>
+                    </div>
+                    <div class="key-box-content" id="createdSecretText">hs_sec_...</div>
+                </div>
+                <div class="key-box-wrap">
+                    <div class="key-box-head">
+                        <span class="key-box-title">1-Line HTML Embed Snippet</span>
+                        <button class="btn-copy-code" type="button" id="btnCopyCreatedSnippet">Copy Script</button>
+                    </div>
+                    <div class="key-box-content code" id="createdSnippetText"></div>
+                </div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">
+                <a class="btn-submit" id="btnContinueRedirect" href="/dashboard/" hidden style="text-decoration:none;flex:1;">Return to Application →</a>
+                <a class="btn-outline" href="/dashboard/" style="flex:1;">Open Dashboard</a>
+                <a class="btn-outline" href="/skill.md?download=1" download="hotspot-SKILL.md">Download SKILL.md</a>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+    (function () {
+        'use strict';
+        const params = new URLSearchParams(window.location.search);
+        let activeCode = (params.get('code') || '').trim().toUpperCase();
+        let adminMode = false;
+        let isSignedIn = false;
+        let forceInlineLogin = false;
+
+        const el = (id) => document.getElementById(id);
+
+        function showError(targetId, msg) {
+            const box = el(targetId);
+            if (!box) return;
+            if (!msg) { box.hidden = true; box.textContent = ''; return; }
+            box.textContent = msg;
+            box.hidden = false;
+        }
+
+        function switchTab(tab) {
+            const existingBtn = el('tabExistingBtn');
+            const regBtn = el('tabRegisterBtn');
+            const pExisting = el('paneExisting');
+            const pReg = el('paneRegister');
+            showError('approveError', '');
+            if (tab === 'register') {
+                existingBtn.classList.remove('active');
+                regBtn.classList.add('active');
+                pExisting.hidden = true;
+                pReg.hidden = false;
+            } else {
+                regBtn.classList.remove('active');
+                existingBtn.classList.add('active');
+                pReg.hidden = true;
+                pExisting.hidden = false;
+            }
+        }
+
+        function copyText(text, btn) {
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(text).catch(() => {});
+            }
+            if (btn) {
+                const prev = btn.textContent;
+                btn.textContent = 'Copied!';
+                setTimeout(() => { btn.textContent = prev; }, 1600);
+            }
+        }
+
+        async function loadStatus(code) {
+            showError('lookupError', '');
+            showError('approveError', '');
+            const q = code ? ('?code=' + encodeURIComponent(code)) : '';
+            const res = await fetch('/hotspot/api/connect/status/' + q, { credentials: 'same-origin' });
+            const data = await res.json();
+            isSignedIn = Boolean(data.signed_in && Array.isArray(data.sites) && data.sites.length > 0);
+
+            if (!code || !data.session) {
+                el('sessionBanner').hidden = true;
+                el('approvalView').hidden = true;
+                el('approvedSuccessView').hidden = true;
+                el('codeEntryView').hidden = false;
+                if (code) {
+                    el('codeInput').value = code;
+                    showError('lookupError', 'Connect code "' + code + '" was not found or expired. Generate a fresh code and try again.');
+                }
+                return;
+            }
+
+            const sess = data.session;
+            activeCode = sess.user_code;
+            el('clientNameLabel').textContent = sess.client_name || 'AI Assistant';
+            el('signedClientName').textContent = sess.client_name || 'your client';
+            el('userCodePill').textContent = sess.user_code;
+            const mins = Math.max(1, Math.ceil((sess.expires_in || 600) / 60));
+            el('sessionExpiryLabel').textContent = 'Expires in ~' + mins + 'm · Grants access only to the site key you choose below';
+            el('sessionBanner').hidden = false;
+
+            if (sess.status === 'approved') {
+                el('codeEntryView').hidden = true;
+                el('approvalView').hidden = true;
+                el('approvedDomainsText').textContent = sess.domain_hint || 'your site';
+                el('approvedSuccessView').hidden = false;
+                return;
+            }
+
+            el('codeEntryView').hidden = true;
+            el('approvedSuccessView').hidden = true;
+            el('approvalView').hidden = false;
+
+            if (sess.domain_hint) {
+                if (!el('loginDomain').value) el('loginDomain').value = sess.domain_hint;
+                if (!el('regSiteDomain').value) el('regSiteDomain').value = sess.domain_hint;
+            }
+            if (sess.name_hint && !el('regSiteName').value) {
+                el('regSiteName').value = sess.name_hint;
+            }
+
+            const signedSelect = el('signedSiteSelect');
+            const sourceSelect = el('connectSourceSiteSelect');
+            signedSelect.innerHTML = '';
+            sourceSelect.innerHTML = '';
+            (data.sites || []).forEach((s) => {
+                const label = (s.name || s.domain) + ' (' + s.domain + ')';
+                const opt1 = document.createElement('option');
+                opt1.value = s.id;
+                opt1.textContent = label;
+                if (sess.domain_hint && s.domain === sess.domain_hint) opt1.selected = true;
+                signedSelect.appendChild(opt1);
+
+                const opt2 = document.createElement('option');
+                opt2.value = s.domain;
+                opt2.textContent = label;
+                sourceSelect.appendChild(opt2);
+            });
+
+            if (isSignedIn && !forceInlineLogin) {
+                el('alreadySignedBox').hidden = false;
+                el('inlineLoginForm').hidden = true;
+                el('connectKeyModeBox').hidden = false;
+                if ((data.sites || []).length > 1) sourceSelect.hidden = false;
+            } else {
+                el('alreadySignedBox').hidden = true;
+                el('inlineLoginForm').hidden = false;
+                el('connectKeyModeBox').hidden = isSignedIn ? false : true;
+            }
+        }
+
+        async function submitApproval(payload, btn) {
+            showError('approveError', '');
+            if (btn) btn.disabled = true;
+            try {
+                const res = await fetch('/hotspot/api/connect/approve/', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify(Object.assign({ code: activeCode }, payload)),
+                });
+                const data = await res.json();
+                if (btn) btn.disabled = false;
+                if (!res.ok || data.status !== 1) {
+                    if (res.status === 409 && data.requires_confirmation) {
+                        el('connectConfirmGroup').hidden = false;
+                        el('connectConfirmKey').focus();
+                    }
+                    showError('approveError', data.error || 'Could not authorize connect request.');
+                    return;
+                }
+
+                el('approvalView').hidden = true;
+                el('approvedSuccessView').hidden = false;
+                const domList = (data.domains && data.domains.length) ? data.domains.join(', ') : (data.domain || 'your site');
+                el('approvedDomainsText').textContent = domList;
+                el('approvedAlert').textContent = 'Authorized for ' + (data.client_name || 'AI Assistant') + ' (' + domList + ').';
+
+                if (data.created_site && data.created_site.secret_key) {
+                    el('createdSiteSecretsBox').hidden = false;
+                    el('createdSecretText').textContent = data.created_site.secret_key;
+                    el('createdSnippetText').textContent = data.created_site.snippet || '';
+                    el('btnCopyCreatedSecret').onclick = () => copyText(data.created_site.secret_key, el('btnCopyCreatedSecret'));
+                    el('btnCopyCreatedSnippet').onclick = () => copyText(data.created_site.snippet || '', el('btnCopyCreatedSnippet'));
+                }
+                if (data.redirect_to) {
+                    const cont = el('btnContinueRedirect');
+                    cont.href = data.redirect_to;
+                    cont.textContent = 'Return to ' + (data.client_name || 'Application') + ' →';
+                    cont.hidden = false;
+                    setTimeout(() => { window.location.assign(data.redirect_to); }, 800);
+                }
+            } catch (err) {
+                if (btn) btn.disabled = false;
+                showError('approveError', 'Network error while authorizing.');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            el('codeLookupForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const raw = el('codeInput').value.trim().toUpperCase();
+                if (!raw) {
+                    showError('lookupError', 'Enter the 8-character connect code first.');
+                    return;
+                }
+                loadStatus(raw);
+            });
+
+            el('tabExistingBtn').addEventListener('click', () => switchTab('existing'));
+            el('tabRegisterBtn').addEventListener('click', () => switchTab('register'));
+
+            el('btnShowInlineLogin').addEventListener('click', () => {
+                forceInlineLogin = true;
+                el('alreadySignedBox').hidden = true;
+                el('inlineLoginForm').hidden = false;
+            });
+
+            el('btnToggleConnectAdmin').addEventListener('click', () => {
+                adminMode = !adminMode;
+                el('loginDomainGroup').hidden = adminMode;
+                el('loginSecretGroup').hidden = adminMode;
+                el('loginAdminGroup').hidden = !adminMode;
+                el('btnToggleConnectAdmin').textContent = adminMode
+                    ? 'Site Owner? Sign in with Domain + Secret Key'
+                    : 'Server Admin? Sign in with Master Key';
+            });
+
+            el('btnApproveSigned').addEventListener('click', () => {
+                submitApproval({ mode: 'existing', site_id: el('signedSiteSelect').value }, el('btnApproveSigned'));
+            });
+
+            el('inlineLoginForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                if (adminMode) {
+                    submitApproval({ mode: 'login', password: el('loginAdminPassword').value.trim() }, el('btnApproveLogin'));
+                } else {
+                    submitApproval({
+                        mode: 'login',
+                        domain: el('loginDomain').value.trim(),
+                        secret_key: el('loginSecret').value.trim(),
+                    }, el('btnApproveLogin'));
+                }
+            });
+
+            document.querySelectorAll('input[name="connectKeyMode"]').forEach((radio) => {
+                radio.addEventListener('change', () => {
+                    const isSame = radio.value === 'same' && radio.checked;
+                    el('connectKeySameCard').classList.toggle('selected', isSame);
+                    el('connectKeyNewCard').classList.toggle('selected', !isSame);
+                });
+            });
+
+            el('connectRegisterForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const checked = document.querySelector('input[name="connectKeyMode"]:checked');
+                const keyMode = isSignedIn && checked ? checked.value : 'new';
+                submitApproval({
+                    mode: 'register',
+                    domain: el('regSiteDomain').value.trim(),
+                    name: el('regSiteName').value.trim(),
+                    key_mode: keyMode,
+                    source_site: el('connectSourceSiteSelect').value || '',
+                    confirmation_key: el('connectConfirmKey').value.trim() || null,
+                }, el('btnApproveRegister'));
+            });
+
+            if (params.get('tab') === 'register') switchTab('register');
+            loadStatus(activeCode);
+        });
+    })();
+</script>
+</body>
+</html>

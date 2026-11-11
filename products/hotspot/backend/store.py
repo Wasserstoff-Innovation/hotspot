@@ -87,6 +87,12 @@ class StorageBackend(Protocol):
 
     def delete_site(self, site_id: str) -> bool: ...
 
+    def set_ephemeral(self, key: str, value: dict[str, Any], ttl_seconds: int) -> None: ...
+
+    def get_ephemeral(self, key: str) -> dict[str, Any] | None: ...
+
+    def pop_ephemeral(self, key: str) -> dict[str, Any] | None: ...
+
 
 class MemoryBackend:
     name = "memory"
@@ -100,6 +106,7 @@ class MemoryBackend:
         self._last_seen: dict[str, float] = {}
         self._events: deque[str] = deque(maxlen=config.max_events)
         self._sites: dict[str, dict[str, Any]] = {}
+        self._ephemeral: dict[str, tuple[float, dict[str, Any]]] = {}
 
     def update_session(
         self,
@@ -160,6 +167,7 @@ class MemoryBackend:
             self._last_seen.clear()
             self._events.clear()
             self._sites.clear()
+            self._ephemeral.clear()
 
     def save_site(self, site: dict[str, Any]) -> None:
         with self._lock:
@@ -177,6 +185,34 @@ class MemoryBackend:
     def delete_site(self, site_id: str) -> bool:
         with self._lock:
             return self._sites.pop(site_id, None) is not None
+
+    def set_ephemeral(self, key: str, value: dict[str, Any], ttl_seconds: int) -> None:
+        expires_at = time.time() + max(1, int(ttl_seconds))
+        with self._lock:
+            self._ephemeral[key] = (expires_at, dict(value))
+
+    def get_ephemeral(self, key: str) -> dict[str, Any] | None:
+        now = time.time()
+        with self._lock:
+            entry = self._ephemeral.get(key)
+            if entry is None:
+                return None
+            expires_at, payload = entry
+            if expires_at <= now:
+                self._ephemeral.pop(key, None)
+                return None
+            return dict(payload)
+
+    def pop_ephemeral(self, key: str) -> dict[str, Any] | None:
+        now = time.time()
+        with self._lock:
+            entry = self._ephemeral.pop(key, None)
+            if entry is None:
+                return None
+            expires_at, payload = entry
+            if expires_at <= now:
+                return None
+            return dict(payload)
 
 
 class RedisBackend:
@@ -291,6 +327,45 @@ class RedisBackend:
 
     def delete_site(self, site_id: str) -> bool:
         return bool(self._client.hdel(self._sites_key, site_id))
+
+    def _ephemeral_key(self, key: str) -> str:
+        return f"{self._prefix}eph:{key}"
+
+    def set_ephemeral(self, key: str, value: dict[str, Any], ttl_seconds: int) -> None:
+        raw = json.dumps(value, separators=(",", ":"))
+        self._client.set(self._ephemeral_key(key), raw, ex=max(1, int(ttl_seconds)))
+
+    def get_ephemeral(self, key: str) -> dict[str, Any] | None:
+        raw = self._client.get(self._ephemeral_key(key))
+        if not raw:
+            return None
+        try:
+            payload = json.loads(_text(raw))
+            return payload if isinstance(payload, dict) else None
+        except Exception:
+            return None
+
+    def pop_ephemeral(self, key: str) -> dict[str, Any] | None:
+        rkey = self._ephemeral_key(key)
+        getdel = getattr(self._client, "getdel", None)
+        if callable(getdel):
+            raw = getdel(rkey)
+        else:
+
+            def txn(pipe: Any) -> Any:
+                val = pipe.get(rkey)
+                pipe.multi()
+                pipe.delete(rkey)
+                return val
+
+            raw = self._client.transaction(txn, rkey, value_from_callable=True)
+        if not raw:
+            return None
+        try:
+            payload = json.loads(_text(raw))
+            return payload if isinstance(payload, dict) else None
+        except Exception:
+            return None
 
 
 def _text(value: Any) -> str:
@@ -496,6 +571,15 @@ class SessionStore:
     def all_api_keys(self) -> frozenset[str]:
         keys = {s["api_key"] for s in self._backend.get_sites() if s.get("api_key")}
         return frozenset(keys)
+
+    def set_ephemeral(self, key: str, value: dict[str, Any], ttl_seconds: int) -> None:
+        self._backend.set_ephemeral(key, value, ttl_seconds)
+
+    def get_ephemeral(self, key: str) -> dict[str, Any] | None:
+        return self._backend.get_ephemeral(key)
+
+    def pop_ephemeral(self, key: str) -> dict[str, Any] | None:
+        return self._backend.pop_ephemeral(key)
 
     def ensure_default_sites(self) -> None:
         self.save_site("Buxa AI", "buxa.ai", "hs_live_buxa_ai", "hs_sec_buxa_ai_root")
