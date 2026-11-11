@@ -64,6 +64,7 @@ class McpAuthContext:
 
     scope: str
     site: dict[str, Any] | None = None
+    sites: tuple[dict[str, Any], ...] = ()
     is_admin: bool = False
     secret_key_hint: str | None = None
 
@@ -332,13 +333,16 @@ def resolve_mcp_auth(
                 "Pass your site's private Secret Key (`hs_sec_...`)."
             )
         if service.config.dashboard_password and password_matches(service.config.dashboard_password, cleaned):
-            return McpAuthContext(scope="*", site=None, is_admin=True, secret_key_hint="admin")
-        site = service.store.get_site_by_secret_key(cleaned)
-        if site is None:
+            return McpAuthContext(scope="*", site=None, sites=(), is_admin=True, secret_key_hint="admin")
+        sites = service.store.get_sites_by_secret_key(cleaned)
+        if not sites:
             raise McpAuthError("Invalid secret key. Verify your `hs_sec_...` key for this site.")
+        domains = service._unique_site_domains(sites)
+        scope = ",".join(domains) if domains else str(sites[0].get("domain") or sites[0].get("id") or "")
         return McpAuthContext(
-            scope=str(site.get("domain") or site.get("id") or ""),
-            site=site,
+            scope=scope,
+            site=sites[0],
+            sites=tuple(sites),
             is_admin=False,
             secret_key_hint=_mask_key(cleaned),
         )
@@ -374,47 +378,68 @@ def _extract_secret_arg(arguments: Mapping[str, Any]) -> str | None:
     return raw.strip() if isinstance(raw, str) and raw.strip() else None
 
 
+def _match_scoped_site(
+    sites: list[dict[str, Any]] | tuple[dict[str, Any], ...], requested_site: str
+) -> dict[str, Any] | None:
+    req = requested_site.strip().lower()
+    if not req:
+        return None
+    for site in sites:
+        if req in {
+            (site.get("domain") or "").lower(),
+            (site.get("id") or "").lower(),
+            (site.get("api_key") or "").lower(),
+        }:
+            return site
+    return None
+
+
 def _target_site_for(
     service: HotspotService,
     auth: McpAuthContext,
     requested_site: str | None = None,
 ) -> dict[str, Any] | None:
-    if auth.site is not None and not auth.is_admin:
-        if requested_site:
-            req = requested_site.strip().lower()
-            candidates = {
-                (auth.site.get("domain") or "").lower(),
-                (auth.site.get("id") or "").lower(),
-                (auth.site.get("api_key") or "").lower(),
-            }
-            if req and req not in candidates:
+    if not auth.is_admin:
+        scoped_sites = list(auth.sites) if auth.sites else ([auth.site] if auth.site is not None else [])
+        if not scoped_sites:
+            return None
+        if requested_site and requested_site.strip():
+            matched = _match_scoped_site(scoped_sites, requested_site)
+            if matched is None:
                 raise McpAuthError(
-                    f"Access denied: secret key is scoped strictly to '{auth.site.get('domain')}', not '{requested_site}'."
+                    f"Access denied: secret key is scoped strictly to '{auth.scope}', not '{requested_site}'."
                 )
-        return auth.site
+            return matched
+        return auth.site or scoped_sites[0]
 
     sites = service.list_sites(authorized_scope="*")
     if not sites:
         return None
-    if requested_site:
-        req = requested_site.strip().lower()
-        for site in sites:
-            if req in {
-                (site.get("domain") or "").lower(),
-                (site.get("id") or "").lower(),
-                (site.get("api_key") or "").lower(),
-            }:
-                return site
-        return None
+    if requested_site and requested_site.strip():
+        return _match_scoped_site(sites, requested_site)
     return sites[0]
 
 
 def _query_params_from_args(auth: McpAuthContext, arguments: Mapping[str, Any]) -> dict[str, str]:
     params: dict[str, str] = {}
-    if auth.site and not auth.is_admin:
-        params["site"] = str(auth.site.get("domain") or "")
-    elif isinstance(arguments.get("site"), str) and arguments["site"].strip():
-        params["site"] = arguments["site"].strip()
+    req_site = arguments.get("site")
+    req_site_str = req_site.strip() if isinstance(req_site, str) and req_site.strip() else None
+    if not auth.is_admin:
+        scoped_sites = auth.sites or ((auth.site,) if auth.site is not None else ())
+        if req_site_str:
+            if req_site_str.lower() == "all":
+                params["site"] = "all" if len(scoped_sites) > 1 else str((auth.site or {}).get("domain") or "")
+            else:
+                matched = _match_scoped_site(scoped_sites, req_site_str)
+                if matched is None:
+                    raise McpAuthError(
+                        f"Access denied: secret key is scoped strictly to '{auth.scope}', not '{req_site_str}'."
+                    )
+                params["site"] = str(matched.get("domain") or req_site_str)
+        elif len(scoped_sites) <= 1 and auth.site:
+            params["site"] = str(auth.site.get("domain") or "")
+    elif req_site_str:
+        params["site"] = req_site_str
 
     for key in ("hours", "limit", "tz_offset"):
         val = arguments.get(key)
@@ -613,15 +638,44 @@ def _tool_register_site(
     if not name:
         name = domain
 
+    key_mode = str(arguments.get("key_mode") or "new").strip().lower()
+    if key_mode not in {"new", "same"}:
+        raise McpProtocolError(_ERROR_INVALID_PARAMS, "`key_mode` must be 'new' or 'same'.")
+
+    secret_key_override: str | None = None
+    if key_mode == "same":
+        if auth is None:
+            raise McpProtocolError(
+                _ERROR_UNAUTHORIZED,
+                "Supply an existing Secret Key (`secret_key` argument or Authorization header) to reuse it with `key_mode='same'`.",
+            )
+        preferred = str(arguments.get("source_site") or "").strip() or None
+        secret_key_override = service.resolve_owner_secret_key(auth.scope, preferred_site=preferred)
+        if not secret_key_override:
+            raise McpProtocolError(
+                _ERROR_INVALID_PARAMS,
+                "No matching existing site with a Secret Key was found in your current scope.",
+            )
+
     confirmation_key = arguments.get("confirmation_key")
     conf_str = str(confirmation_key).strip() if confirmation_key else None
     if not conf_str and auth is not None:
         if auth.is_admin:
             conf_str = service.config.dashboard_password
-        elif auth.site and (auth.site.get("domain") or "").lower() == domain.lower():
-            conf_str = auth.site.get("secret_key")
+        else:
+            owned_match = _match_scoped_site(
+                list(auth.sites) if auth.sites else ([auth.site] if auth.site else []),
+                domain,
+            )
+            if owned_match is not None:
+                conf_str = owned_match.get("secret_key")
 
-    ok, res = service.create_site(name, domain, confirmation_key=conf_str)
+    ok, res = service.create_site(
+        name,
+        domain,
+        confirmation_key=conf_str,
+        secret_key_override=secret_key_override,
+    )
     if not ok:
         raise McpProtocolError(_ERROR_INVALID_PARAMS, str(res))
 
@@ -694,6 +748,10 @@ def _tool_get_site_setup(
             },
         },
         "mcp_client_config": _mcp_config_snippet(service, site.get("secret_key")),
+        "sites_sharing_secret_key": [
+            {"id": s.get("id"), "name": s.get("name"), "domain": s.get("domain"), "api_key": s.get("api_key")}
+            for s in (auth.sites if (not auth.is_admin and auth.sites) else [site])
+        ],
     }
 
 
@@ -710,7 +768,7 @@ def _tool_verify_connection(
         {"site": domain, "hours": str(int(arguments.get("hours") or 168)), "limit": "5"},
         authorized_scope=auth.scope,
     )
-    feed = service.events_feed({"limit": "15"}, authorized_scope=auth.scope)
+    feed = service.events_feed({"site": domain, "limit": "15"}, authorized_scope=auth.scope)
     recent_events = feed.get("events") or []
     sessions = overview.get("sessions") or []
     metrics = overview.get("metrics") or {}
@@ -1310,6 +1368,9 @@ def _tool_get_live_events(
         params["since"] = str(arguments["since"])
     if arguments.get("limit") is not None:
         params["limit"] = str(int(arguments["limit"]))
+    if isinstance(arguments.get("site"), str) and arguments["site"].strip():
+        matched = _target_site_for(service, auth, arguments["site"])
+        params["site"] = str((matched or {}).get("domain") or arguments["site"].strip())
 
     feed = service.events_feed(params, authorized_scope=auth.scope)
     events = list(feed.get("events") or [])
@@ -1365,7 +1426,10 @@ _SECRET_KEY_PROP = {
 
 _FILTER_PROPS = {
     "secret_key": _SECRET_KEY_PROP,
-    "site": {"type": "string", "description": "Optional domain (only needed with an admin key)."},
+    "site": {
+        "type": "string",
+        "description": "Optional domain within your Secret Key scope (or 'all' across sites sharing the same Secret Key).",
+    },
     "hours": {
         "type": "integer",
         "description": "Lookback window in hours (default 24; use 0 for all stored time).",
@@ -1439,6 +1503,16 @@ _TOOLS: tuple[_ToolSpec, ...] = (
                     "type": "string",
                     "description": "Required when re-registering an existing domain to prove ownership (existing `hs_sec_...`).",
                 },
+                "secret_key": _SECRET_KEY_PROP,
+                "key_mode": {
+                    "type": "string",
+                    "enum": ["new", "same"],
+                    "description": "Set 'same' (with an authenticated Secret Key) to share the existing Secret Key with the new domain, or 'new' (default) for a separate key.",
+                },
+                "source_site": {
+                    "type": "string",
+                    "description": "Optional existing domain in your scope whose Secret Key to copy when key_mode='same'.",
+                },
                 "framework": {
                     "type": "string",
                     "enum": list(VALID_FRAMEWORKS),
@@ -1461,7 +1535,10 @@ _TOOLS: tuple[_ToolSpec, ...] = (
             "type": "object",
             "properties": {
                 "secret_key": _SECRET_KEY_PROP,
-                "site": {"type": "string", "description": "Target domain (if using an admin key)."},
+                "site": {
+                    "type": "string",
+                    "description": "Target domain within your Secret Key scope (if sharing a key across sites or using an admin key).",
+                },
                 "framework": {
                     "type": "string",
                     "enum": list(VALID_FRAMEWORKS),

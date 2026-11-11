@@ -261,3 +261,190 @@ def test_domain_secret_key_auth_and_collision_protection(protected_service: Hots
     assert overview_data["scope"]["authorized_site"] == "acme.com"
     assert len(overview_data["sites"]) == 1
     assert overview_data["sites"][0]["domain"] == "acme.com"
+
+
+def test_add_more_sites_without_logout_same_or_new_secret_key() -> None:
+    from starlette.testclient import TestClient  # noqa: PLC0415
+
+    from products.hotspot.standalone import server as standalone_server  # noqa: PLC0415
+
+    service = make_service(
+        HOTSPOT_DASHBOARD_PASSWORD="master-secret-password",
+        HOTSPOT_DEMO_ENABLED="false",
+    )
+    reset_service(service)
+    factory = RequestFactory()
+    try:
+        # 1. Create an unrelated third-party site first
+        unauth_other = views.sites_endpoint(
+            factory.post(
+                "/hotspot/api/sites/",
+                data=json.dumps({"name": "Unrelated", "domain": "unrelated.example.com"}),
+                content_type="application/json",
+            )
+        )
+        assert unauth_other.status_code == 200
+        other_site = json.loads(unauth_other.content)["site"]
+
+        # Unauthenticated key_mode='same' MUST be rejected cleanly
+        unauth_same = views.sites_endpoint(
+            factory.post(
+                "/hotspot/api/sites/",
+                data=json.dumps({"name": "Steal", "domain": "steal.example.com", "key_mode": "same"}),
+                content_type="application/json",
+            )
+        )
+        assert unauth_same.status_code == 401
+
+        # 2. User registers Site A via Starlette standalone client (receives scoped session cookie)
+        with TestClient(standalone_server.app) as client:
+            reg_a = client.post(
+                "/hotspot/api/sites/",
+                json={"name": "Alpha App", "domain": "alpha.example.com", "key_mode": "new"},
+            )
+            assert reg_a.status_code == 200
+            data_a = reg_a.json()
+            assert data_a["status"] == 1
+            assert data_a["scope"] == "alpha.example.com"
+            site_a = data_a["site"]
+
+            # Trying key_mode='same' pointing at an unowned source_site is rejected
+            bad_src = client.post(
+                "/hotspot/api/sites/",
+                json={
+                    "name": "Hijack",
+                    "domain": "hijack.example.com",
+                    "key_mode": "same",
+                    "source_site": "unrelated.example.com",
+                },
+            )
+            assert bad_src.status_code == 403
+
+            # Collision protection still rejects re-registering unrelated domain with key_mode='same'
+            collide = client.post(
+                "/hotspot/api/sites/",
+                json={"name": "Collision", "domain": "unrelated.example.com", "key_mode": "same"},
+            )
+            assert collide.status_code == 409
+
+            # 3. Logged-in user adds Site B with key_mode='same' -> shares secret_key, keeps both sites in session
+            reg_b = client.post(
+                "/hotspot/api/sites/",
+                json={"name": "Beta Docs", "domain": "beta.example.com", "key_mode": "same"},
+            )
+            assert reg_b.status_code == 200
+            data_b = reg_b.json()
+            assert data_b["status"] == 1
+            site_b = data_b["site"]
+            assert site_b["secret_key"] == site_a["secret_key"]
+            assert site_b["api_key"] != site_a["api_key"]
+            assert data_b["scope"] == "alpha.example.com,beta.example.com"
+
+            # 4. Logged-in user adds Site C with key_mode='new' -> new secret_key, STILL merged into current session
+            reg_c = client.post(
+                "/hotspot/api/sites/",
+                json={"name": "Gamma Store", "domain": "gamma.example.com", "key_mode": "new"},
+            )
+            assert reg_c.status_code == 200
+            data_c = reg_c.json()
+            site_c = data_c["site"]
+            assert site_c["secret_key"] != site_a["secret_key"]
+            assert data_c["scope"] == "alpha.example.com,beta.example.com,gamma.example.com"
+
+            # Ingest one session per site (including unrelated.example.com)
+            now = time.time()
+            for idx, (s, host_name) in enumerate(
+                [
+                    (site_a, "alpha.example.com"),
+                    (site_b, "beta.example.com"),
+                    (site_c, "gamma.example.com"),
+                    (other_site, "unrelated.example.com"),
+                ],
+                start=1,
+            ):
+                cap = client.post(
+                    "/hotspot/batch/",
+                    content=batch_body(
+                        [
+                            event_item(
+                                "$pageview",
+                                f"sess-{idx}",
+                                now - idx,
+                                f"user-{idx}",
+                                **{"$current_url": f"https://{host_name}/home", "$host": host_name},
+                            )
+                        ],
+                        api_key=s["api_key"],
+                    ),
+                    headers={"Content-Type": "text/plain"},
+                )
+                assert cap.status_code == 200
+
+            # Aggregate overview in current browser session sees Alpha + Beta + Gamma, NEVER Unrelated
+            ov_all = client.get("/hotspot/api/overview/").json()
+            assert ov_all["scope"]["is_admin"] is False
+            assert ov_all["scope"]["authorized_sites"] == [
+                "alpha.example.com",
+                "beta.example.com",
+                "gamma.example.com",
+            ]
+            assert {s["domain"] for s in ov_all["sites"]} == {
+                "alpha.example.com",
+                "beta.example.com",
+                "gamma.example.com",
+            }
+            assert ov_all["metrics"]["sessions"] == 3
+            assert ov_all["scope"]["sessions_stored"] == 3
+
+            # Per-site switcher query filters cleanly and cross-tenant query yields 0
+            ov_b = client.get("/hotspot/api/overview/?site=beta.example.com").json()
+            assert ov_b["metrics"]["sessions"] == 1
+            assert ov_b["sessions"][0]["session_id"] == "sess-2"
+
+            ov_victim = client.get("/hotspot/api/overview/?site=unrelated.example.com").json()
+            assert ov_victim["metrics"]["sessions"] == 0
+
+            # Detail + events feed allow own sites and deny unrelated site
+            assert client.get("/hotspot/api/sessions/sess-3/").status_code == 200
+            assert client.get("/hotspot/api/sessions/sess-4/").status_code == 404
+            feed = client.get("/hotspot/api/events/").json()
+            assert len(feed["events"]) == 3
+            assert {ev.get("session_id") for ev in feed["events"]} == {"sess-1", "sess-2", "sess-3"}
+
+            # Deleting Site C removes it from cookie scope without dropping Alpha or Beta
+            del_unrelated = client.delete(f"/hotspot/api/sites/{other_site['id']}/")
+            assert del_unrelated.status_code == 403
+            del_c = client.delete(f"/hotspot/api/sites/{site_c['id']}/")
+            assert del_c.status_code == 200
+            assert del_c.json()["scope"] == "alpha.example.com,beta.example.com"
+
+        # 5. Re-logging in later with shared secret key unlocks BOTH Alpha & Beta; Gamma key unlocks ONLY Gamma
+        shared_token = service.login(site_a["secret_key"], domain="alpha.example.com")
+        assert shared_token is not None
+        shared_ov = service.overview(
+            {"hours": "24"},
+            authorized_scope=service.authorized_scope(shared_token, None)[1] or "",
+        )
+        assert {s["domain"] for s in shared_ov["sites"]} == {"alpha.example.com", "beta.example.com"}
+
+        # Admin cookie ("*") MUST NOT be downgraded when admin creates a site
+        admin_req = factory.post(
+            "/hotspot/api/sites/",
+            data=json.dumps(
+                {
+                    "name": "Admin Shared",
+                    "domain": "admin-shared.example.com",
+                    "key_mode": "same",
+                    "source_site": "alpha.example.com",
+                }
+            ),
+            content_type="application/json",
+            HTTP_AUTHORIZATION="Bearer master-secret-password",
+        )
+        admin_res = views.sites_endpoint(admin_req)
+        assert admin_res.status_code == 200
+        admin_payload = json.loads(admin_res.content)
+        assert admin_payload["scope"] == "*"
+        assert admin_payload["site"]["secret_key"] == site_a["secret_key"]
+    finally:
+        reset_service(None)

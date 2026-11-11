@@ -554,3 +554,54 @@ def test_official_mcp_sdk_stdio_subprocess() -> None:
                 assert ov.structuredContent["metrics"]["sessions"] == 1
 
     asyncio.run(_run_stdio())
+
+
+def test_mcp_multi_site_shared_secret_key_isolation(mcp_service: HotspotService) -> None:
+    _, reg_other = _call_tool(mcp_service, "register_site", {"name": "Other Co", "domain": "other.mcp.example.com"})
+    assert not reg_other["result"]["isError"]
+    _call_tool(
+        mcp_service,
+        "send_test_session",
+        {"secret_key": reg_other["result"]["structuredContent"]["site"]["secret_key"]},
+    )
+
+    _, unauth_same = _call_tool(
+        mcp_service,
+        "register_site",
+        {"name": "Unauth", "domain": "unauth.mcp.example.com", "key_mode": "same"},
+    )
+    assert unauth_same["result"]["isError"] is True
+
+    _, reg_a = _call_tool(mcp_service, "register_site", {"name": "Alpha MCP", "domain": "alpha.mcp.example.com"})
+    sec_shared = reg_a["result"]["structuredContent"]["site"]["secret_key"]
+    headers = {"Authorization": f"Bearer {sec_shared}"}
+
+    _, reg_b = _call_tool(
+        mcp_service,
+        "register_site",
+        {"name": "Beta MCP", "domain": "beta.mcp.example.com", "key_mode": "same"},
+        headers=headers,
+    )
+    assert not reg_b["result"]["isError"]
+    assert reg_b["result"]["structuredContent"]["site"]["secret_key"] == sec_shared
+
+    _call_tool(mcp_service, "send_test_session", {"site": "alpha.mcp.example.com"}, headers=headers)
+    _call_tool(mcp_service, "send_test_session", {"site": "beta.mcp.example.com"}, headers=headers)
+
+    _, ov_all = _call_tool(mcp_service, "get_overview", {}, headers=headers)
+    assert not ov_all["result"]["isError"]
+    all_content = ov_all["result"]["structuredContent"]
+    assert all_content["metrics"]["sessions"] == 2
+    assert all_content["scope"]["sessions_stored"] == 2
+
+    _, ov_b = _call_tool(mcp_service, "get_overview", {"site": "beta.mcp.example.com"}, headers=headers)
+    assert not ov_b["result"]["isError"]
+    assert ov_b["result"]["structuredContent"]["metrics"]["sessions"] == 1
+
+    _, setup_b = _call_tool(mcp_service, "get_site_setup", {"site": "beta.mcp.example.com"}, headers=headers)
+    assert not setup_b["result"]["isError"]
+    assert setup_b["result"]["structuredContent"]["site"]["domain"] == "beta.mcp.example.com"
+    assert len(setup_b["result"]["structuredContent"]["sites_sharing_secret_key"]) == 2
+
+    _, forbidden = _call_tool(mcp_service, "get_overview", {"site": "other.mcp.example.com"}, headers=headers)
+    assert forbidden["result"]["isError"] is True

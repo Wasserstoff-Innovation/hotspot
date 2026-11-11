@@ -97,18 +97,24 @@ class HotspotService:
         return 200, {"status": 1, "received": chunk.event_count, "stored": stored}
 
     def list_sites(self, authorized_scope: str = "*") -> list[dict[str, Any]]:
+        from products.hotspot.backend.analytics import site_in_scope  # noqa: PLC0415
+
         all_sites = self.store.sites()
-        if authorized_scope == "*":
-            return all_sites
-        return [s for s in all_sites if s.get("domain") == authorized_scope or s.get("id") == authorized_scope]
+        return [s for s in all_sites if site_in_scope(s, authorized_scope)]
 
     def create_site(
         self,
         name: str,
         domain: str,
         confirmation_key: str | None = None,
+        secret_key_override: str | None = None,
     ) -> tuple[bool, dict[str, Any] | str]:
-        ok, res = self.store.create_site_safely(name, domain, confirmation_key)
+        ok, res = self.store.create_site_safely(
+            name,
+            domain,
+            confirmation_key,
+            secret_key_override=secret_key_override,
+        )
         if ok and isinstance(res, dict):
             res["snippet"] = (
                 f'<script src="{self.config.sdk_url}" data-api-host="{self.config.site_url}" '
@@ -146,10 +152,15 @@ class HotspotService:
         if detail is None:
             return None
         if authorized_scope != "*":
-            target = authorized_scope.lower()
-            host = (detail.get("host") or "").lower()
-            proj = (detail.get("project_id") or "").lower()
-            if host != target and not host.endswith("." + target) and proj != target:
+            from products.hotspot.backend.analytics import record_in_scope  # noqa: PLC0415
+
+            allowed_sites = self.list_sites(authorized_scope=authorized_scope)
+            if not record_in_scope(
+                detail.get("host"),
+                detail.get("project_id"),
+                authorized_scope,
+                allowed_sites,
+            ):
                 return None
         events = sorted(detail.pop("events", []), key=lambda event: float(event.get("timestamp") or 0))
         return {
@@ -176,10 +187,15 @@ class HotspotService:
         if summary is None:
             return None
         if authorized_scope != "*":
-            target = authorized_scope.lower()
-            host = (summary.get("host") or "").lower()
-            proj = (summary.get("project_id") or "").lower()
-            if host != target and not host.endswith("." + target) and proj != target:
+            from products.hotspot.backend.analytics import record_in_scope  # noqa: PLC0415
+
+            allowed_sites = self.list_sites(authorized_scope=authorized_scope)
+            if not record_in_scope(
+                summary.get("host"),
+                summary.get("project_id"),
+                authorized_scope,
+                allowed_sites,
+            ):
                 return None
         start = _int_param(params.get("from"), default=0, low=0, high=MAX_RECORDING_CURSOR)
         chunks = self.store.recording_chunks(session_id, start)
@@ -212,13 +228,42 @@ class HotspotService:
         limit = _int_param(params.get("limit"), default=100, low=1, high=MAX_FEED_EVENTS)
         events = self.store.recent_events(limit=limit, since=since)
         if authorized_scope != "*":
-            target = authorized_scope.lower()
+            from products.hotspot.backend.analytics import record_in_scope  # noqa: PLC0415
+
+            allowed_sites = self.list_sites(authorized_scope=authorized_scope)
             events = [
                 e
                 for e in events
-                if (e.get("properties", {}).get("$host") or "").lower() == target
-                or (e.get("properties", {}).get("$host") or "").lower().endswith("." + target)
-                or (e.get("project_id") or "").lower() == target
+                if record_in_scope(
+                    (e.get("properties") or {}).get("$host"),
+                    e.get("project_id"),
+                    authorized_scope,
+                    allowed_sites,
+                )
+            ]
+        requested_site = (params.get("site") or "").strip()
+        if requested_site and requested_site != "all":
+            from products.hotspot.backend.analytics import record_in_scope  # noqa: PLC0415
+
+            requested_sites = [
+                s
+                for s in self.list_sites(authorized_scope=authorized_scope)
+                if requested_site.lower()
+                in {
+                    str(s.get("domain") or "").lower(),
+                    str(s.get("id") or "").lower(),
+                    str(s.get("api_key") or "").lower(),
+                }
+            ]
+            events = [
+                e
+                for e in events
+                if record_in_scope(
+                    (e.get("properties") or {}).get("$host"),
+                    e.get("project_id"),
+                    requested_site,
+                    requested_sites,
+                )
             ]
         return {
             "status": 1,
@@ -257,13 +302,17 @@ class HotspotService:
         if domain_clean and candidate:
             site = self.store.authenticate_site(domain_clean, candidate)
             if site:
-                return make_dashboard_token(self.config.secret_key, moment, scope=site["domain"])
+                shared = self.store.get_sites_by_secret_key(candidate)
+                domains = self._unique_site_domains(shared)
+                scope_value = ",".join(domains) if domains else str(site["domain"])
+                return make_dashboard_token(self.config.secret_key, moment, scope=scope_value)
 
         # 3. Direct Secret Key sign-in (domain omitted)
         if candidate and not domain_clean:
-            site = self.store.get_site_by_secret_key(candidate)
-            if site:
-                return make_dashboard_token(self.config.secret_key, moment, scope=site["domain"])
+            shared = self.store.get_sites_by_secret_key(candidate)
+            domains = self._unique_site_domains(shared)
+            if domains:
+                return make_dashboard_token(self.config.secret_key, moment, scope=",".join(domains))
 
         # 4. Fallback for unconfigured dev setups
         if not self.config.dashboard_protected and candidate in ("admin", "guest", "demo", "buxa2026!"):
@@ -271,12 +320,27 @@ class HotspotService:
 
         return None
 
-    def authorized_scope(
+    @staticmethod
+    def _unique_site_domains(sites: list[dict[str, Any]]) -> list[str]:
+        seen: set[str] = set()
+        domains: list[str] = []
+        for site in sites:
+            domain = str(site.get("domain") or site.get("id") or "").strip()
+            if not domain:
+                continue
+            key = domain.lower()
+            if key not in seen:
+                seen.add(key)
+                domains.append(domain)
+        return domains
+
+    def explicit_authorized_scope(
         self,
         cookie_token: str | None,
         authorization: str | None,
         now: float | None = None,
     ) -> tuple[bool, str | None]:
+        """Verify only an explicit session cookie or Bearer credential (never the open-dev fallback)."""
         moment = time.time() if now is None else now
         if cookie_token:
             scope = verify_dashboard_token(self.config.secret_key, cookie_token, moment)
@@ -285,11 +349,154 @@ class HotspotService:
         scheme, _, credential = (authorization or "").partition(" ")
         if scheme.lower() == "bearer" and credential:
             cred = credential.strip()
-            if password_matches(self.config.dashboard_password, cred):
+            if self.config.dashboard_protected and password_matches(self.config.dashboard_password, cred):
                 return True, "*"
-            site = self.store.get_site_by_secret_key(cred)
-            if site:
-                return True, site["domain"]
+            shared = self.store.get_sites_by_secret_key(cred)
+            domains = self._unique_site_domains(shared)
+            if domains:
+                return True, ",".join(domains)
+        return False, None
+
+    def resolve_owner_secret_key(
+        self,
+        authorized_scope: str,
+        preferred_site: str | None = None,
+    ) -> str | None:
+        owned = self.list_sites(authorized_scope=authorized_scope)
+        if not owned:
+            return None
+        preferred = (preferred_site or "").strip().lower()
+        if preferred and preferred != "all":
+            for site in owned:
+                candidates = {
+                    str(site.get("domain") or "").strip().lower(),
+                    str(site.get("id") or "").strip().lower(),
+                    str(site.get("api_key") or "").strip().lower(),
+                }
+                if preferred in candidates:
+                    sec = str(site.get("secret_key") or "").strip()
+                    return sec or None
+            return None
+        for site in owned:
+            sec = str(site.get("secret_key") or "").strip()
+            if sec:
+                return sec
+        return None
+
+    def create_site_for_session(
+        self,
+        name: str,
+        domain: str,
+        *,
+        confirmation_key: str | None = None,
+        key_mode: str = "new",
+        source_site: str | None = None,
+        cookie_token: str | None = None,
+        authorization: str | None = None,
+        now: float | None = None,
+    ) -> tuple[int, dict[str, Any]]:
+        from products.hotspot.backend.analytics import merge_scopes  # noqa: PLC0415
+
+        domain_clean = domain.strip()
+        if not domain_clean:
+            return 400, {"status": 0, "error": "Website domain or URL is required."}
+
+        mode = (key_mode or "new").strip().lower()
+        if mode not in {"new", "same"}:
+            return 400, {"status": 0, "error": "Invalid key_mode. Choose 'same' or 'new'."}
+
+        moment = time.time() if now is None else now
+        has_explicit_auth, current_scope = self.explicit_authorized_scope(cookie_token, authorization, now=moment)
+
+        secret_key_override: str | None = None
+        if mode == "same":
+            if not has_explicit_auth or not current_scope:
+                return 401, {
+                    "status": 0,
+                    "error": "Sign in to your dashboard or existing site before reusing a secret key.",
+                }
+            preferred = (source_site or "").strip()
+            secret_key_override = self.resolve_owner_secret_key(current_scope, preferred_site=preferred or None)
+            if not secret_key_override:
+                if preferred and preferred.lower() != "all":
+                    return 403, {"status": 0, "error": "Selected source site does not belong to your current session."}
+                return 400, {
+                    "status": 0,
+                    "error": "No existing site secret key is available to share. Create a new key instead.",
+                }
+
+        ok, res = self.create_site(
+            name.strip() or domain_clean,
+            domain_clean,
+            confirmation_key=(confirmation_key or "").strip() or None,
+            secret_key_override=secret_key_override,
+        )
+        if not ok:
+            status_code = 409 if "already registered" in str(res) else 400
+            payload: dict[str, Any] = {"status": 0, "error": str(res)}
+            if status_code == 409:
+                payload["requires_confirmation"] = True
+            return status_code, payload
+
+        assert isinstance(res, dict)
+        new_scope = (
+            merge_scopes(current_scope, str(res["domain"]))
+            if has_explicit_auth and current_scope
+            else str(res["domain"])
+        )
+        token = make_dashboard_token(self.config.secret_key, moment, scope=new_scope)
+        return 200, {
+            "status": 1,
+            "site": res,
+            "token": token,
+            "scope": new_scope,
+            "key_mode": mode,
+        }
+
+    def delete_site_for_session(
+        self,
+        identifier: str,
+        authorized_scope: str,
+        *,
+        now: float | None = None,
+    ) -> tuple[int, dict[str, Any], str | None]:
+        from products.hotspot.backend.analytics import remove_from_scope, site_in_scope  # noqa: PLC0415
+
+        target = identifier.strip()
+        target_site = None
+        for site in self.store.sites():
+            if target.lower() in {
+                str(site.get("id") or "").lower(),
+                str(site.get("domain") or "").lower(),
+            }:
+                target_site = site
+                break
+        if target_site is None:
+            return 404, {"status": 0, "error": "site not found"}, None
+        if authorized_scope != "*" and not site_in_scope(target_site, authorized_scope):
+            return 403, {"status": 0, "error": "Unauthorized to delete this site"}, None
+        if not self.delete_site(identifier):
+            return 404, {"status": 0, "error": "site not found"}, None
+
+        refreshed_token: str | None = None
+        updated_scope: str = authorized_scope
+        if authorized_scope != "*":
+            moment = time.time() if now is None else now
+            updated_scope = remove_from_scope(authorized_scope, str(target_site.get("domain") or target))
+            refreshed_token = (
+                make_dashboard_token(self.config.secret_key, moment, scope=updated_scope) if updated_scope else ""
+            )
+        return 200, {"status": 1, "deleted": identifier, "scope": updated_scope}, refreshed_token
+
+    def authorized_scope(
+        self,
+        cookie_token: str | None,
+        authorization: str | None,
+        now: float | None = None,
+    ) -> tuple[bool, str | None]:
+        ok, scope = self.explicit_authorized_scope(cookie_token, authorization, now=now)
+        if ok:
+            return True, scope
         if not self.config.dashboard_protected:
             return True, "*"
         return False, None

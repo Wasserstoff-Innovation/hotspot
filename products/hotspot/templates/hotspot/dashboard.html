@@ -156,17 +156,13 @@
             top: calc(100% + 6px);
             left: 0;
             width: 300px;
+            max-width: calc(100vw - 84px);
             background: var(--surface);
             border: 1px solid var(--border);
             border-radius: 10px;
             box-shadow: var(--shadow);
             z-index: 1000;
             overflow: hidden;
-            animation: fadeInMenu 0.15s ease;
-        }
-        @keyframes fadeInMenu {
-            from { opacity: 0; transform: translateY(-4px); }
-            to { opacity: 1; transform: translateY(0); }
         }
         .site-menu-head {
             display: flex;
@@ -412,7 +408,6 @@
             justify-content: center;
             z-index: 9999;
             padding: 16px;
-            animation: fadeInOverlay 0.15s ease;
         }
         @keyframes fadeInOverlay {
             from { opacity: 0; }
@@ -516,10 +511,111 @@
             font-weight: 600;
             margin-bottom: 12px;
         }
+        .site-dropdown-menu {
+            animation: none;
+            opacity: 1;
+            z-index: 1000;
+        }
+        .modal-card {
+            max-height: calc(100vh - 32px);
+            overflow-y: auto;
+            animation: none;
+            opacity: 1;
+        }
         .result-lead {
             font-size: 13.5px;
             color: var(--text-2);
             margin-bottom: 10px;
+        }
+        .key-mode-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+        .key-mode-card {
+            display: flex;
+            align-items: flex-start;
+            gap: 9px;
+            padding: 11px 12px;
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
+            background: var(--surface);
+            cursor: pointer;
+            transition: border-color 0.15s ease, background-color 0.15s ease;
+        }
+        .key-mode-card:hover { border-color: #93C5FD; }
+        .key-mode-card.is-selected {
+            border-color: var(--brand);
+            background: #EFF6FF;
+        }
+        .key-mode-card.is-disabled {
+            opacity: 0.52;
+            cursor: not-allowed;
+        }
+        .key-mode-card input[type="radio"] {
+            margin-top: 2px;
+            accent-color: var(--brand);
+            flex-shrink: 0;
+        }
+        .key-mode-title {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 2px;
+        }
+        .key-mode-desc {
+            display: block;
+            font-size: 11.5px;
+            line-height: 1.4;
+            color: var(--text-3);
+        }
+        .modal-error-banner {
+            margin-bottom: 12px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid #FECACA;
+            background: #FEF2F2;
+            color: #B91C1C;
+            font-size: 12.5px;
+            line-height: 1.45;
+        }
+        .modal-confirm-box {
+            margin-top: 12px;
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid #FDE68A;
+            background: #FFFBEB;
+        }
+        .modal-confirm-box .form-label {
+            color: #92400E;
+        }
+        .site-menu-add-row {
+            margin-top: 4px;
+            padding-top: 6px;
+            border-top: 1px solid var(--border);
+        }
+        .site-menu-add-btn {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 8px 10px;
+            border: 1px dashed #93C5FD;
+            border-radius: 8px;
+            background: #F8FAFC;
+            color: var(--brand);
+            font-size: 12.5px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .site-menu-add-btn:hover {
+            background: #EFF6FF;
+            border-color: var(--brand);
+        }
+        @media (max-width: 560px) {
+            .key-mode-grid { grid-template-columns: 1fr; }
         }
         .nav { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 2px; }
         .nav-btn {
@@ -576,8 +672,8 @@
             .sidebar-foot { justify-content: center; padding: 10px 0; }
         }
 
-        .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-        .topbar { display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 24px; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+        .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; position: relative; }
+        .topbar { position: relative; z-index: 50; display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 24px; background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0; }
         .topbar .host { display: flex; align-items: center; gap: 8px; min-width: 0; font-weight: 600; font-size: 14px; }
         .topbar .host span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .topbar .host .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 3px #D1FAE5; flex-shrink: 0; }
@@ -585,7 +681,19 @@
         .topbar .spacer { flex: 1; }
         .updated { font-size: 12px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
         .updated.bad { color: #B91C1C; }
-        .content { flex: 1; min-height: 0; overflow: auto; padding: 20px 24px 40px; }
+        .content { position: relative; z-index: 1; flex: 1; min-height: 0; overflow: auto; padding: 20px 24px 40px; }
+        @media (max-width: 720px) {
+            .topbar { height: auto; min-height: 52px; padding: 8px 12px; gap: 6px; flex-wrap: wrap; }
+            .site-switcher-wrap { flex: 1 1 160px; min-width: 0; max-width: 100%; }
+            .site-switcher-btn { max-width: 100%; min-width: 0; padding: 0 9px; gap: 6px; }
+            .site-label-group { flex: 1; min-width: 0; max-width: none; }
+            .site-dropdown-menu { width: min(300px, calc(100vw - 84px)); }
+            .topbar .spacer, .topbar .updated { display: none; }
+            .topbar .select { flex: 1 1 120px; min-width: 0; }
+            .content { padding: 14px 12px 32px; }
+            .rt-now, .rt-minutes { min-width: 0; width: 100%; }
+            .search .input { width: 100%; }
+        }
         .tab { display: none; }
         .tab.active { display: block; }
         .page-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
@@ -1222,7 +1330,7 @@
                 </button>
                 <div class="site-dropdown-menu" id="siteDropdownMenu" hidden>
                     <div class="site-menu-head">
-                        <span class="site-menu-title">Tracked Web Properties</span>
+                        <span class="site-menu-title" id="siteMenuTitle">Tracked Websites</span>
                         <button class="btn-add-site-quick" type="button" id="btnQuickAddSite">+ New Site</button>
                     </div>
                     <div class="site-menu-list" id="siteMenuList">
@@ -1846,19 +1954,47 @@
     <div class="modal-card">
         <div class="modal-header">
             <div>
-                <h2 class="modal-title">Track a New Website or App</h2>
-                <p class="modal-subtitle">Generate a 1-line tracking script and begin capturing dropoff corridors and session replays.</p>
+                <h2 class="modal-title">Add Website or App</h2>
+                <p class="modal-subtitle">Add another property right here without signing out, with the same secret key or a new one.</p>
             </div>
             <button class="modal-close" type="button" id="closeAddSiteModal" aria-label="Close">&times;</button>
         </div>
         <form id="addSiteForm" class="modal-form">
+            <div class="modal-error-banner" id="addSiteError" hidden></div>
             <div class="form-group">
                 <label class="form-label" for="newSiteName">Website or App Name</label>
-                <input class="form-input" id="newSiteName" type="text" placeholder="e.g. Buxa Production App" required autofocus>
+                <input class="form-input" id="newSiteName" type="text" placeholder="e.g. Docs, Marketing App, or Blog" required autofocus>
             </div>
             <div class="form-group">
                 <label class="form-label" for="newSiteDomain">Domain or Hostname</label>
-                <input class="form-input" id="newSiteDomain" type="text" placeholder="e.g. buxa.ai, app.buxa.ai, or mysite.com" required>
+                <input class="form-input" id="newSiteDomain" type="text" placeholder="e.g. docs.example.com or app.example.com" required>
+            </div>
+            <div class="form-group" id="keyModeSection">
+                <label class="form-label">Secret Key Option</label>
+                <div class="key-mode-grid">
+                    <label class="key-mode-card" id="keyModeSameCard">
+                        <input type="radio" name="keyMode" id="keyModeSame" value="same">
+                        <span>
+                            <span class="key-mode-title">Same secret key</span>
+                            <span class="key-mode-desc" id="keyModeSameDesc">Share your existing <code>hs_sec_...</code> key across sites so one login &amp; MCP token sees both.</span>
+                        </span>
+                    </label>
+                    <label class="key-mode-card is-selected" id="keyModeNewCard">
+                        <input type="radio" name="keyMode" id="keyModeNew" value="new" checked>
+                        <span>
+                            <span class="key-mode-title">New secret key</span>
+                            <span class="key-mode-desc">Generate an isolated <code>hs_sec_...</code> key for this domain while keeping it in your switcher.</span>
+                        </span>
+                    </label>
+                </div>
+            </div>
+            <div class="form-group" id="sourceSecretRow" hidden>
+                <label class="form-label" for="sourceSiteSelect">Copy Secret Key From</label>
+                <select class="form-input" id="sourceSiteSelect"></select>
+            </div>
+            <div class="modal-confirm-box" id="confirmKeyGroup" hidden>
+                <label class="form-label" for="confirmExistingKey">Domain already registered — enter its existing Secret Key (<code>hs_sec_...</code>) to rotate keys</label>
+                <input class="form-input" id="confirmExistingKey" type="password" autocomplete="off" placeholder="hs_sec_...">
             </div>
             <div class="modal-actions">
                 <button type="button" class="btn" id="cancelAddSite">Cancel</button>
@@ -1867,7 +2003,17 @@
         </form>
         <div id="newSiteResult" class="modal-result" hidden>
             <div class="result-success-badge">Site Created Successfully! ✓</div>
-            <p class="result-lead">Embed this 1-line script into the <code>&lt;head&gt;</code> of <strong id="resSiteDomain"></strong>:</p>
+            <p class="result-lead" id="resSiteLead"><span id="resSiteLeadPrefix">Created</span> <strong id="resSiteDomain"></strong> <span id="resSiteLeadSuffix">and generated your tracking keys. Embed this 1-line script into your <code>&lt;head&gt;</code>:</span></p>
+            <div class="code-box-card" style="margin-bottom: 12px;">
+                <div class="code-box-card-head">
+                    <span class="code-box-tag" id="resSecretKeyTag">Private Secret Key</span>
+                    <button class="btn sm" type="button" id="btnCopyNewSiteSecret">
+                        <span class="ico" data-icon="copy"></span>
+                        <span>Copy Secret Key</span>
+                    </button>
+                </div>
+                <div class="code-box-card-content"><code id="newSiteSecretCode"></code></div>
+            </div>
             <div class="code-box-card">
                 <div class="code-box-card-head">
                     <span class="code-box-tag">HTML Tracking Snippet</span>
@@ -1879,12 +2025,10 @@
                 <div class="code-box-card-content"><code id="newSiteSnippetCode"></code></div>
             </div>
             <div class="modal-actions" style="margin-top: 16px;">
+                <button type="button" class="btn" id="btnAddAnotherSite">+ Add Another</button>
                 <button type="button" class="btn primary" id="btnDoneAddSite">Done &amp; View in Dashboard</button>
             </div>
         </div>
-    </div>
-</div>
-        </main>
     </div>
 </div>
 
@@ -2302,6 +2446,19 @@
         state.inflight = true;
         renderUpdated();
         api('/hotspot/api/overview/', overviewParams()).then(function (data) {
+            if (
+                state.site &&
+                state.site !== 'all' &&
+                data.sites &&
+                data.sites.length > 0 &&
+                !data.sites.some(function (s) { return s.domain === state.site || s.id === state.site; })
+            ) {
+                state.site = data.sites.length === 1 ? data.sites[0].domain : 'all';
+                store('selected_site', state.site);
+                state.inflight = false;
+                loadOverview();
+                return;
+            }
             state.overview = data;
             state.loadedAt = Date.now();
             state.failing = false;
@@ -4740,44 +4897,43 @@
     // ---------- Sites & Setup ----------
 
     function renderSiteSwitcher(sites, currentSite) {
+        sites = sites || [];
         var isAdmin = !(state.overview && state.overview.scope && state.overview.scope.is_admin === false);
         var switcherBtn = $('siteSwitcherBtn');
         var switcherChevron = switcherBtn ? switcherBtn.querySelector('svg:last-child') : null;
         var topbarAddBtn = $('topbarAddSiteBtn');
+        var menuTitle = $('siteMenuTitle');
 
-        if (!isAdmin) {
-            if (switcherChevron) switcherChevron.style.display = 'none';
-            if (switcherBtn) switcherBtn.style.cursor = 'default';
-            if (topbarAddBtn) topbarAddBtn.style.display = 'none';
-        } else {
-            if (switcherChevron) switcherChevron.style.display = '';
-            if (switcherBtn) switcherBtn.style.cursor = 'pointer';
-            if (topbarAddBtn) topbarAddBtn.style.display = '';
-        }
+        if (switcherChevron) switcherChevron.style.display = '';
+        if (switcherBtn) switcherBtn.style.cursor = 'pointer';
+        if (topbarAddBtn) topbarAddBtn.style.display = '';
+        if (menuTitle) menuTitle.textContent = isAdmin ? 'Tracked Web Properties' : 'Your Tracked Sites';
 
         var nameNode = $('currentSiteName');
         var domainNode = $('currentSiteDomain');
         var siteDot = $('siteDot');
         var listNode = $('siteMenuList');
 
-        if (!isAdmin && sites && sites.length) {
-            var mySite = sites[0];
-            if (nameNode) nameNode.textContent = mySite.name;
-            if (domainNode) domainNode.textContent = mySite.domain;
-            if (siteDot) siteDot.className = 'dot' + (mySite.active_visitors > 0 ? '' : ' inactive');
-            if (listNode) clear(listNode);
-            return;
-        }
-
         currentSite = currentSite || state.site || 'all';
 
-        var selectedObj = (sites || []).filter(function (s) {
+        var selectedObj = sites.filter(function (s) {
             return s.domain === currentSite || s.id === currentSite;
         })[0];
 
-        if (currentSite === 'all' || !selectedObj) {
+        if (!sites.length) {
+            if (nameNode) nameNode.textContent = 'No Tracked Sites';
+            if (domainNode) domainNode.textContent = 'Click + Add Site';
+            if (siteDot) siteDot.className = 'dot inactive';
+        } else if (!isAdmin && sites.length === 1) {
+            var onlySite = sites[0];
+            selectedObj = onlySite;
+            currentSite = onlySite.domain;
+            if (nameNode) nameNode.textContent = onlySite.name;
+            if (domainNode) domainNode.textContent = onlySite.domain;
+            if (siteDot) siteDot.className = 'dot' + (onlySite.active_visitors > 0 ? '' : ' inactive');
+        } else if (currentSite === 'all' || !selectedObj) {
             if (nameNode) nameNode.textContent = 'All Tracked Sites';
-            if (domainNode) domainNode.textContent = (sites && sites.length ? sites.length + ' properties' : 'all');
+            if (domainNode) domainNode.textContent = sites.length + ' properties';
             if (siteDot) siteDot.className = 'dot';
         } else {
             if (nameNode) nameNode.textContent = selectedObj.name;
@@ -4788,30 +4944,33 @@
         if (!listNode) return;
         clear(listNode);
 
-        // 1. "All Tracked Sites" option
-        var totalAllSessions = (sites || []).reduce(function (sum, s) { return sum + (s.total_sessions || 0); }, 0);
-        var allItem = el('button', {
-            class: 'site-menu-item' + (currentSite === 'all' ? ' active' : ''),
-            type: 'button',
-            'data-site': 'all'
-        }, [
-            el('div', { class: 'site-menu-item-info' }, [
-                el('span', { class: 'site-menu-item-name', text: 'All Tracked Sites' }),
-                el('span', { class: 'site-menu-item-domain', text: 'Aggregate fleet view' })
-            ]),
-            el('span', { class: 'site-menu-badge', text: totalAllSessions ? fmtNum(totalAllSessions) + ' visits' : '0' })
-        ]);
-        allItem.addEventListener('click', function () {
-            selectSite('all');
-        });
-        listNode.appendChild(allItem);
+        // 1. "All Tracked Sites" option when admin or tracking multiple sites
+        if (isAdmin || sites.length > 1) {
+            var totalAllSessions = sites.reduce(function (sum, s) { return sum + (s.total_sessions || 0); }, 0);
+            var allItem = el('button', {
+                class: 'site-menu-item' + (currentSite === 'all' ? ' active' : ''),
+                type: 'button',
+                'data-site': 'all'
+            }, [
+                el('div', { class: 'site-menu-item-info' }, [
+                    el('span', { class: 'site-menu-item-name', text: 'All Tracked Sites' }),
+                    el('span', {
+                        class: 'site-menu-item-domain',
+                        text: isAdmin ? 'Aggregate fleet view' : 'All ' + sites.length + ' sites in your session'
+                    })
+                ]),
+                el('span', { class: 'site-menu-badge', text: totalAllSessions ? fmtNum(totalAllSessions) + ' visits' : '0' })
+            ]);
+            allItem.addEventListener('click', function () {
+                selectSite('all');
+            });
+            listNode.appendChild(allItem);
 
-        // Divider
-        var div = el('div', { style: 'height: 1px; background: var(--border); margin: 4px 0;' });
-        listNode.appendChild(div);
+            listNode.appendChild(el('div', { style: 'height: 1px; background: var(--border); margin: 4px 0;' }));
+        }
 
         // 2. Individual sites
-        (sites || []).forEach(function (s) {
+        sites.forEach(function (s) {
             var isSel = currentSite === s.domain || currentSite === s.id;
             var item = el('button', {
                 class: 'site-menu-item' + (isSel ? ' active' : ''),
@@ -4832,6 +4991,22 @@
             });
             listNode.appendChild(item);
         });
+
+        // 3. Footer quick action inside dropdown to add another site (same or new key)
+        var footerRow = el('div', { class: 'site-menu-add-row' });
+        var footerBtn = el('button', {
+            class: 'site-menu-add-btn',
+            type: 'button',
+            id: 'btnDropdownAddSite',
+            text: sites.length ? '+ Add another site (same or new key)' : '+ Add your first site'
+        });
+        footerBtn.addEventListener('click', function () {
+            if (typeof window.__openHotspotAddSiteModal === 'function') {
+                window.__openHotspotAddSiteModal();
+            }
+        });
+        footerRow.appendChild(footerBtn);
+        listNode.appendChild(footerRow);
     }
 
     function selectSite(siteDomain) {
@@ -4853,9 +5028,8 @@
     function renderSitesTab(sites, currentSite, setup) {
         setup = setup || {};
         sites = sites || [];
-        var isAdmin = !(state.overview && state.overview.scope && state.overview.scope.is_admin === false);
         var tabAddBtn = $('btnOpenAddSiteFromTab');
-        if (tabAddBtn) tabAddBtn.style.display = isAdmin ? '' : 'none';
+        if (tabAddBtn) tabAddBtn.style.display = '';
         var tbody = $('sitesTableBody');
         if (tbody) {
             clear(tbody);
@@ -5008,26 +5182,120 @@
     function setupSiteModalAndVerify() {
         var modal = $('addSiteModal');
         var form = $('addSiteForm');
-        var openBtns = [$('btnOpenAddSiteFromTab'), $('topbarAddSiteBtn'), $('btnQuickAddSite')];
+        var openBtns = [$('btnOpenAddSiteFromTab'), $('topbarAddSiteBtn'), $('btnQuickAddSite'), $('btnAddAnotherSite')];
         var closeBtn = $('closeAddSiteModal');
         var cancelBtn = $('cancelAddSite');
         var doneBtn = $('btnDoneAddSite');
+        var copySecretBtn = $('btnCopyNewSiteSecret');
         var copySnippetBtn = $('btnCopyNewSiteSnippet');
+        var keyModeSame = $('keyModeSame');
+        var keyModeNew = $('keyModeNew');
+        var keyModeSameCard = $('keyModeSameCard');
+        var keyModeNewCard = $('keyModeNewCard');
+        var keyModeSameDesc = $('keyModeSameDesc');
+        var sourceSecretRow = $('sourceSecretRow');
+        var sourceSiteSelect = $('sourceSiteSelect');
+        var confirmKeyGroup = $('confirmKeyGroup');
+        var confirmExistingKey = $('confirmExistingKey');
+        var errorBanner = $('addSiteError');
+        var lastCreatedSite = null;
+        var lastSnippet = '';
+
+        function availableShareSites() {
+            var list = (state.overview && state.overview.sites) ? state.overview.sites : [];
+            return list.filter(function (s) { return !!(s && s.secret_key); });
+        }
+
+        function updateKeyModeUI() {
+            var mode = (keyModeSame && keyModeSame.checked) ? 'same' : 'new';
+            if (keyModeSameCard) keyModeSameCard.classList.toggle('is-selected', mode === 'same');
+            if (keyModeNewCard) keyModeNewCard.classList.toggle('is-selected', mode === 'new');
+
+            var shareSites = availableShareSites();
+            if (sourceSecretRow) {
+                var distinctKeys = [];
+                shareSites.forEach(function (s) {
+                    if (distinctKeys.indexOf(s.secret_key) < 0) { distinctKeys.push(s.secret_key); }
+                });
+                sourceSecretRow.hidden = !(mode === 'same' && distinctKeys.length > 1);
+            }
+        }
+
+        function setError(msg) {
+            if (!errorBanner) return;
+            if (!msg) {
+                errorBanner.hidden = true;
+                errorBanner.textContent = '';
+            } else {
+                errorBanner.hidden = false;
+                errorBanner.textContent = msg;
+            }
+        }
 
         function openModal() {
             if (!modal) return;
             modal.hidden = false;
+            lastCreatedSite = null;
+            lastSnippet = '';
+            setError('');
+            if (confirmKeyGroup) confirmKeyGroup.hidden = true;
+            if (confirmExistingKey) confirmExistingKey.value = '';
             if (form) {
                 form.hidden = false;
                 form.reset();
             }
             var res = $('newSiteResult');
             if (res) res.hidden = true;
+            var prevSec = $('newSiteSecretCode');
+            if (prevSec) prevSec.textContent = '';
+            var prevSnip = $('newSiteSnippetCode');
+            if (prevSnip) prevSnip.textContent = '';
+
+            var shareSites = availableShareSites();
+            var isAdmin = !(state.overview && state.overview.scope && state.overview.scope.is_admin === false);
+            var canShare = shareSites.length > 0;
+
+            if (sourceSiteSelect) {
+                clear(sourceSiteSelect);
+                shareSites.forEach(function (s) {
+                    var label = s.name && s.name !== s.domain ? (s.name + ' (' + s.domain + ')') : s.domain;
+                    sourceSiteSelect.appendChild(el('option', { value: s.domain, text: label }));
+                });
+                if (state.site && state.site !== 'all' && shareSites.some(function (s) { return s.domain === state.site; })) {
+                    sourceSiteSelect.value = state.site;
+                }
+            }
+
+            if (keyModeSame) {
+                keyModeSame.disabled = !canShare;
+            }
+            if (keyModeSameCard) {
+                keyModeSameCard.classList.toggle('is-disabled', !canShare);
+            }
+            if (keyModeSameDesc) {
+                keyModeSameDesc.textContent = canShare
+                    ? 'Share your existing hs_sec_... key across sites so one login and MCP credential sees both.'
+                    : 'Create your first site with a new key first before sharing it.';
+            }
+
+            if (canShare && !isAdmin) {
+                if (keyModeSame) keyModeSame.checked = true;
+                if (keyModeNew) keyModeNew.checked = false;
+            } else {
+                if (keyModeNew) keyModeNew.checked = true;
+                if (keyModeSame) keyModeSame.checked = false;
+            }
+            updateKeyModeUI();
+
             var nameInput = $('newSiteName');
             if (nameInput) setTimeout(function () { nameInput.focus(); }, 50);
             var menu = $('siteDropdownMenu');
+            var switcherBtn = $('siteSwitcherBtn');
             if (menu) menu.hidden = true;
+            if (switcherBtn) switcherBtn.setAttribute('aria-expanded', 'false');
         }
+
+        window.__openHotspotAddSiteModal = openModal;
 
         function closeModal() {
             if (modal) modal.hidden = true;
@@ -5038,55 +5306,110 @@
         });
         if (closeBtn) closeBtn.addEventListener('click', closeModal);
         if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+        if (keyModeSame) keyModeSame.addEventListener('change', updateKeyModeUI);
+        if (keyModeNew) keyModeNew.addEventListener('change', updateKeyModeUI);
+
+        if (copySecretBtn) {
+            copySecretBtn.addEventListener('click', function () {
+                if (lastCreatedSite && lastCreatedSite.secret_key) {
+                    copyText(lastCreatedSite.secret_key, copySecretBtn);
+                }
+            });
+        }
+        if (copySnippetBtn) {
+            copySnippetBtn.addEventListener('click', function () {
+                if (lastSnippet) {
+                    copyText(lastSnippet, copySnippetBtn);
+                }
+            });
+        }
+        if (doneBtn) {
+            doneBtn.addEventListener('click', function () {
+                var targetDomain = lastCreatedSite && lastCreatedSite.domain ? lastCreatedSite.domain : null;
+                closeModal();
+                if (targetDomain) {
+                    selectSite(targetDomain);
+                } else {
+                    reloadForFilters();
+                }
+            });
+        }
 
         if (form) {
             form.addEventListener('submit', function (e) {
                 e.preventDefault();
+                setError('');
                 var name = ($('newSiteName').value || '').trim();
                 var domain = ($('newSiteDomain').value || '').trim().toLowerCase()
                     .replace(/^https?:\/\//, '')
                     .replace(/\/.*$/, '');
                 if (!name || !domain) return;
 
+                var selectedMode = (keyModeSame && keyModeSame.checked && !keyModeSame.disabled) ? 'same' : 'new';
+                var sourceSite = (selectedMode === 'same' && sourceSiteSelect && sourceSiteSelect.value)
+                    ? sourceSiteSelect.value
+                    : (state.site && state.site !== 'all' ? state.site : '');
+                var confirmationKey = (confirmExistingKey && !confirmKeyGroup.hidden)
+                    ? (confirmExistingKey.value || '').trim()
+                    : '';
+
                 var submitBtn = $('submitAddSite');
                 if (submitBtn) {
                     submitBtn.disabled = true;
-                    submitBtn.textContent = 'Generating...';
+                    submitBtn.textContent = 'Creating...';
                 }
 
                 api('/hotspot/api/sites/', null, {
                     method: 'POST',
-                    body: JSON.stringify({ name: name, domain: domain })
+                    body: JSON.stringify({
+                        name: name,
+                        domain: domain,
+                        key_mode: selectedMode,
+                        source_site: sourceSite || undefined,
+                        confirmation_key: confirmationKey || undefined
+                    })
                 }).then(function (res) {
                     if (submitBtn) {
                         submitBtn.disabled = false;
                         submitBtn.textContent = 'Create Site & Get Script →';
                     }
                     if (res.status === 1 && res.site) {
+                        lastCreatedSite = res.site;
+                        lastSnippet = res.site.snippet || generateEmbedSnippet(res.site.api_key, res.site.domain);
+                        var domainNode = $('resSiteDomain');
+                        if (domainNode) domainNode.textContent = res.site.domain;
+                        var leadPrefix = $('resSiteLeadPrefix');
+                        if (leadPrefix) leadPrefix.textContent = selectedMode === 'same' ? 'Added' : 'Created';
+                        var leadSuffix = $('resSiteLeadSuffix');
+                        if (leadSuffix) {
+                            leadSuffix.textContent = selectedMode === 'same'
+                                ? 'under your existing Secret Key. Embed this 1-line script into your <head>:'
+                                : 'with its own private Secret Key and kept it active in your switcher. Embed this 1-line script into your <head>:';
+                        }
+                        var secretNode = $('newSiteSecretCode');
+                        if (secretNode) secretNode.textContent = res.site.secret_key || '';
+                        var secretTag = $('resSecretKeyTag');
+                        if (secretTag) {
+                            secretTag.textContent = selectedMode === 'same'
+                                ? 'Private Secret Key (Shared with your account)'
+                                : 'New Private Secret Key (Save for future login & MCP)';
+                        }
+                        var snippetNode = $('newSiteSnippetCode');
+                        if (snippetNode) snippetNode.textContent = lastSnippet;
                         form.hidden = true;
                         var resultBox = $('newSiteResult');
                         resultBox.hidden = false;
-                        $('resSiteDomain').textContent = res.site.domain;
-                        var snippet = res.site.snippet || generateEmbedSnippet(res.site.api_key, res.site.domain);
-                        $('newSiteSnippetCode').textContent = snippet;
-                        if (copySnippetBtn) {
-                            copySnippetBtn.onclick = function () {
-                                copyText(snippet, copySnippetBtn);
-                            };
-                        }
-                        if (doneBtn) {
-                            doneBtn.onclick = function () {
-                                closeModal();
-                                selectSite(res.site.domain);
-                            };
-                        }
                     }
                 }).catch(function (err) {
                     if (submitBtn) {
                         submitBtn.disabled = false;
                         submitBtn.textContent = 'Create Site & Get Script →';
                     }
-                    alert('Error creating site: ' + (err.message || 'Please check input.'));
+                    if (err && err.status === 409 && confirmKeyGroup) {
+                        confirmKeyGroup.hidden = false;
+                        if (confirmExistingKey) confirmExistingKey.focus();
+                    }
+                    setError((err && err.message) ? err.message : 'Could not add site. Please check the domain and try again.');
                 });
             });
         }
@@ -5096,8 +5419,6 @@
         var switcherMenu = $('siteDropdownMenu');
         if (switcherBtn && switcherMenu) {
             switcherBtn.addEventListener('click', function (e) {
-                var isAdmin = !(state.overview && state.overview.scope && state.overview.scope.is_admin === false);
-                if (!isAdmin) return;
                 e.stopPropagation();
                 var isHidden = switcherMenu.hidden;
                 switcherMenu.hidden = !isHidden;

@@ -389,14 +389,19 @@ class SessionStore:
         return None
 
     def get_site_by_secret_key(self, secret_key: str) -> dict[str, Any] | None:
+        sites = self.get_sites_by_secret_key(secret_key)
+        return sites[0] if sites else None
+
+    def get_sites_by_secret_key(self, secret_key: str) -> list[dict[str, Any]]:
         key = (secret_key or "").strip()
         if not key:
-            return None
+            return []
+        matches: list[dict[str, Any]] = []
         for s in self._backend.get_sites():
             sec = s.get("secret_key")
             if sec and hmac.compare_digest(sec, key):
-                return s
-        return None
+                matches.append(s)
+        return matches
 
     def authenticate_site(self, domain: str, secret_key: str) -> dict[str, Any] | None:
         site = self.get_site_by_domain(domain)
@@ -435,6 +440,7 @@ class SessionStore:
         name: str,
         domain: str,
         confirmation_key: str | None = None,
+        secret_key_override: str | None = None,
     ) -> tuple[bool, dict[str, Any] | str]:
         domain_clean = _clean_domain(domain)
         if not domain_clean:
@@ -471,7 +477,7 @@ class SessionStore:
             return True, existing
 
         # Brand new domain
-        site = self.save_site(name, domain_clean)
+        site = self.save_site(name, domain_clean, secret_key=secret_key_override or None)
         return True, site
 
     def sites(self) -> list[dict[str, Any]]:

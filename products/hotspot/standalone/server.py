@@ -271,21 +271,20 @@ async def sites_endpoint(request: Request) -> Response:
             payload = await request.json()
         except Exception:
             payload = {}
-        name = str(payload.get("name") or "").strip()
-        domain = str(payload.get("domain") or "").strip()
-        confirmation_key = str(payload.get("confirmation_key") or "").strip() or None
-        if not domain:
-            return _json({"status": 0, "error": "domain is required"}, status=400)
-        ok, res = service.create_site(name or domain, domain, confirmation_key=confirmation_key)
-        if not ok:
-            return _json({"status": 0, "error": str(res)}, status=409)
-
-        token = service.login(res.get("secret_key"), domain=res.get("domain")) if isinstance(res, dict) else None
-        response = _json({"status": 1, "site": res, "token": token})
-        if token:
+        status_code, body = service.create_site_for_session(
+            str(payload.get("name") or ""),
+            str(payload.get("domain") or ""),
+            confirmation_key=str(payload.get("confirmation_key") or "") or None,
+            key_mode=str(payload.get("key_mode") or "new"),
+            source_site=str(payload.get("source_site") or payload.get("current_site") or "") or None,
+            cookie_token=request.cookies.get(DASHBOARD_COOKIE),
+            authorization=request.headers.get("authorization"),
+        )
+        response = _json(body, status=status_code)
+        if status_code == 200 and body.get("token"):
             response.set_cookie(
                 DASHBOARD_COOKIE,
-                token,
+                str(body["token"]),
                 max_age=TOKEN_TTL_SECONDS,
                 httponly=True,
                 samesite="lax",
@@ -304,16 +303,23 @@ async def site_delete_endpoint(request: Request) -> Response:
     ok, scope = _authorized_scope(request)
     if not ok:
         return _unauthorized()
-    service = _service()
     site_id = request.path_params.get("site_id", "")
-    if scope != "*":
-        site = service.store.get_site_by_domain(scope)
-        if not site or site.get("id") != site_id:
-            return _json({"status": 0, "error": "Unauthorized to delete this site"}, status=403)
-    ok_del = service.delete_site(site_id)
-    return _json({"status": 1 if ok_del else 0})
-    ok = _service().delete_site(site_id)
-    return _json({"status": 1 if ok else 0})
+    status_code, body, refreshed_token = _service().delete_site_for_session(site_id, scope)
+    response = _json(body, status=status_code)
+    if refreshed_token is not None:
+        if refreshed_token:
+            response.set_cookie(
+                DASHBOARD_COOKIE,
+                refreshed_token,
+                max_age=TOKEN_TTL_SECONDS,
+                httponly=True,
+                samesite="lax",
+                secure=request.url.scheme == "https",
+                path="/",
+            )
+        else:
+            response.delete_cookie(DASHBOARD_COOKIE, path="/")
+    return response
 
 
 def _unauthorized() -> Response:

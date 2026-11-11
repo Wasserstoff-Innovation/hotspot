@@ -943,10 +943,22 @@ def build_overview(
     now: float,
     authorized_scope: str = "*",
 ) -> dict[str, Any]:
-    if authorized_scope != "*":
+    all_sites_raw = store.sites()
+    authorized_domains = scope_domains(authorized_scope)
+    allowed_sites = (
+        all_sites_raw
+        if authorized_domains is None
+        else [s for s in all_sites_raw if site_in_scope(s, authorized_scope)]
+    )
+    if authorized_domains is not None:
+        selected_site = query.site
+        if len(authorized_domains) == 1:
+            selected_site = authorized_domains[0]
+        elif len(authorized_domains) == 0:
+            selected_site = "__unauthorized__"
         query = OverviewQuery(
             hours=query.hours,
-            site=authorized_scope,
+            site=selected_site,
             device_type=query.device_type,
             browser=query.browser,
             os=query.os,
@@ -958,6 +970,12 @@ def build_overview(
             tz_offset=query.tz_offset,
         )
     stored = store.sessions(limit=MAX_SESSIONS_ANALYZED)
+    if authorized_domains is not None:
+        stored = [
+            summary
+            for summary in stored
+            if record_in_scope(summary.get("host"), summary.get("project_id"), authorized_scope, allowed_sites)
+        ]
     in_range = stored
     if query.hours:
         cutoff = now - query.hours * 3600
@@ -1011,16 +1029,7 @@ def build_overview(
         comparison = summarize_metrics(previous, now)
     recent_events = store.recent_events(limit=config.max_events)
 
-    all_sites = store.sites()
-    if authorized_scope != "*":
-        target = authorized_scope.lower()
-        all_sites = [
-            s
-            for s in all_sites
-            if (s.get("domain") or "").lower() == target
-            or (s.get("id") or "").lower() == target
-            or (s.get("api_key") or "").lower() == target
-        ]
+    all_sites = allowed_sites
 
     sites_data = []
     for s in all_sites:
@@ -1054,7 +1063,7 @@ def build_overview(
             "snippet": f'<script src="{config.sdk_url}" data-api-host="{config.site_url}" data-api-key="{s.get("api_key")}" defer></script>',
         }
         # Only expose secret key to the owner of this site or master admin
-        if authorized_scope == "*" or (s.get("domain") or "").lower() == authorized_scope.lower():
+        if authorized_scope == "*" or site_in_scope(s, authorized_scope):
             site_entry["secret_key"] = s.get("secret_key")
 
         sites_data.append(site_entry)
@@ -1079,6 +1088,7 @@ def build_overview(
             "search": query.search,
             "is_admin": authorized_scope == "*",
             "authorized_site": None if authorized_scope == "*" else authorized_scope,
+            "authorized_sites": None if authorized_domains is None else list(authorized_domains),
             "sessions_analyzed": len(summaries),
             "sessions_in_range": len(in_range),
             "sessions_stored": len(stored),
@@ -1178,3 +1188,87 @@ def _matches_session_filter(summary: Mapping[str, Any], query: OverviewQuery, no
 
 def _share(part: int, whole: int) -> float:
     return round(part / whole * 100, 1) if whole else 0.0
+
+
+def scope_domains(authorized_scope: str | None) -> tuple[str, ...] | None:
+    raw = (authorized_scope or "").strip()
+    if raw == "*":
+        return None
+    if not raw:
+        return ()
+    seen: set[str] = set()
+    domains: list[str] = []
+    for part in raw.split(","):
+        cleaned = part.strip()
+        if not cleaned:
+            continue
+        lowered = cleaned.lower()
+        if lowered not in seen:
+            seen.add(lowered)
+            domains.append(cleaned)
+    return tuple(domains)
+
+
+def merge_scopes(current_scope: str | None, new_domain: str) -> str:
+    if (current_scope or "").strip() == "*":
+        return "*"
+    domains = list(scope_domains(current_scope) or ())
+    candidate = (new_domain or "").strip()
+    if candidate and candidate.lower() not in {d.lower() for d in domains}:
+        domains.append(candidate)
+    return ",".join(domains)
+
+
+def remove_from_scope(current_scope: str | None, domain: str) -> str:
+    if (current_scope or "").strip() == "*":
+        return "*"
+    domains = scope_domains(current_scope) or ()
+    target = (domain or "").strip().lower()
+    return ",".join(d for d in domains if d.lower() != target)
+
+
+def site_in_scope(site: Mapping[str, Any], authorized_scope: str | None) -> bool:
+    domains = scope_domains(authorized_scope)
+    if domains is None:
+        return True
+    if not domains:
+        return False
+    allowed = {d.lower() for d in domains}
+    for key in ("domain", "id", "api_key"):
+        val = str(site.get(key) or "").strip().lower()
+        if val and val in allowed:
+            return True
+    return False
+
+
+def record_in_scope(
+    host: str | None,
+    project_id: str | None,
+    authorized_scope: str | None,
+    allowed_sites: list[dict[str, Any]] | None = None,
+) -> bool:
+    domains = scope_domains(authorized_scope)
+    if domains is None:
+        return True
+    if not domains:
+        return False
+    allowed_hosts = {d.lower() for d in domains}
+    allowed_tokens = set(allowed_hosts)
+    for site in allowed_sites or ():
+        for key in ("domain", "id"):
+            val = str(site.get(key) or "").strip().lower()
+            if val:
+                allowed_hosts.add(val)
+                allowed_tokens.add(val)
+        api_key = str(site.get("api_key") or "").strip().lower()
+        if api_key:
+            allowed_tokens.add(api_key)
+    pid = str(project_id or "").strip().lower()
+    if pid and pid in allowed_tokens:
+        return True
+    clean_host = str(host or "").strip().lower()
+    if clean_host:
+        for candidate in allowed_hosts:
+            if clean_host == candidate or ("." in candidate and clean_host.endswith("." + candidate)):
+                return True
+    return False
