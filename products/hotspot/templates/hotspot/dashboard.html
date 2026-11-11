@@ -890,6 +890,7 @@
 
         /* Realtime */
         .rt-top { display: flex; align-items: stretch; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+        .rt-top > .card, .rt-top > .card + .card { margin-top: 0; }
         .rt-now { display: flex; flex-direction: column; justify-content: center; padding: 14px 20px; min-width: 220px; margin-top: 0; }
         .rt-now .big { font-size: 40px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; font-variant-numeric: tabular-nums; display: flex; align-items: center; gap: 12px; }
         .rt-now .big .pulse { width: 12px; height: 12px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); animation: pulse 1.8s ease-out infinite; }
@@ -1132,9 +1133,10 @@
         .fhelp code { font-family: var(--mono); font-size: 11.5px; background: var(--subtle); border: 1px solid var(--border); padding: 0 4px; border-radius: 4px; }
 
         /* Breakage */
-        .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 20px; }
+        .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 20px; align-items: stretch; }
         @media (max-width: 900px) { .tiles { grid-template-columns: minmax(0, 1fr); } }
-        .tile { padding: 18px 20px; display: flex; align-items: center; gap: 16px; margin-top: 0; min-height: 104px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-sm); cursor: pointer; transition: all 0.18s ease; position: relative; user-select: none; }
+        .tiles > .card, .tiles > .card + .card, .tiles > .tile { margin-top: 0; height: 100%; }
+        .tile { padding: 18px 20px; display: flex; align-items: center; gap: 16px; min-height: 104px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-sm); cursor: pointer; transition: all 0.18s ease; position: relative; user-select: none; }
         .tile:hover { border-color: var(--border-2); box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08); transform: translateY(-2px); }
         .tile.active { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-ring), 0 4px 14px rgba(37, 99, 235, 0.12); }
         .tile .t-ico { width: 44px; height: 44px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -5407,14 +5409,7 @@
             el('div', { class: 't-sub', text: sub })
         ]));
         if (count > 0) {
-            box.appendChild(el('button', {
-                class: 'btn sm ghost t-watch-btn',
-                type: 'button',
-                'data-action': 'filter-status',
-                'data-status': status,
-                title: 'Watch ' + label + ' sessions',
-                text: 'Watch'
-            }));
+            box.appendChild(watchBtn({ status: status, title: 'Watch ' + label + ' sessions', text: 'Watch' }));
         }
         return box;
     }
