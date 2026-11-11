@@ -767,6 +767,7 @@
         .t .num { text-align: right; white-space: nowrap; }
         .t .mono { font-size: 12px; }
         .t .trunc { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #sourcesGrid .t .trunc { max-width: 175px; }
         .t .empty-cell { color: var(--muted); font-size: 13px; padding: 24px 16px; text-align: center; }
         .t .sub { display: block; color: var(--muted); font-size: 11.5px; font-family: var(--mono); margin-top: 2px; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .t .main-text { font-weight: 500; display: block; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -774,9 +775,9 @@
         .bar { flex: 1; height: 6px; border-radius: 3px; background: var(--subtle); overflow: hidden; min-width: 60px; }
         .bar i { display: block; height: 100%; background: var(--brand); border-radius: 3px; }
         .share span { width: 46px; text-align: right; font-size: 12px; color: var(--text-2); font-variant-numeric: tabular-nums; }
-        .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
-        .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; }
-        .grid2 .card + .card, .grid3 .card + .card, .grid2 > .card, .grid3 > .card { margin-top: 0; }
+        .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
+        .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
+        .grid2 .card + .card, .grid3 .card + .card, .grid2 > .card, .grid3 > .card { margin-top: 0; display: flex; flex-direction: column; height: 100%; }
         .grid2.single { grid-template-columns: minmax(0, 1fr); }
         .stack > .card + .card { margin-top: 16px; }
         .section-gap { margin-top: 16px; }
@@ -825,10 +826,11 @@
         .notice .link { color: inherit; font-weight: 600; margin-left: 4px; }
 
         /* KPI tiles */
-        .kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+        .kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; align-items: stretch; }
         @media (max-width: 1360px) { .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
         @media (max-width: 800px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-        .kpi { padding: 12px 14px 10px; min-height: 96px; display: flex; flex-direction: column; margin-top: 0; }
+        .kpis > .card + .card, .kpis > .kpi { margin-top: 0; height: 100%; }
+        .kpi { padding: 12px 14px 10px; min-height: 96px; display: flex; flex-direction: column; }
         .kpi .k-label { font-size: 11.5px; font-weight: 500; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .kpi .k-row { display: flex; align-items: baseline; gap: 8px; margin-top: 3px; flex-wrap: wrap; }
         .kpi .k-value { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; font-variant-numeric: tabular-nums; }
@@ -1251,6 +1253,116 @@
         .api-list code { font-family: var(--mono); font-size: 12px; white-space: nowrap; }
         .api-list span { color: var(--text-2); }
         @media (max-width: 1100px) { .api-list { grid-template-columns: minmax(0, 1fr); } }
+
+        /* Sticky Global Filter Bar (Clarity-inspired cross-tab filtering) */
+        .global-filters { position: sticky; top: 0; z-index: 40; display: flex; flex-direction: column; gap: 6px; padding: 9px 24px; background: rgba(255, 255, 255, 0.96); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+        .gf-row { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
+        .gf-title { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--text-2); margin-right: 4px; white-space: nowrap; }
+        .gf-title .ico { width: 13px; height: 13px; color: var(--brand); }
+        .gf-select { height: 29px; font-size: 12.5px; padding: 0 24px 0 9px; max-width: 150px; }
+        .gf-search { flex: 1 1 170px; max-width: 240px; min-width: 120px; }
+        .gf-search .input { height: 29px; font-size: 12.5px; width: 100%; padding-left: 28px; }
+        .gf-search .ico { top: 7px; left: 8px; }
+        .gf-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+        .filter-chip { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 8px; font-size: 11.5px; font-weight: 600; border-radius: 999px; background: var(--brand-soft); color: var(--brand); border: 1px solid #BFDBFE; cursor: pointer; max-width: 220px; }
+        .filter-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .filter-chip:hover { background: #DBEAFE; }
+        .filter-chip .ico { width: 11px; height: 11px; }
+        @media (max-width: 900px) {
+            .global-filters { padding: 8px 12px; }
+            .gf-select { flex: 1 1 44%; max-width: none; }
+            .gf-search { flex: 1 1 100%; max-width: none; }
+        }
+
+        /* Clarity-inspired widgets: watch camera CTA, Users Overview, Frustration, Donut, Perf, Errors */
+        .watch-btn { display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 24px; padding: 0 7px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--brand); font-size: 11px; font-weight: 600; cursor: pointer; flex-shrink: 0; transition: background 0.12s, border-color 0.12s; }
+        .watch-btn:hover { background: var(--brand-soft); border-color: #93C5FD; }
+        .watch-btn .ico { width: 12px; height: 12px; }
+        .watch-btn:disabled { opacity: 0.45; cursor: default; pointer-events: none; }
+
+        .card-flex-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+        .u-top-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+        .u-stat { border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; background: var(--subtle); }
+        .u-stat-lbl { font-size: 11.5px; color: var(--text-2); display: flex; align-items: center; gap: 6px; }
+        .u-stat-lbl .dot-live { width: 7px; height: 7px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 3px #D1FAE5; }
+        .u-stat-lbl .dot-live.off { background: var(--border-2); box-shadow: none; }
+        .u-stat-val { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; margin-top: 2px; font-variant-numeric: tabular-nums; }
+        .u-split-wrap { display: flex; flex-direction: column; gap: 7px; }
+        .u-split-bar { height: 11px; border-radius: 999px; background: var(--subtle); border: 1px solid var(--border); overflow: hidden; display: flex; }
+        .u-split-seg.new { background: #2563EB; transition: width 0.25s ease; }
+        .u-split-seg.ret { background: #7C3AED; transition: width 0.25s ease; }
+        .u-legend { display: flex; flex-direction: column; gap: 6px; }
+        .u-legend-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+        .u-swatch { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
+        .u-swatch.new { background: #2563EB; }
+        .u-swatch.ret { background: #7C3AED; }
+        .u-legend-row .u-name { flex: 1; min-width: 0; color: var(--text-2); }
+        .u-legend-row .u-num { font-weight: 600; font-variant-numeric: tabular-nums; }
+        .u-top-visitor { margin-top: auto; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: #F8FAFC; display: flex; align-items: center; gap: 10px; }
+        .u-top-visitor .u-av { width: 32px; height: 32px; border-radius: 50%; background: var(--brand-soft); color: var(--brand); font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .u-top-visitor .u-info { flex: 1; min-width: 0; }
+        .u-top-visitor .u-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+        .u-top-visitor .u-who { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .u-top-visitor .u-meta { font-size: 11.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        .frust-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; flex: 1; align-content: start; }
+        .frust-tile { border: 1px solid var(--border); border-radius: 10px; padding: 11px 12px; display: flex; flex-direction: column; gap: 6px; background: var(--surface); min-width: 0; }
+        .frust-tile.bad { border-color: #FECACA; background: #FFF8F8; }
+        .frust-tile.warn { border-color: #FDE68A; background: #FFFDF5; }
+        .frust-tile.ok { border-color: var(--border); background: var(--surface); }
+        .frust-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+        .frust-name { font-size: 12px; font-weight: 600; color: var(--text-2); display: inline-flex; align-items: center; gap: 5px; }
+        .frust-name .ico { width: 13px; height: 13px; }
+        .frust-tile.bad .frust-name .ico { color: var(--danger); }
+        .frust-tile.warn .frust-name .ico { color: #D97706; }
+        .frust-val { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.15; }
+        .frust-sub { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        .ev-badge { display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border-radius: 5px; font-size: 10.5px; font-weight: 600; flex-shrink: 0; }
+        .ev-badge.goal { background: #ECFDF5; color: #047857; border: 1px solid #A7F3D0; }
+        .ev-badge.form { background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; }
+        .ev-badge.custom { background: #F5F3FF; color: #6D28D9; border: 1px solid #DDD6FE; }
+        .ev-badge.click { background: var(--subtle); color: var(--text-2); border: 1px solid var(--border); }
+
+        .donut-wrap { display: flex; align-items: center; gap: 14px; padding: 12px 16px 4px; }
+        .donut-svg-box { position: relative; width: 104px; height: 104px; flex-shrink: 0; }
+        .donut-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; text-align: center; }
+        .donut-center b { font-size: 16px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+        .donut-center span { font-size: 10.5px; color: var(--muted); }
+        .donut-swatch { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+        .perf-head-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+        .perf-score-wrap { display: flex; align-items: center; gap: 10px; }
+        .perf-pill { display: inline-flex; align-items: center; justify-content: center; min-width: 64px; height: 32px; padding: 0 11px; border-radius: 999px; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; border: 1px solid var(--border); background: var(--subtle); color: var(--text); }
+        .perf-pill.good { background: #ECFDF5; border-color: #A7F3D0; color: #047857; }
+        .perf-pill.needs { background: #FFFBEB; border-color: #FDE68A; color: #B45309; }
+        .perf-pill.poor { background: #FEF2F2; border-color: #FECACA; color: #B91C1C; }
+        .perf-stack { height: 10px; border-radius: 999px; background: var(--subtle); border: 1px solid var(--border); overflow: hidden; display: flex; }
+        .perf-seg-good { background: #10B981; }
+        .perf-seg-needs { background: #F59E0B; }
+        .perf-seg-poor { background: #EF4444; }
+        .perf-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 11.5px; color: var(--text-2); }
+        .perf-legend span { display: inline-flex; align-items: center; gap: 5px; }
+        .perf-legend i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+        .err-top { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+        .err-gauge-box { position: relative; width: 132px; height: 76px; flex-shrink: 0; }
+        .err-gauge-val { position: absolute; left: 0; right: 0; bottom: 2px; text-align: center; }
+        .err-gauge-val b { display: block; font-size: 20px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+        .err-gauge-val span { font-size: 10.5px; color: var(--muted); }
+        .err-summary { flex: 1; min-width: 140px; display: flex; flex-direction: column; gap: 4px; }
+        .err-summary .err-stat { font-size: 13px; color: var(--text-2); }
+        .err-summary .err-stat strong { color: var(--text); }
+        .err-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border); }
+        .err-list li { display: flex; align-items: center; gap: 10px; padding: 9px 16px; border-top: 1px solid var(--border); font-size: 12.5px; }
+        .err-list li:first-child { border-top: 0; }
+        .err-msg-wrap { flex: 1; min-width: 0; }
+        .err-msg { font-family: var(--mono); font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .err-bar-track { height: 4px; border-radius: 999px; background: var(--subtle); margin-top: 4px; overflow: hidden; }
+        .err-bar-fill { height: 100%; background: #EF4444; border-radius: 999px; }
+
+        .dur-pill { font-size: 11px; color: var(--text-2); background: var(--subtle); border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; }
+
         @media (prefers-reduced-motion: reduce) {
             .chip.active::before, .console-head .ldot, .rt-now .big .pulse, .map-wrap .ring, .tbox .ldot { animation: none; }
         }
@@ -1358,6 +1470,36 @@
             </form>
         </header>
 
+        <div class="global-filters" id="globalFilters">
+            <div class="gf-row">
+                <span class="gf-title"><span class="ico" data-icon="funnel"></span>Filters</span>
+                <select class="select gf-select" id="fDevice" aria-label="Device filter"><option value="all">All devices</option></select>
+                <select class="select gf-select" id="fBrowser" aria-label="Browser filter"><option value="all">All browsers</option></select>
+                <select class="select gf-select" id="fOs" aria-label="OS filter"><option value="all">All OS</option></select>
+                <select class="select gf-select" id="fChannel" aria-label="Channel filter"><option value="all">All channels</option></select>
+                <select class="select gf-select" id="fCountry" aria-label="Country filter"><option value="all">All countries</option></select>
+                <select class="select gf-select" id="fStatus" aria-label="Session cohort filter">
+                    <option value="all">All cohorts</option>
+                    <option value="active">Active now</option>
+                    <option value="new">New visitors</option>
+                    <option value="returning">Returning visitors</option>
+                    <option value="converted">Converted</option>
+                    <option value="ai">AI referred</option>
+                    <option value="rage">Rage clicks</option>
+                    <option value="dead">Dead clicks</option>
+                    <option value="quick_back">Quick backs</option>
+                    <option value="error">JS errors</option>
+                    <option value="broken">Broken (any)</option>
+                    <option value="bounced">Bounced</option>
+                    <option value="engaged">Engaged</option>
+                    <option value="identified">Known people</option>
+                </select>
+                <div class="search gf-search"><span class="ico" id="searchIcon"></span><input class="input" id="fSearch" type="search" placeholder="Search email, page, referrer" aria-label="Search sessions"></div>
+                <button class="btn ghost sm" type="button" data-action="clear-filters" id="clearFilters" hidden>Clear all</button>
+            </div>
+            <div class="gf-chips" id="filterChips" hidden></div>
+        </div>
+
         <main class="content" id="content">
             <div id="notices"></div>
 
@@ -1376,7 +1518,41 @@
                 </div>
                 <div id="ovBody">
                     <div class="kpis" id="kpis"></div>
-                    <div class="card">
+
+                    <!-- Clarity Row 1: Users overview + Frustration Insights + Key Events -->
+                    <div class="grid3">
+                        <div class="card">
+                            <div class="card-head">
+                                <h2>Users overview</h2>
+                                <span class="meta" id="usersOvMeta"></span>
+                            </div>
+                            <div class="card-flex-body" id="usersOverviewBody"></div>
+                        </div>
+                        <div class="card">
+                            <div class="card-head">
+                                <h2>Insights</h2>
+                                <span class="meta"><button class="link" type="button" data-action="nav" data-tab="breakage">Breakage</button></span>
+                            </div>
+                            <div class="card-flex-body">
+                                <div class="frust-grid" id="frustrationGrid"></div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-head">
+                                <h2>Key events</h2>
+                                <span class="meta">
+                                    <span class="seg" id="eventsModeSeg">
+                                        <button type="button" data-action="events-mode" data-mode="count" class="active">Count</button>
+                                        <button type="button" data-action="events-mode" data-mode="pct">% sessions</button>
+                                    </span>
+                                </span>
+                            </div>
+                            <ul class="blist" id="smartEvents"></ul>
+                        </div>
+                    </div>
+
+                    <!-- Trend chart -->
+                    <div class="card section-gap">
                         <div class="card-head">
                             <h2 id="trendTitle">Sessions over time</h2>
                             <span class="meta">
@@ -1389,31 +1565,81 @@
                         </div>
                         <div class="chart" id="trendChart"></div>
                     </div>
+
+                    <!-- Clarity Row 2: Traffic Sources + Technology & Geo (Donut) + Top Pages -->
                     <div class="grid3 section-gap">
                         <div class="card">
-                            <div class="card-head"><h2>Top pages</h2><span class="meta"><button class="link" type="button" data-action="nav" data-tab="pages">All pages</button></span></div>
-                            <ul class="blist" id="topPages"></ul>
-                        </div>
-                        <div class="card">
-                            <div class="card-head"><h2>Where visitors come from</h2><span class="meta" id="channelsMeta"></span></div>
+                            <div class="card-head">
+                                <h2>Traffic</h2>
+                                <span class="meta">
+                                    <span class="seg" id="trafficSeg">
+                                        <button type="button" data-action="traffic-mode" data-mode="channels" class="active">Channels</button>
+                                        <button type="button" data-action="traffic-mode" data-mode="sources">Referrers</button>
+                                        <button type="button" data-action="traffic-mode" data-mode="campaigns">Campaigns</button>
+                                        <button type="button" data-action="traffic-mode" data-mode="ai">AI</button>
+                                    </span>
+                                </span>
+                            </div>
                             <ul class="blist" id="channels"></ul>
                         </div>
                         <div class="card">
-                            <div class="card-head"><h2>Devices and places</h2><span class="meta"><span class="seg" id="audienceSeg"><button type="button" data-action="audience" data-kind="device_type" class="active">Devices</button><button type="button" data-action="audience" data-kind="browser">Browsers</button><button type="button" data-action="audience" data-kind="country">Countries</button></span></span></div>
+                            <div class="card-head">
+                                <h2>Technology &amp; Geo</h2>
+                                <span class="meta">
+                                    <span class="seg" id="audienceSeg">
+                                        <button type="button" data-action="audience" data-kind="browser">Browsers</button>
+                                        <button type="button" data-action="audience" data-kind="device_type" class="active">Devices</button>
+                                        <button type="button" data-action="audience" data-kind="os">OS</button>
+                                        <button type="button" data-action="audience" data-kind="country">Countries</button>
+                                    </span>
+                                </span>
+                            </div>
+                            <div id="audienceDonut"></div>
                             <ul class="blist" id="audience"></ul>
                         </div>
+                        <div class="card">
+                            <div class="card-head">
+                                <h2>Pages</h2>
+                                <span class="meta" style="display: inline-flex; align-items: center; gap: 6px;">
+                                    <span class="seg" id="pagesSeg">
+                                        <button type="button" data-action="pages-mode" data-mode="top" class="active">Top</button>
+                                        <button type="button" data-action="pages-mode" data-mode="entry">Entry</button>
+                                        <button type="button" data-action="pages-mode" data-mode="exit">Exit</button>
+                                    </span>
+                                    <button class="btn sm ghost" type="button" id="stripParamsBtn" data-action="toggle-strip-params" title="Group URLs without query parameters">?params</button>
+                                </span>
+                            </div>
+                            <ul class="blist" id="topPages"></ul>
+                        </div>
                     </div>
+
+                    <!-- Clarity Row 3: Performance Overview + JavaScript Errors -->
                     <div class="grid2 section-gap">
                         <div class="card">
-                            <div class="card-head"><h2>What stands out</h2><span class="meta" id="insightsMeta"></span></div>
-                            <ul class="ilist" id="insights"></ul>
+                            <div class="card-head">
+                                <h2>Performance overview</h2>
+                                <span class="meta" id="healthMeta"></span>
+                            </div>
+                            <div class="card-flex-body">
+                                <div class="perf-head-row" id="perfHeadRow"></div>
+                                <div id="perfDistribution"></div>
+                                <div class="health" id="healthVitals" style="padding: 0;"></div>
+                            </div>
                         </div>
                         <div class="card">
-                            <div class="card-head"><h2>Site health</h2><span class="meta" id="healthMeta"></span></div>
-                            <div class="health" id="healthVitals"></div>
-                            <div class="health" id="healthBreakage" style="padding-top: 0;"></div>
-                            <div class="health-foot" id="healthFoot"></div>
+                            <div class="card-head">
+                                <h2>JavaScript errors</h2>
+                                <span class="meta"><button class="link" type="button" data-action="nav" data-tab="breakage">All errors</button></span>
+                            </div>
+                            <div class="card-flex-body" style="padding-bottom: 8px;" id="jsErrorsGauge"></div>
+                            <ul class="err-list" id="jsErrorsList"></ul>
                         </div>
+                    </div>
+
+                    <!-- Diagnostics & Findings -->
+                    <div class="card section-gap">
+                        <div class="card-head"><h2>What stands out</h2><span class="meta" id="insightsMeta"></span></div>
+                        <ul class="ilist" id="insights"></ul>
                     </div>
                 </div>
             </section>
@@ -1469,22 +1695,7 @@
             <section class="tab" data-tab="sessions" id="tab-sessions">
                 <div class="page-head"><h1>Sessions</h1><p id="sessionsScope"></p></div>
                 <div class="toolbar" id="sessionToolbar">
-                    <select class="select" id="fStatus" aria-label="Status">
-                        <option value="all">All sessions</option>
-                        <option value="active">Active now</option>
-                        <option value="converted">Converted</option>
-                        <option value="rage">Rage clicks</option>
-                        <option value="dead">Dead clicks</option>
-                        <option value="error">Errors</option>
-                        <option value="bounced">Bounced</option>
-                        <option value="engaged">Engaged</option>
-                        <option value="identified">Known people</option>
-                    </select>
-                    <select class="select" id="fDevice" aria-label="Device"><option value="all">All devices</option></select>
-                    <select class="select" id="fBrowser" aria-label="Browser"><option value="all">All browsers</option></select>
-                    <select class="select" id="fOs" aria-label="Operating system"><option value="all">All operating systems</option></select>
-                    <div class="search"><span class="ico" id="searchIcon"></span><input class="input" id="fSearch" type="search" placeholder="Search email, page, referrer" aria-label="Search sessions"></div>
-                    <button class="btn ghost" type="button" data-action="clear-filters" id="clearFilters" hidden>Clear filters</button>
+                    <span class="muted" id="sessionFilterNote" style="font-size: 12.5px;">Showing matching recorded sessions &mdash; use the Filters bar above to refine across all tabs.</span>
                 </div>
 
                 <div class="card" id="sessionsEmpty" hidden>
@@ -1772,12 +1983,12 @@
                 <div class="page-head"><h1>Pages</h1><p>Every page visitors saw: how long they stayed, how far they scrolled, where they left and how fast it loaded.</p></div>
                 <div class="card">
                     <div class="card-head"><h2>Pages</h2><span class="meta" id="pagesMeta"></span></div>
-                    <div class="table-wrap"><table class="t"><thead><tr><th>Page</th><th class="num">Views</th><th class="num">Visits</th><th class="num">Time on page</th><th class="num">Scrolled</th><th class="num">Left here</th><th class="num">Converted</th><th>Breakage</th><th class="num" title="Largest contentful paint, 75th percentile">Load</th><th class="num" title="Cumulative layout shift, 75th percentile">Stability</th><th class="num" title="Interaction to next paint, 75th percentile">Response</th></tr></thead><tbody id="pagesTable"></tbody></table></div>
+                    <div class="table-wrap"><table class="t"><thead><tr><th>Page</th><th class="num">Views</th><th class="num">Visits</th><th class="num">Time on page</th><th class="num">Scrolled</th><th class="num">Left here</th><th class="num">Converted</th><th>Breakage</th><th class="num" title="Largest contentful paint, 75th percentile">Load</th><th class="num" title="Cumulative layout shift, 75th percentile">Stability</th><th class="num" title="Interaction to next paint, 75th percentile">Response</th><th class="num">Replay</th></tr></thead><tbody id="pagesTable"></tbody></table></div>
                 </div>
                 <div class="grid2 section-gap" id="sourcesGrid">
                     <div class="card">
                         <div class="card-head"><h2>Referring sites</h2><span class="meta">where visits started</span></div>
-                        <div class="table-wrap"><table class="t"><thead><tr><th>Source</th><th class="num">Visits</th><th>Share</th><th class="num">Converted</th><th class="num">Conversion rate</th></tr></thead><tbody id="referrersTable"></tbody></table></div>
+                        <div class="table-wrap"><table class="t"><thead><tr><th>Source</th><th class="num">Visits</th><th>Share</th><th class="num" title="Converted sessions">Conv.</th><th class="num" title="Conversion rate">Rate</th></tr></thead><tbody id="referrersTable"></tbody></table></div>
                     </div>
                     <div class="card" id="aiCard" hidden>
                         <div class="card-head"><h2>AI assistants</h2><span class="meta" id="aiMeta"></span></div>
@@ -2109,7 +2320,7 @@
     var TABS = ['overview', 'realtime', 'sessions', 'flow', 'funnel', 'breakage', 'pages', 'install'];
     // Links and bookmarks from earlier versions keep working.
     var TAB_ALIASES = { paths: 'flow', friction: 'breakage', errors: 'breakage', live: 'realtime' };
-    var STATUS_VALUES = ['all', 'active', 'converted', 'rage', 'dead', 'error', 'bounced', 'engaged', 'identified'];
+    var STATUS_VALUES = ['all', 'active', 'new', 'returning', 'converted', 'ai', 'rage', 'dead', 'quick_back', 'error', 'broken', 'bounced', 'engaged', 'identified'];
     var HOURS_VALUES = [1, 24, 168, 720, 0];
     var STEP_KINDS = ['path', 'event', 'click', 'text'];
     var MAX_FUNNEL_STEPS = 8;
@@ -2350,6 +2561,7 @@
         trend: svgIcon('<path d="m22 7-8.5 8.5-5-5L2 17"/><path d="M16 7h6v6"/>'),
         mapPin: svgIcon('<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/>'),
         key: svgIcon('<path d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/>'),
+        video: svgIcon('<path d="m22 8-6 4 6 4V8z"/><rect x="2" y="6" width="14" height="12" rx="2"/>'),
         bug: svgIcon('<path d="m8 2 1.88 1.88"/><path d="M14.12 3.88 16 2"/><path d="M9 7.13v-1a3.003 3.003 0 1 1 6 0v1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6"/><path d="M12 20v-9"/><path d="M6.53 9C4.6 8.8 3 7.1 3 5"/><path d="M6 13H2"/><path d="M3 21c0-2.1 1.7-3.9 3.8-4"/><path d="M20.97 5c0 2.1-1.6 3.8-3.5 4"/><path d="M22 13h-4"/><path d="M17.2 17c2.1.1 3.8 1.9 3.8 4"/>')
     };
 
@@ -2371,6 +2583,8 @@
         device: 'all',
         browser: 'all',
         os: 'all',
+        channel: 'all',
+        country: 'all',
         search: '',
         funnel: null,
         overview: null,
@@ -2383,6 +2597,10 @@
         detail: null,
         detailInflight: false,
         trendMetric: 'sessions',
+        eventsMode: 'count',
+        trafficMode: 'channels',
+        pagesMode: 'top',
+        stripParams: false,
         audience: 'device_type',
         flowAnimate: !REDUCED_MOTION
     };
@@ -2481,6 +2699,8 @@
             device_type: state.device,
             browser: state.browser,
             os: state.os,
+            channel: state.channel,
+            country: state.country,
             search: state.search,
             limit: '200',
             tz_offset: String(-new Date().getTimezoneOffset())
@@ -2621,7 +2841,7 @@
         renderSitesTab(o.sites, o.current_site || state.site, o.setup);
         renderOverview(o);
         renderRealtime(o);
-        renderFilters(o.breakdowns);
+        renderFilters(o.breakdowns, o.referrers);
         renderSessions(o);
         renderFunnelPresets(o.funnel, o);
         renderFunnelEditor(o.funnel, o.pages);
@@ -2651,6 +2871,29 @@
         return svg;
     }
 
+    // Camera Watch button jumping directly to matching session replays.
+    function watchBtn(opts) {
+        opts = opts || {};
+        var attrs = {
+            class: 'watch-btn',
+            type: 'button',
+            'data-action': 'watch-filter',
+            title: opts.title || 'Watch matching sessions',
+            'aria-label': opts.title || 'Watch matching sessions'
+        };
+        if (opts.status !== undefined) { attrs['data-w-status'] = opts.status; }
+        if (opts.device !== undefined) { attrs['data-w-device'] = opts.device; }
+        if (opts.browser !== undefined) { attrs['data-w-browser'] = opts.browser; }
+        if (opts.os !== undefined) { attrs['data-w-os'] = opts.os; }
+        if (opts.channel !== undefined) { attrs['data-w-channel'] = opts.channel; }
+        if (opts.country !== undefined) { attrs['data-w-country'] = opts.country; }
+        if (opts.search !== undefined) { attrs['data-w-search'] = opts.search; }
+        if (opts.sessionId) { attrs['data-w-sid'] = opts.sessionId; }
+        var btn = el('button', attrs, icon('video'));
+        if (opts.text) { btn.appendChild(document.createTextNode(opts.text)); }
+        return btn;
+    }
+
     // A list row with a share bar behind the label, the pattern every "top X" card uses.
     function barRow(opts) {
         var li = el('li');
@@ -2660,19 +2903,26 @@
         var label = opts.action
             ? el('button', { class: 'lbl' + (opts.mono ? ' mono' : ''), type: 'button', 'data-action': opts.action.name, 'data-value': opts.action.value || '', 'data-tab': opts.action.tab || '', title: opts.title || opts.label })
             : el('span', { class: 'lbl' + (opts.mono ? ' mono' : ''), title: opts.title || opts.label });
+        if (opts.swatch) {
+            var sw = el('span', { class: 'donut-swatch' });
+            sw.style.background = opts.swatch;
+            label.appendChild(sw);
+        }
         if (opts.flag) { label.appendChild(el('span', { class: 'flag', text: opts.flag })); }
         if (opts.icon) { label.appendChild(icon(opts.icon)); }
+        if (opts.badge) { label.appendChild(el('span', { class: 'ev-badge ' + (opts.badge.cls || ''), text: opts.badge.text })); }
         label.appendChild(document.createTextNode(opts.label));
         li.appendChild(label);
         li.appendChild(el('span', { class: 'val', text: opts.value }));
         if (opts.pct !== undefined) { li.appendChild(el('span', { class: 'pct', text: opts.pct })); }
+        if (opts.watch) { li.appendChild(watchBtn(opts.watch)); }
         return li;
     }
 
     function fillList(list, rows, emptyText, build) {
         clear(list);
         if (!rows || !rows.length) { list.appendChild(el('li', null, el('span', { class: 'empty-cell', text: emptyText }))); return; }
-        rows.forEach(function (row) { list.appendChild(build(row)); });
+        rows.forEach(function (row, idx) { list.appendChild(build(row, idx)); });
     }
 
     function emptyRow(columns, text) {
@@ -2759,19 +3009,41 @@
     }
 
     function renderKpis(o) {
-        var m = o.metrics, c = o.comparison, t = o.trend || {};
+        var m = o.metrics || {}, c = o.comparison, t = o.trend || {}, u = o.users_overview || {};
         var box = $('kpis');
         clear(box);
         function spark(key) {
             var values = t[key] || [];
             return values.some(function (v) { return v > 0; }) ? sparkline(values, '#2563EB', 'rgba(37, 99, 235, 0.12)') : null;
         }
-        box.appendChild(kpi('Visitors', fmtNum(m.visitors), { delta: c ? deltaChip(m.visitors, c.visitors) : null, spark: spark('visitors'), sub: 'different people' }));
-        box.appendChild(kpi('Sessions', fmtNum(m.sessions), { delta: c ? deltaChip(m.sessions, c.sessions) : null, spark: spark('sessions'), sub: 'visits in ' + scopeLabel() }));
-        box.appendChild(kpi('Page views', fmtNum(m.pageviews), { delta: c ? deltaChip(m.pageviews, c.pageviews) : null, spark: spark('pageviews'), sub: m.sessions ? (Math.round(m.pageviews / m.sessions * 10) / 10) + ' per session' : '' }));
-        box.appendChild(kpi('Time on site', m.sessions ? fmtDuration(m.avg_duration_seconds) : null, { delta: c ? deltaChip(m.avg_duration_seconds, c.avg_duration_seconds, { prevText: fmtDuration(c.avg_duration_seconds) }) : null, sub: 'average per session' }));
-        box.appendChild(kpi('Bounce rate', m.sessions ? fmtPct0(m.bounce_rate) : null, { delta: c ? deltaChip(m.bounce_rate, c.bounce_rate, { points: true, invert: true }) : null, sub: 'left after one page' }));
-        box.appendChild(kpi('Conversion rate', m.sessions ? fmtPct0(m.conversion_rate) : null, { delta: c ? deltaChip(m.conversion_rate, c.conversion_rate, { points: true }) : null, sub: plural(m.converted_sessions || 0, 'session reached a goal', 'sessions reached a goal') }));
+        var pagesPerSess = m.sessions ? (isNum(m.pages_per_session) ? m.pages_per_session : Math.round(m.pageviews / m.sessions * 10) / 10) : null;
+        var prevPagesPerSess = c && c.sessions ? (isNum(c.pages_per_session) ? c.pages_per_session : Math.round(c.pageviews / c.sessions * 10) / 10) : null;
+        box.appendChild(kpi('Sessions', fmtNum(m.sessions), {
+            delta: c ? deltaChip(m.sessions, c.sessions) : null,
+            spark: spark('sessions'),
+            sub: plural(m.pageviews || 0, 'page view', 'page views') + (m.sessions_with_replay ? ' · ' + fmtNum(m.sessions_with_replay) + ' replay' : '')
+        }));
+        box.appendChild(kpi('Unique visitors', fmtNum(m.visitors), {
+            delta: c ? deltaChip(m.visitors, c.visitors) : null,
+            spark: spark('visitors'),
+            sub: (isNum(u.new_sessions) ? fmtNum(u.new_sessions) + ' new · ' + fmtNum(u.returning_sessions || 0) + ' returning' : 'different people')
+        }));
+        box.appendChild(kpi('Pages / session', pagesPerSess !== null ? String(pagesPerSess) : null, {
+            delta: c && pagesPerSess !== null ? deltaChip(pagesPerSess, prevPagesPerSess) : null,
+            sub: plural(m.pageviews || 0, 'total view', 'total views')
+        }));
+        box.appendChild(kpi('Scroll depth', isNum(m.avg_scroll_depth) ? Math.round(m.avg_scroll_depth) + '%' : null, {
+            delta: c && isNum(m.avg_scroll_depth) && isNum(c.avg_scroll_depth) ? deltaChip(m.avg_scroll_depth, c.avg_scroll_depth, { points: true }) : null,
+            sub: 'average page depth'
+        }));
+        box.appendChild(kpi('Active time', m.sessions ? fmtDuration(isNum(m.avg_active_seconds) ? m.avg_active_seconds : m.avg_duration_seconds) : null, {
+            delta: c ? deltaChip(isNum(m.avg_active_seconds) ? m.avg_active_seconds : m.avg_duration_seconds, isNum(c.avg_active_seconds) ? c.avg_active_seconds : c.avg_duration_seconds, { prevText: fmtDuration(isNum(c.avg_active_seconds) ? c.avg_active_seconds : c.avg_duration_seconds) }) : null,
+            sub: m.sessions ? 'of ' + fmtDuration(m.avg_duration_seconds) + ' total' : ''
+        }));
+        box.appendChild(kpi('Conversion rate', m.sessions ? fmtPct0(m.conversion_rate) : null, {
+            delta: c ? deltaChip(m.conversion_rate, c.conversion_rate, { points: true }) : null,
+            sub: plural(m.converted_sessions || 0, 'converted', 'converted') + ' · ' + fmtPct0(m.bounce_rate) + ' bounce'
+        }));
     }
 
     function niceCeil(value) {
@@ -2839,23 +3111,296 @@
         svg.addEventListener('mouseleave', function () { tip.hidden = true; });
     }
 
+    var DONUT_PALETTE = ['#2563EB', '#7C3AED', '#0EA5E9', '#10B981', '#F59E0B', '#64748B'];
+
+    function renderUsersOverview(o) {
+        var u = o.users_overview || {};
+        var m = o.metrics || {};
+        var total = m.sessions || 0;
+        var box = $('usersOverviewBody');
+        clear(box);
+        $('usersOvMeta').textContent = total ? plural(total, 'session', 'sessions') : '';
+
+        var liveCount = isNum(u.live_users) ? u.live_users : (m.active_sessions || 0);
+        var uniqueCount = isNum(u.unique_users) ? u.unique_users : (m.visitors || 0);
+        var newSess = isNum(u.new_sessions) ? u.new_sessions : total;
+        var retSess = isNum(u.returning_sessions) ? u.returning_sessions : 0;
+        var newPct = total ? Math.round((newSess / total) * 1000) / 10 : 0;
+        var retPct = total ? Math.round((retSess / total) * 1000) / 10 : 0;
+
+        box.appendChild(el('div', { class: 'u-top-stats' }, [
+            el('div', { class: 'u-stat' }, [
+                el('div', { class: 'u-stat-lbl' }, [el('span', { class: 'dot-live' + (liveCount ? '' : ' off') }), 'Live now (<5m)']),
+                el('div', { class: 'u-stat-val', text: fmtNum(liveCount) })
+            ]),
+            el('div', { class: 'u-stat' }, [
+                el('div', { class: 'u-stat-lbl', text: 'Unique users' }),
+                el('div', { class: 'u-stat-val', text: fmtNum(uniqueCount) })
+            ])
+        ]));
+
+        var newSeg = el('div', { class: 'u-split-seg new' });
+        newSeg.style.width = newPct + '%';
+        var retSeg = el('div', { class: 'u-split-seg ret' });
+        retSeg.style.width = retPct + '%';
+
+        box.appendChild(el('div', { class: 'u-split-wrap' }, [
+            el('div', { class: 'u-split-bar' }, [newSeg, retSeg]),
+            el('div', { class: 'u-legend' }, [
+                el('div', { class: 'u-legend-row' }, [
+                    el('span', { class: 'u-swatch new' }),
+                    el('span', { class: 'u-name', text: 'New visitor sessions' }),
+                    el('span', { class: 'u-num', text: fmtNum(newSess) + ' (' + Math.round(newPct) + '%)' }),
+                    newSess ? watchBtn({ status: 'new', title: 'Watch new visitor sessions' }) : null
+                ]),
+                el('div', { class: 'u-legend-row' }, [
+                    el('span', { class: 'u-swatch ret' }),
+                    el('span', { class: 'u-name', text: 'Returning sessions' }),
+                    el('span', { class: 'u-num', text: fmtNum(retSess) + ' (' + Math.round(retPct) + '%)' }),
+                    retSess ? watchBtn({ status: 'returning', title: 'Watch returning visitor sessions' }) : null
+                ])
+            ])
+        ]));
+
+        var tv = u.top_visitor;
+        if (tv) {
+            var initials = String(tv.label || 'V').replace(/[^A-Za-z0-9]/g, '').slice(0, 2).toUpperCase() || 'V';
+            var tvMeta = [
+                plural(tv.sessions || 1, 'session', 'sessions'),
+                plural(tv.pageviews || 0, 'view', 'views'),
+                tv.device_type || null,
+                tv.country ? flagOf(tv.country) + ' ' + countryName(tv.country) : null
+            ].filter(Boolean).join(' · ');
+            box.appendChild(el('div', { class: 'u-top-visitor' }, [
+                el('div', { class: 'u-av', text: initials }),
+                el('div', { class: 'u-info' }, [
+                    el('div', { class: 'u-title', text: 'Top user' }),
+                    el('div', { class: 'u-who', text: tv.email || tv.label || tv.distinct_id, title: tv.distinct_id }),
+                    el('div', { class: 'u-meta', text: tvMeta })
+                ]),
+                tv.sample_session_id ? watchBtn({ sessionId: tv.sample_session_id, title: 'Watch top user replay' }) : null
+            ]));
+        }
+    }
+
+    function renderFrustrationInsights(o) {
+        var m = o.metrics || {};
+        var total = m.sessions || 0;
+        var qb = o.quick_backs || {};
+        var grid = $('frustrationGrid');
+        clear(grid);
+
+        function frustTile(cls, iconName, name, sessCount, totalCount, unitLabel, filterStatus, extraSub) {
+            var rate = total ? fmtPct(sessCount / total * 100) : '0%';
+            var tileCls = sessCount > 0 ? cls : 'ok';
+            var sub = extraSub || (plural(sessCount, 'session', 'sessions') + (totalCount ? ' · ' + plural(totalCount, unitLabel, unitLabel + 's') : ''));
+            return el('div', { class: 'frust-tile ' + tileCls }, [
+                el('div', { class: 'frust-head' }, [
+                    el('span', { class: 'frust-name' }, [icon(iconName), name]),
+                    sessCount ? watchBtn({ status: filterStatus, title: 'Watch ' + name.toLowerCase() + ' sessions' }) : null
+                ]),
+                el('div', { class: 'frust-val', text: rate }),
+                el('div', { class: 'frust-sub', text: sub, title: sub })
+            ]);
+        }
+
+        var topPair = (qb.top_pairs || [])[0];
+        var qbSub = qb.sessions
+            ? (plural(qb.sessions, 'session', 'sessions') + (topPair ? ' · ' + topPair.from + ' → ' + topPair.to : ''))
+            : '0 sessions';
+
+        grid.appendChild(frustTile('bad', 'flame', 'Rage clicks', m.sessions_with_rage || 0, m.rage_clicks || 0, 'click', 'rage'));
+        grid.appendChild(frustTile('warn', 'ban', 'Dead clicks', m.sessions_with_dead_clicks || 0, m.dead_clicks || 0, 'click', 'dead'));
+        grid.appendChild(frustTile('warn', 'arrowUp', 'Quick backs', qb.sessions || 0, qb.count || 0, 'return', 'quick_back', qbSub));
+        grid.appendChild(frustTile('bad', 'alert', 'JS errors', m.sessions_with_errors || 0, m.errors || 0, 'error', 'error'));
+    }
+
+    function renderSmartEvents(o) {
+        Array.prototype.forEach.call($('eventsModeSeg').children, function (button) {
+            button.classList.toggle('active', button.getAttribute('data-mode') === state.eventsMode);
+        });
+        var rows = o.smart_events || [];
+        var maxCount = Math.max.apply(null, rows.map(function (r) { return r.count || 0; }).concat([1]));
+        fillList($('smartEvents'), rows.slice(0, 7), 'No actions captured in ' + scopeLabel() + ' yet.', function (row) {
+            var isPct = state.eventsMode === 'pct';
+            var badgeText = row.kind === 'goal' ? 'Goal' : row.kind === 'form' ? 'Form' : row.kind === 'custom' ? 'Custom' : 'Click';
+            var share = isPct ? row.share : (maxCount ? (row.count / maxCount) * 100 : 0);
+            var valText = isPct ? fmtPct(row.share) : fmtNum(row.count);
+            var sampleIds = row.sample_session_ids || [];
+            return barRow({
+                label: row.name,
+                badge: { cls: row.kind, text: badgeText },
+                value: valText,
+                pct: isPct ? fmtNum(row.sessions) + 's' : fmtPct0(row.share),
+                share: share,
+                title: plural(row.count, 'event', 'events') + ' across ' + plural(row.sessions, 'session', 'sessions'),
+                watch: sampleIds.length ? { sessionId: sampleIds[0], title: 'Watch a session with ' + row.name } : null
+            });
+        });
+    }
+
+    function normalizePathForView(path) {
+        if (!state.stripParams || !path) { return path || '/'; }
+        var idx = path.indexOf('?');
+        return idx >= 0 ? (path.slice(0, idx) || '/') : path;
+    }
+
     function renderTopPages(o) {
-        var m = o.metrics;
-        var rows = (o.pages || []).slice().sort(function (a, b) { return b.sessions - a.sessions || b.views - a.views; }).slice(0, 8);
-        fillList($('topPages'), rows, 'No page views in ' + scopeLabel() + ' yet.', function (row) {
-            return barRow({ label: row.pathname, mono: true, value: fmtNum(row.sessions), pct: fmtPct0(m.sessions ? row.sessions / m.sessions * 100 : 0), share: m.sessions ? row.sessions / m.sessions * 100 : 0, title: plural(row.views, 'view', 'views') + ' in ' + plural(row.sessions, 'visit', 'visits') + ', ' + plural(row.exits, 'visit ended here', 'visits ended here'), action: { name: 'search-sessions', value: row.pathname } });
+        var m = o.metrics || {};
+        Array.prototype.forEach.call($('pagesSeg').children, function (button) {
+            button.classList.toggle('active', button.getAttribute('data-mode') === state.pagesMode);
+        });
+        var stripBtn = $('stripParamsBtn');
+        if (stripBtn) {
+            stripBtn.classList.toggle('primary', state.stripParams);
+            stripBtn.classList.toggle('ghost', !state.stripParams);
+        }
+
+        var rawRows = [];
+        if (state.pagesMode === 'entry') {
+            rawRows = ((o.paths && o.paths.entry_pages) || []).map(function (r) { return { pathname: r.pathname, sessions: r.count, extra: fmtPct0(r.share) + ' entries' }; });
+        } else if (state.pagesMode === 'exit') {
+            rawRows = (o.pages || []).filter(function (r) { return r.exits > 0; }).map(function (r) { return { pathname: r.pathname, sessions: r.exits, extra: fmtPct0(r.exit_rate) + ' exit rate' }; });
+        } else {
+            rawRows = (o.pages || []).map(function (r) { return { pathname: r.pathname, sessions: r.sessions, views: r.views, exits: r.exits }; });
+        }
+
+        var grouped = {};
+        var merged = [];
+        rawRows.forEach(function (r) {
+            var p = normalizePathForView(r.pathname);
+            if (!grouped[p]) {
+                grouped[p] = { pathname: p, sessions: 0, views: 0, extra: r.extra || '' };
+                merged.push(grouped[p]);
+            }
+            grouped[p].sessions += (r.sessions || 0);
+            grouped[p].views += (r.views || 0);
+        });
+        merged.sort(function (a, b) { return b.sessions - a.sessions || b.views - a.views; });
+        var topRows = merged.slice(0, 7);
+        var maxSess = Math.max.apply(null, topRows.map(function (r) { return r.sessions; }).concat([1]));
+
+        fillList($('topPages'), topRows, 'No page views in ' + scopeLabel() + ' yet.', function (row) {
+            return barRow({
+                label: row.pathname,
+                mono: true,
+                value: fmtNum(row.sessions),
+                pct: fmtPct0(m.sessions ? row.sessions / m.sessions * 100 : 0),
+                share: maxSess ? row.sessions / maxSess * 100 : 0,
+                title: row.extra || (plural(row.views, 'view', 'views') + ' in ' + plural(row.sessions, 'visit', 'visits')),
+                action: { name: 'search-sessions', value: row.pathname },
+                watch: { search: row.pathname, title: 'Watch sessions on ' + row.pathname }
+            });
         });
     }
 
     function renderChannels(o) {
-        var channels = (o.referrers && o.referrers.channels) || [];
-        var total = o.metrics.sessions || 0;
-        $('channelsMeta').textContent = channels.length > 1 ? plural(channels.length, 'channel', 'channels') : '';
-        fillList($('channels'), channels, 'No sessions in ' + scopeLabel() + ' yet.', function (row) {
-            var title = plural(row.sessions, 'visit', 'visits') + (row.converted ? ', ' + fmtPct0(row.conversion_rate) + ' reached a goal' : '');
-            return barRow({ label: CHANNEL_LABELS[row.channel] || row.channel, icon: CHANNEL_ICONS[row.channel] || 'globe', value: fmtNum(row.sessions), pct: fmtPct0(row.share), share: row.share, title: title, action: { name: 'nav', tab: 'pages' } });
+        Array.prototype.forEach.call($('trafficSeg').children, function (button) {
+            button.classList.toggle('active', button.getAttribute('data-mode') === state.trafficMode);
         });
-        void total;
+        var refs = o.referrers || {};
+        var total = (o.metrics && o.metrics.sessions) || 0;
+        var mode = state.trafficMode;
+
+        if (mode === 'sources') {
+            var srcs = refs.sources || [];
+            fillList($('channels'), srcs.slice(0, 7), 'No referrers recorded in ' + scopeLabel() + '.', function (row) {
+                var hostLabel = row.host === 'direct' ? 'Direct (typed / bookmark)' : row.host;
+                return barRow({
+                    label: hostLabel,
+                    icon: 'link',
+                    value: fmtNum(row.sessions),
+                    pct: fmtPct0(row.share),
+                    share: row.share,
+                    title: plural(row.sessions, 'session', 'sessions'),
+                    watch: row.host !== 'direct' ? { search: row.host, title: 'Watch visits from ' + row.host } : { channel: 'direct', title: 'Watch direct visits' }
+                });
+            });
+            return;
+        }
+        if (mode === 'campaigns') {
+            var camps = refs.campaigns || [];
+            fillList($('channels'), camps.slice(0, 7), 'No UTM campaign tags captured yet.', function (row) {
+                var label = row.campaign + (row.source && row.source !== 'direct' ? ' (' + row.source + '/' + row.medium + ')' : '');
+                return barRow({
+                    label: label,
+                    icon: 'tag',
+                    value: fmtNum(row.sessions),
+                    pct: fmtPct0(row.share),
+                    share: row.share,
+                    title: 'Campaign ' + row.campaign + ' · ' + row.source + ' / ' + row.medium,
+                    watch: { search: row.source !== 'direct' ? row.source : '', title: 'Watch campaign sessions' }
+                });
+            });
+            return;
+        }
+        if (mode === 'ai') {
+            var ai = refs.ai_sources || [];
+            fillList($('channels'), ai.slice(0, 7), 'No AI assistant referrals (ChatGPT, Perplexity, Claude) yet.', function (row) {
+                var pct = total ? row.sessions / total * 100 : 0;
+                return barRow({
+                    label: row.source,
+                    icon: 'sparkles',
+                    value: fmtNum(row.sessions),
+                    pct: fmtPct0(pct),
+                    share: pct,
+                    title: row.source + ' referrals',
+                    watch: { channel: 'ai', title: 'Watch AI-referred sessions' }
+                });
+            });
+            return;
+        }
+
+        var channels = refs.channels || [];
+        fillList($('channels'), channels.slice(0, 7), 'No sessions in ' + scopeLabel() + ' yet.', function (row) {
+            var title = plural(row.sessions, 'visit', 'visits') + (row.converted ? ', ' + fmtPct0(row.conversion_rate) + ' reached a goal' : '');
+            return barRow({
+                label: CHANNEL_LABELS[row.channel] || row.channel,
+                icon: CHANNEL_ICONS[row.channel] || 'globe',
+                value: fmtNum(row.sessions),
+                pct: fmtPct0(row.share),
+                share: row.share,
+                title: title,
+                action: { name: 'apply-scope-filter', value: row.channel, tab: 'channel' },
+                watch: { channel: row.channel, title: 'Watch ' + (CHANNEL_LABELS[row.channel] || row.channel) + ' sessions' }
+            });
+        });
+    }
+
+    function renderAudienceDonut(rows, total) {
+        var wrap = $('audienceDonut');
+        clear(wrap);
+        if (!rows.length || !total) { wrap.hidden = true; return; }
+        wrap.hidden = false;
+        var C = 2 * Math.PI * 36;
+        var offset = 0;
+        var svg = svgEl('svg', { viewBox: '0 0 100 100', width: '104', height: '104', role: 'img', 'aria-label': 'Distribution donut' });
+        svg.appendChild(svgEl('circle', { cx: '50', cy: '50', r: '36', fill: 'none', stroke: '#E2E8F0', 'stroke-width': '13' }));
+        rows.slice(0, 6).forEach(function (row, idx) {
+            var frac = row.count / total;
+            var segLen = Math.max(2, frac * C);
+            var dashOffset = C * 0.25 - offset;
+            offset += segLen;
+            svg.appendChild(svgEl('circle', {
+                cx: '50', cy: '50', r: '36', fill: 'none',
+                stroke: DONUT_PALETTE[idx % DONUT_PALETTE.length],
+                'stroke-width': '13',
+                'stroke-dasharray': segLen.toFixed(2) + ' ' + Math.max(0, C - segLen).toFixed(2),
+                'stroke-dashoffset': dashOffset.toFixed(2)
+            }));
+        });
+        wrap.appendChild(el('div', { class: 'donut-wrap' }, [
+            el('div', { class: 'donut-svg-box' }, [
+                svg,
+                el('div', { class: 'donut-center' }, [el('b', { text: fmtNum(total) }), el('span', { text: 'sessions' })])
+            ]),
+            el('div', { style: 'flex: 1; min-width: 0; font-size: 12px; color: var(--text-2);' }, [
+                rows[0] ? el('div', null, [
+                    el('div', { style: 'font-weight: 600; color: var(--text); font-size: 13px;', text: (state.audience === 'country' ? countryName(rows[0].key) : rows[0].key) }),
+                    el('div', { text: fmtPct0(rows[0].count / total * 100) + ' of ' + scopeLabel() + ' sessions' })
+                ]) : null
+            ])
+        ]));
     }
 
     function renderAudience(o) {
@@ -2865,12 +3410,24 @@
             button.classList.toggle('active', button.getAttribute('data-kind') === kind);
         });
         var counts = breakdowns[kind] || {};
-        var rows = Object.keys(counts).map(function (key) { return { key: key, count: counts[key] }; }).sort(function (a, b) { return b.count - a.count; }).slice(0, 8);
+        var rows = Object.keys(counts).map(function (key) { return { key: key, count: counts[key] }; }).sort(function (a, b) { return b.count - a.count; }).slice(0, 6);
         var total = rows.reduce(function (sum, row) { return sum + row.count; }, 0);
-        var empty = kind === 'country' ? 'No location known yet. It comes from the timezone of the browser, or from your CDN.' : 'No sessions in ' + scopeLabel() + ' yet.';
-        fillList($('audience'), rows, empty, function (row) {
+        renderAudienceDonut(rows, total);
+        var empty = kind === 'country' ? 'No location known yet. It comes from browser timezone or your CDN.' : 'No sessions in ' + scopeLabel() + ' yet.';
+        fillList($('audience'), rows, empty, function (row, idx) {
             var label = row.key;
-            var opts = { value: fmtNum(row.count), pct: fmtPct0(total ? row.count / total * 100 : 0), share: total ? row.count / total * 100 : 0 };
+            var watchOpts = { title: 'Watch sessions for ' + label };
+            if (kind === 'country') { watchOpts.country = row.key; }
+            else if (kind === 'device_type') { watchOpts.device = row.key.toLowerCase(); }
+            else if (kind === 'browser') { watchOpts.browser = row.key.toLowerCase(); }
+            else if (kind === 'os') { watchOpts.os = row.key.toLowerCase(); }
+            var opts = {
+                value: fmtNum(row.count),
+                pct: fmtPct0(total ? row.count / total * 100 : 0),
+                share: total ? row.count / total * 100 : 0,
+                swatch: DONUT_PALETTE[(idx || 0) % DONUT_PALETTE.length],
+                watch: watchOpts
+            };
             if (kind === 'country') { opts.label = countryName(row.key); opts.flag = flagOf(row.key); }
             else if (kind === 'device_type') { opts.label = label.charAt(0).toUpperCase() + label.slice(1); opts.icon = label === 'mobile' ? 'phone' : label === 'tablet' ? 'tablet' : 'monitor'; }
             else { opts.label = label; }
@@ -2903,6 +3460,11 @@
         if (m.sessions_with_dead_clicks && dead) {
             items.push({ kind: 'warn', icon: 'ban', text: pctOf(m.sessions_with_dead_clicks, total) + ' of sessions clicked something that does nothing, most often ' + describeElement(dead) + ' on ' + dead.pathname + '.', tab: 'breakage' });
         }
+        var qb = o.quick_backs || {};
+        if (qb.sessions && (qb.top_pairs || [])[0]) {
+            var qp = qb.top_pairs[0];
+            items.push({ kind: 'warn', icon: 'arrowUp', text: pctOf(qb.sessions, total) + ' of sessions bounced right back from ' + qp.to + ' to ' + qp.from + ' within 15s.', actionStatus: 'quick_back' });
+        }
         var error = (o.errors || [])[0];
         if (m.sessions_with_errors && error) {
             items.push({ kind: 'bad', icon: 'alert', text: plural(m.sessions_with_errors, 'session hit', 'sessions hit') + ' a JavaScript error' + (error.pathname ? ' on ' + error.pathname : '') + ': ' + truncate(error.message, 90), tab: 'breakage' });
@@ -2930,7 +3492,7 @@
         }
         if (m.ai_referral_sessions) {
             var sources = ((o.referrers && o.referrers.ai_sources) || []).map(function (row) { return row.source; }).slice(0, 3).join(', ');
-            items.push({ kind: 'info', icon: 'sparkles', text: plural(m.ai_referral_sessions, 'visit came', 'visits came') + ' from an AI assistant' + (sources ? ' (' + sources + ')' : '') + '.', tab: 'pages' });
+            items.push({ kind: 'info', icon: 'sparkles', text: plural(m.ai_referral_sessions, 'visit came', 'visits came') + ' from an AI assistant' + (sources ? ' (' + sources + ')' : '') + '.', actionStatus: 'ai' });
         }
         var vitals = o.web_vitals || {};
         CORE_VITALS.forEach(function (def) {
@@ -2940,7 +3502,7 @@
             items.push({ kind: 'info', icon: 'user', text: 'No session has a name yet. Call hotspot.identify() after sign-in to see people instead of visitor ids.', tab: 'install' });
         }
         if (!items.length) {
-            items.push({ kind: 'good', icon: 'check', text: 'Nothing stands out in ' + scopeLabel() + ': no rage clicks, no errors and no big drop-off.' });
+            items.push({ kind: 'good', icon: 'check', text: 'Nothing stands out in ' + scopeLabel() + ': no rage clicks, no quick backs, and no errors.' });
         }
         return items.slice(0, 7);
     }
@@ -2956,7 +3518,8 @@
         }
         items.forEach(function (item) {
             var li = el('li', { class: item.kind }, [icon(item.icon), el('span', { class: 'txt', text: item.text })]);
-            if (item.tab) { li.appendChild(el('button', { class: 'btn sm', type: 'button', 'data-action': 'nav', 'data-tab': item.tab, text: 'Show' })); }
+            if (item.actionStatus) { li.appendChild(watchBtn({ status: item.actionStatus, text: 'Watch', title: 'Watch matching sessions' })); }
+            else if (item.tab) { li.appendChild(el('button', { class: 'btn sm', type: 'button', 'data-action': 'nav', 'data-tab': item.tab, text: 'Show' })); }
             list.appendChild(li);
         });
     }
@@ -2971,22 +3534,100 @@
 
     function renderHealth(o) {
         var vitals = o.web_vitals || {};
-        var m = o.metrics;
-        var box = $('healthVitals');
-        clear(box);
+        var perf = o.performance || {};
+        var m = o.metrics || {};
+
+        // 1. Performance overview card (0-100 score + Good/Needs/Poor distribution + Core Web Vitals)
+        var headRow = $('perfHeadRow');
+        clear(headRow);
+        var scoreCls = !isNum(perf.score) ? '' : perf.score >= 75 ? 'good' : perf.score >= 50 ? 'needs' : 'poor';
+        var scoreLabel = isNum(perf.score) ? perf.score + ' / 100' : 'No data';
+        headRow.appendChild(el('div', { class: 'perf-score-wrap' }, [
+            el('span', { class: 'perf-pill ' + scoreCls, text: scoreLabel }),
+            el('div', null, [
+                el('div', { style: 'font-size: 13px; font-weight: 600;', text: isNum(perf.score) ? (perf.score >= 75 ? 'Good speed' : perf.score >= 50 ? 'Needs improvement' : 'Poor speed') : 'Waiting for Web Vitals' }),
+                el('div', { style: 'font-size: 11.5px; color: var(--muted);', text: perf.samples ? 'Scored from ' + plural(perf.samples, 'page load', 'page loads') : 'Captured automatically by hotspot.js' })
+            ])
+        ]));
+        if (perf.slow_session_ids && perf.slow_session_ids.length) {
+            headRow.appendChild(watchBtn({ sessionId: perf.slow_session_ids[0], text: 'Watch slow', title: 'Watch slowest page load session' }));
+        }
+
+        var distBox = $('perfDistribution');
+        clear(distBox);
+        if (perf.rated_samples > 0) {
+            var gSeg = el('div', { class: 'perf-seg-good' }); gSeg.style.width = (perf.good_pct || 0) + '%';
+            var nSeg = el('div', { class: 'perf-seg-needs' }); nSeg.style.width = (perf.needs_pct || 0) + '%';
+            var pSeg = el('div', { class: 'perf-seg-poor' }); pSeg.style.width = (perf.poor_pct || 0) + '%';
+            distBox.appendChild(el('div', { class: 'perf-stack' }, [gSeg, nSeg, pSeg]));
+            distBox.appendChild(el('div', { class: 'perf-legend', style: 'margin-top: 6px;' }, [
+                el('span', null, [el('i', { style: 'background: #10B981;' }), 'Good ' + fmtPct0(perf.good_pct)]),
+                el('span', null, [el('i', { style: 'background: #F59E0B;' }), 'Needs work ' + fmtPct0(perf.needs_pct)]),
+                el('span', null, [el('i', { style: 'background: #EF4444;' }), 'Poor ' + fmtPct0(perf.poor_pct)])
+            ]));
+        }
+
+        var vbox = $('healthVitals');
+        clear(vbox);
         CORE_VITALS.forEach(function (def) {
             var value = vitals[def.key];
             var rating = vitalRating(def, value);
-            box.appendChild(healthBox(rating || '', def.label + ': ' + def.plain, isNum(value) ? def.fmt(value) : 'No data', rating ? RATING_LABEL[rating] : 'Needs a few page views'));
+            vbox.appendChild(healthBox(rating || '', def.label + ': ' + def.plain, isNum(value) ? def.fmt(value) : 'No data', rating ? RATING_LABEL[rating] : 'Needs a few page views'));
         });
-        var breakage = $('healthBreakage');
-        clear(breakage);
-        var total = m.sessions || 0;
-        breakage.appendChild(healthBox(m.sessions_with_rage ? 'poor' : total ? 'good' : '', 'Rage clicks', total ? pctOf(m.sessions_with_rage, total) : 'No data', plural(m.sessions_with_rage || 0, 'session', 'sessions')));
-        breakage.appendChild(healthBox(m.sessions_with_dead_clicks ? 'needs' : total ? 'good' : '', 'Dead clicks', total ? pctOf(m.sessions_with_dead_clicks, total) : 'No data', plural(m.sessions_with_dead_clicks || 0, 'session', 'sessions')));
-        breakage.appendChild(healthBox(m.sessions_with_errors ? 'poor' : total ? 'good' : '', 'JavaScript errors', total ? pctOf(m.sessions_with_errors, total) : 'No data', plural(m.sessions_with_errors || 0, 'session', 'sessions')));
-        $('healthMeta').textContent = vitals.samples ? 'speed from ' + plural(vitals.samples, 'page view', 'page views') : '';
-        $('healthFoot').textContent = 'Speed is what the slowest quarter of page views saw, the way Google scores a site. Breakage is the share of sessions with at least one of each.';
+        $('healthMeta').textContent = vitals.samples ? 'p75 · ' + plural(vitals.samples, 'sample', 'samples') : '';
+
+        // 2. JavaScript Errors card (semicircle SVG arc gauge + error breakdown)
+        var totalSess = m.sessions || 0;
+        var errSess = m.sessions_with_errors || 0;
+        var errRate = totalSess ? (errSess / totalSess) * 100 : 0;
+        var gaugeBox = $('jsErrorsGauge');
+        clear(gaugeBox);
+        var arcLen = Math.PI * 46;
+        var filledLen = errRate > 0 ? Math.max(4, Math.min(1, errRate / 100) * arcLen) : 0;
+        var gSvg = svgEl('svg', { viewBox: '0 0 120 70', width: '132', height: '76', role: 'img', 'aria-label': fmtPct(errRate) + ' of sessions with JS errors' });
+        gSvg.appendChild(svgEl('path', { d: 'M 14 60 A 46 46 0 0 1 106 60', fill: 'none', stroke: '#E2E8F0', 'stroke-width': '11', 'stroke-linecap': 'round' }));
+        if (filledLen > 0) {
+            gSvg.appendChild(svgEl('path', {
+                d: 'M 14 60 A 46 46 0 0 1 106 60',
+                fill: 'none',
+                stroke: '#EF4444',
+                'stroke-width': '11',
+                'stroke-linecap': 'round',
+                'stroke-dasharray': filledLen.toFixed(2) + ' ' + arcLen.toFixed(2)
+            }));
+        }
+        gaugeBox.appendChild(el('div', { class: 'err-top' }, [
+            el('div', { class: 'err-gauge-box' }, [
+                gSvg,
+                el('div', { class: 'err-gauge-val' }, [el('b', { text: fmtPct(errRate) }), el('span', { text: 'of sessions' })])
+            ]),
+            el('div', { class: 'err-summary' }, [
+                el('div', { class: 'err-stat' }, [el('strong', { text: fmtNum(errSess) }), ' affected ' + (errSess === 1 ? 'session' : 'sessions')]),
+                el('div', { class: 'err-stat' }, [el('strong', { text: fmtNum(m.errors || 0) }), ' uncaught ' + ((m.errors || 0) === 1 ? 'exception' : 'exceptions')]),
+                errSess ? el('div', { style: 'margin-top: 4px;' }, [watchBtn({ status: 'error', text: 'Watch error sessions', title: 'Watch sessions with JS errors' })]) : null
+            ])
+        ]));
+
+        var errList = $('jsErrorsList');
+        clear(errList);
+        var errors = (o.errors || []).slice(0, 4);
+        if (!errors.length) {
+            errList.appendChild(el('li', null, el('span', { class: 'muted', style: 'padding: 6px 0;', text: 'Zero uncaught JavaScript errors captured in ' + scopeLabel() + '.' })));
+        } else {
+            var maxErr = Math.max.apply(null, errors.map(function (e) { return e.count || 0; }).concat([1]));
+            errors.forEach(function (err) {
+                var bar = el('div', { class: 'err-bar-fill' });
+                bar.style.width = Math.max(8, Math.round((err.count / maxErr) * 100)) + '%';
+                errList.appendChild(el('li', null, [
+                    el('div', { class: 'err-msg-wrap' }, [
+                        el('div', { class: 'err-msg', text: err.message, title: err.message }),
+                        el('div', { class: 'err-bar-track' }, bar)
+                    ]),
+                    el('span', { class: 'muted', style: 'font-size: 11.5px; white-space: nowrap;', text: plural(err.sessions, 'sess', 'sess') + ' · ' + fmtNum(err.count) }),
+                    watchBtn({ status: 'error', title: 'Watch sessions with this error' })
+                ]));
+            });
+        }
     }
 
     function renderOverview(o) {
@@ -2999,12 +3640,15 @@
         $('ovScope').textContent = nothing ? '' : plural(m.sessions || 0, 'session', 'sessions') + ' in ' + scopeLabel() + (o.comparison ? ', compared with ' + previousLabel() : '');
         if (nothing) { return; }
         renderKpis(o);
+        renderUsersOverview(o);
+        renderFrustrationInsights(o);
+        renderSmartEvents(o);
         renderTrend(o.trend);
         renderTopPages(o);
         renderChannels(o);
         renderAudience(o);
-        renderInsights(o);
         renderHealth(o);
+        renderInsights(o);
     }
 
     // ---------- Realtime ----------
@@ -3236,15 +3880,60 @@
         if (select.value !== current) { select.value = 'all'; }
     }
 
-    function renderFilters(breakdowns) {
+    function renderFilterChips() {
+        var box = $('filterChips');
+        if (!box) { return; }
+        clear(box);
+        var chips = [];
+        if (state.device !== 'all') { chips.push({ key: 'device', label: 'Device: ' + state.device }); }
+        if (state.browser !== 'all') { chips.push({ key: 'browser', label: 'Browser: ' + state.browser }); }
+        if (state.os !== 'all') { chips.push({ key: 'os', label: 'OS: ' + state.os }); }
+        if (state.channel !== 'all') { chips.push({ key: 'channel', label: 'Channel: ' + (CHANNEL_LABELS[state.channel] || state.channel) }); }
+        if (state.country !== 'all') { chips.push({ key: 'country', label: 'Country: ' + countryName(state.country) }); }
+        if (state.status !== 'all') {
+            var statusLbls = { active: 'Active', new: 'New', returning: 'Returning', converted: 'Converted', ai: 'AI referred', rage: 'Rage clicks', dead: 'Dead clicks', quick_back: 'Quick backs', error: 'JS errors', broken: 'Broken', bounced: 'Bounced', engaged: 'Engaged', identified: 'Known people' };
+            chips.push({ key: 'status', label: 'Cohort: ' + (statusLbls[state.status] || state.status) });
+        }
+        if (state.search) { chips.push({ key: 'search', label: 'Search: ' + state.search }); }
+        box.hidden = !chips.length;
+        $('clearFilters').hidden = !chips.length;
+        chips.forEach(function (c) {
+            box.appendChild(el('button', { class: 'filter-chip', type: 'button', 'data-action': 'remove-filter', 'data-filter-key': c.key, title: 'Remove ' + c.label + ' filter' }, [
+                el('span', { text: c.label }),
+                icon('x')
+            ]));
+        });
+    }
+
+    function renderFilters(breakdowns, referrers) {
         breakdowns = breakdowns || {};
         fillSelect($('fDevice'), breakdowns.device_type, state.device, 'All devices');
         fillSelect($('fBrowser'), breakdowns.browser, state.browser, 'All browsers');
-        fillSelect($('fOs'), breakdowns.os, state.os, 'All operating systems');
-        $('clearFilters').hidden = !hasListFilters() && !hasScopeFilters();
+        fillSelect($('fOs'), breakdowns.os, state.os, 'All OS');
+
+        var channelCounts = {};
+        if (referrers && referrers.channels) {
+            referrers.channels.forEach(function (c) { channelCounts[c.channel] = c.sessions; });
+        }
+        fillSelect($('fChannel'), channelCounts, state.channel, 'All channels');
+
+        var countrySelect = $('fCountry');
+        if (countrySelect) {
+            clear(countrySelect);
+            countrySelect.appendChild(el('option', { value: 'all', text: 'All countries' }));
+            var cc = breakdowns.country || {};
+            Object.keys(cc).sort(function (a, b) { return cc[b] - cc[a]; }).forEach(function (code) {
+                countrySelect.appendChild(el('option', { value: code, text: countryName(code) + ' (' + cc[code] + ')' }));
+            });
+            countrySelect.value = state.country;
+            if (countrySelect.value !== state.country) { countrySelect.value = 'all'; }
+        }
+        renderFilterChips();
     }
 
-    function hasScopeFilters() { return state.device !== 'all' || state.browser !== 'all' || state.os !== 'all'; }
+    function hasScopeFilters() {
+        return state.device !== 'all' || state.browser !== 'all' || state.os !== 'all' || state.channel !== 'all' || state.country !== 'all';
+    }
     function hasListFilters() { return state.status !== 'all' || state.search !== ''; }
 
     function statusChip(status) {
@@ -3265,11 +3954,17 @@
         ]);
         var l2 = el('div', { class: 'l2' });
         if (s.has_recording) { l2.appendChild(el('span', { class: 'chip replay', title: 'This session has a replay' }, [icon('play'), 'Replay'])); }
+        if (s.is_ai_referral) { l2.appendChild(el('span', { class: 'chip ai', title: 'Referred by AI assistant' }, s.ai_source || 'AI')); }
         var email = s.identity && s.identity.email;
         if (email && email !== s.label) { l2.appendChild(el('span', { class: 'email', text: email })); }
-        if (s.entry_page) { l2.appendChild(el('span', { class: 'path', text: s.entry_page, title: s.entry_page })); }
-        l2.appendChild(el('span', { text: fmtDuration(s.duration_seconds) }));
+        if (s.entry_page) {
+            var pathText = s.exit_page && s.exit_page !== s.entry_page ? (s.entry_page + ' → ' + s.exit_page) : s.entry_page;
+            l2.appendChild(el('span', { class: 'path', text: pathText, title: pathText }));
+        }
+        var durText = s.active_seconds ? (fmtDuration(s.active_seconds) + ' active / ' + fmtDuration(s.duration_seconds)) : fmtDuration(s.duration_seconds);
+        l2.appendChild(el('span', { class: 'dur-pill', text: durText, title: 'Active vs total session time' }));
         l2.appendChild(el('span', { text: plural(s.pageview_count || 0, 'page', 'pages') }));
+        if (isNum(s.max_scroll_depth)) { l2.appendChild(el('span', { class: 'muted', text: Math.round(s.max_scroll_depth) + '% scroll' })); }
         if (s.rage_click_count) { l2.appendChild(counter('flame', 'rage', s.rage_click_count, 'Rage clicks')); }
         if (s.dead_click_count) { l2.appendChild(counter('ban', 'dead', s.dead_click_count, 'Dead clicks')); }
         if (s.error_count) { l2.appendChild(counter('alert', 'err', s.error_count, 'Errors')); }
@@ -4916,7 +5611,7 @@
         pages = pages || [];
         referrers = referrers || {};
         $('pagesMeta').textContent = pages.length ? plural(pages.length, 'page', 'pages') + ' in ' + scopeLabel() : '';
-        fillTable($('pagesTable'), pages, 11, 'No page views in ' + scopeLabel() + ' yet.', function (row) {
+        fillTable($('pagesTable'), pages, 12, 'No page views in ' + scopeLabel() + ' yet.', function (row) {
             var breakage = el('td');
             if (row.rage_clicks) { breakage.appendChild(counter('flame', 'rage', row.rage_clicks, 'Rage clicks')); }
             if (row.dead_clicks) { if (breakage.childNodes.length) { breakage.appendChild(document.createTextNode(' ')); } breakage.appendChild(counter('ban', 'dead', row.dead_clicks, 'Dead clicks')); }
@@ -4931,12 +5626,13 @@
                 cell(fmtPct0(row.exit_rate), 'num', plural(row.exits, 'visit ended on this page', 'visits ended on this page')),
                 cell(row.converted ? fmtPct0(row.conversion_rate) : '–', 'num' + (row.converted ? '' : ' muted'), plural(row.converted || 0, 'visit that saw this page reached a goal', 'visits that saw this page reached a goal')),
                 breakage,
-                CORE_VITALS.map(function (def) { return vitalCell(def, row.vitals); })
+                CORE_VITALS.map(function (def) { return vitalCell(def, row.vitals); }),
+                el('td', { class: 'num' }, watchBtn({ search: row.pathname, title: 'Watch replays for ' + row.pathname }))
             ]);
         });
         fillTable($('referrersTable'), referrers.sources, 5, 'No sessions in ' + scopeLabel() + ' yet.', function (row) {
             return el('tr', null, [
-                cell(row.host === 'direct' ? 'Direct (typed the address or a bookmark)' : row.host, 'trunc', row.host),
+                cell(row.host === 'direct' ? 'Direct (typed or bookmark)' : row.host, 'trunc', row.host === 'direct' ? 'Direct (typed the address or a bookmark)' : row.host),
                 cell(fmtNum(row.sessions), 'num'),
                 shareCell(row.share),
                 cell(fmtNum(row.converted), 'num'),
@@ -5612,6 +6308,8 @@
         });
         store('tab', tab);
         if (!fromHash && window.location.hash !== '#' + tab) { history.replaceState(null, '', '#' + tab); }
+        var gf = $('globalFilters');
+        if (gf) { gf.hidden = (tab === 'install' || tab === 'realtime'); }
         if (tab === 'realtime') { pollLive(); loadWorld(); }
         if (tab === 'sessions') { fitFrame(); }
         if (tab !== 'sessions' && replay.playing) { pausePlayback(); }
@@ -5623,7 +6321,13 @@
     }
 
     function goToSessions(opts) {
+        opts = opts || {};
         if (opts.status !== undefined) { state.status = STATUS_VALUES.indexOf(opts.status) >= 0 ? opts.status : 'all'; }
+        if (opts.device !== undefined) { state.device = opts.device || 'all'; }
+        if (opts.browser !== undefined) { state.browser = opts.browser || 'all'; }
+        if (opts.os !== undefined) { state.os = opts.os || 'all'; }
+        if (opts.channel !== undefined) { state.channel = opts.channel || 'all'; }
+        if (opts.country !== undefined) { state.country = opts.country || 'all'; }
         if (opts.search !== undefined) { state.search = opts.search; }
         applyFilterControls();
         setTab('sessions', false);
@@ -5634,7 +6338,7 @@
         $('fStatus').value = state.status;
         $('fSearch').value = state.search;
         $('hoursSelect').value = String(state.hours);
-        renderFilters(state.overview ? state.overview.breakdowns : null);
+        renderFilters(state.overview ? state.overview.breakdowns : null, state.overview ? state.overview.referrers : null);
     }
 
     function clearFilters() {
@@ -5642,6 +6346,8 @@
         state.device = 'all';
         state.browser = 'all';
         state.os = 'all';
+        state.channel = 'all';
+        state.country = 'all';
         state.search = '';
         applyFilterControls();
         reloadForFilters();
@@ -5784,6 +6490,58 @@
                 }
                 break;
             }
+            case 'watch-filter': {
+                var directSid = trigger.getAttribute('data-w-sid');
+                if (directSid) {
+                    setTab('sessions', false);
+                    state.selectedId = directSid;
+                    if (state.overview) { markSelectedRow(); }
+                    loadDetail(directSid, true);
+                    break;
+                }
+                var nextOpts = { status: 'all', search: '' };
+                if (trigger.hasAttribute('data-w-status')) { nextOpts.status = trigger.getAttribute('data-w-status') || 'all'; }
+                if (trigger.hasAttribute('data-w-device')) { nextOpts.device = trigger.getAttribute('data-w-device') || 'all'; }
+                if (trigger.hasAttribute('data-w-browser')) { nextOpts.browser = trigger.getAttribute('data-w-browser') || 'all'; }
+                if (trigger.hasAttribute('data-w-os')) { nextOpts.os = trigger.getAttribute('data-w-os') || 'all'; }
+                if (trigger.hasAttribute('data-w-channel')) { nextOpts.channel = trigger.getAttribute('data-w-channel') || 'all'; }
+                if (trigger.hasAttribute('data-w-country')) { nextOpts.country = trigger.getAttribute('data-w-country') || 'all'; }
+                if (trigger.hasAttribute('data-w-search')) { nextOpts.search = trigger.getAttribute('data-w-search') || ''; }
+                goToSessions(nextOpts);
+                break;
+            }
+            case 'apply-scope-filter': {
+                var kind = trigger.getAttribute('data-tab');
+                var val = trigger.getAttribute('data-value') || 'all';
+                if (kind === 'channel') { state.channel = state.channel === val ? 'all' : val; }
+                applyFilterControls();
+                reloadForFilters();
+                break;
+            }
+            case 'remove-filter': {
+                var fkey = trigger.getAttribute('data-filter-key');
+                if (fkey === 'search') { state.search = ''; }
+                else if (fkey && state[fkey] !== undefined) { state[fkey] = 'all'; }
+                applyFilterControls();
+                reloadForFilters();
+                break;
+            }
+            case 'events-mode':
+                state.eventsMode = trigger.getAttribute('data-mode') || 'count';
+                if (state.overview) { renderSmartEvents(state.overview); }
+                break;
+            case 'traffic-mode':
+                state.trafficMode = trigger.getAttribute('data-mode') || 'channels';
+                if (state.overview) { renderChannels(state.overview); }
+                break;
+            case 'pages-mode':
+                state.pagesMode = trigger.getAttribute('data-mode') || 'top';
+                if (state.overview) { renderTopPages(state.overview); }
+                break;
+            case 'toggle-strip-params':
+                state.stripParams = !state.stripParams;
+                if (state.overview) { renderTopPages(state.overview); }
+                break;
             case 'filter-status':
                 goToSessions({ status: trigger.getAttribute('data-status') || 'all', search: '' });
                 break;
@@ -5851,15 +6609,27 @@
             reloadForFilters();
         } else if (target.id === 'fStatus') {
             state.status = STATUS_VALUES.indexOf(target.value) >= 0 ? target.value : 'all';
+            renderFilterChips();
             reloadForFilters();
         } else if (target.id === 'fDevice') {
             state.device = target.value || 'all';
+            renderFilterChips();
             reloadForFilters();
         } else if (target.id === 'fBrowser') {
             state.browser = target.value || 'all';
+            renderFilterChips();
             reloadForFilters();
         } else if (target.id === 'fOs') {
             state.os = target.value || 'all';
+            renderFilterChips();
+            reloadForFilters();
+        } else if (target.id === 'fChannel') {
+            state.channel = target.value || 'all';
+            renderFilterChips();
+            reloadForFilters();
+        } else if (target.id === 'fCountry') {
+            state.country = target.value || 'all';
+            renderFilterChips();
             reloadForFilters();
         } else if (target.id === 'skipToggle') {
             setSkipInactive(!!target.checked);
@@ -5883,7 +6653,7 @@
                 var value = target.value.trim();
                 if (value === state.search) { return; }
                 state.search = value;
-                $('clearFilters').hidden = !hasListFilters() && !hasScopeFilters();
+                renderFilterChips();
                 reloadForFilters();
             }, 300);
         } else if (target.id === 'breakageSearch') {

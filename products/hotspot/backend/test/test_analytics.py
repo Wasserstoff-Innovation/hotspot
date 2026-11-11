@@ -219,3 +219,179 @@ def test_status_prefers_conversion_then_rage_then_recency() -> None:
     assert session_status({**base, "last_seen": NOW - 10}, NOW) == "active"
     assert session_status(base, NOW) == "bounced"
     assert session_status({**base, "pageview_count": 3}, NOW) == "engaged"
+
+
+def test_clarity_overview_metrics_users_quick_backs_smart_events_and_performance() -> None:
+    config = make_config()
+    store = SessionStore(MemoryBackend(config), config)
+
+    # Returning visitor's earlier visit sits 48 hours ago (outside 24h range, still makes today's visit returning!).
+    store.record(
+        capture_events(
+            config,
+            visit("ret-old", NOW - 48 * 3600, ["/"], distinct_id="d-returning"),
+            NOW,
+        ),
+        now=NOW,
+    )
+    # Today's returning visit: quick back (/ -> /pricing -> / within 6s), UTM campaign, good web vitals, custom event.
+    store.record(
+        capture_events(
+            config,
+            [
+                event_item(
+                    "$pageview",
+                    "ret-new",
+                    NOW - 600,
+                    "d-returning",
+                    **{
+                        "$pathname": "/",
+                        "$referrer": "https://www.google.com/search?q=hotspot",
+                        "utm_campaign": "launch",
+                        "utm_source": "google",
+                        "utm_medium": "cpc",
+                        "$timezone": "America/New_York",
+                    },
+                ),
+                event_item("$pageview", "ret-new", NOW - 595, "d-returning", **{"$pathname": "/pricing"}),
+                event_item("$pageview", "ret-new", NOW - 589, "d-returning", **{"$pathname": "/"}),
+                event_item(
+                    "$pageleave",
+                    "ret-new",
+                    NOW - 580,
+                    "d-returning",
+                    **{"$pathname": "/", "$duration_seconds": 18, "$scroll_depth_percent": 90},
+                ),
+                event_item("cta_click", "ret-new", NOW - 575, "d-returning", **{"$pathname": "/"}),
+                event_item(
+                    "$web_vitals",
+                    "ret-new",
+                    NOW - 570,
+                    "d-returning",
+                    **{"$pathname": "/", "$lcp_ms": 1100, "$inp_ms": 90, "$cls": 0.04},
+                ),
+            ],
+            NOW,
+        ),
+        now=NOW,
+    )
+    # New visitor with poor web vitals & JS error.
+    store.record(
+        capture_events(
+            config,
+            [
+                event_item(
+                    "$pageview",
+                    "new-poor",
+                    NOW - 350,
+                    "d-new",
+                    **{"$pathname": "/docs", "$timezone": "Europe/Berlin"},
+                ),
+                event_item(
+                    "$web_vitals",
+                    "new-poor",
+                    NOW - 340,
+                    "d-new",
+                    **{"$pathname": "/docs", "$lcp_ms": 4800, "$inp_ms": 600, "$cls": 0.35},
+                ),
+                event_item(
+                    "$exception",
+                    "new-poor",
+                    NOW - 335,
+                    "d-new",
+                    **{"$pathname": "/docs", "$exception_message": "TypeError: boom"},
+                ),
+            ],
+            NOW,
+        ),
+        now=NOW,
+    )
+    # Live AI-referred visitor (<5m ago) submitting a form.
+    store.record(
+        capture_events(
+            config,
+            [
+                event_item(
+                    "$pageview",
+                    "ai-live",
+                    NOW - 60,
+                    "d-ai",
+                    **{
+                        "$pathname": "/signup",
+                        "$referrer": "https://chatgpt.com/",
+                        "$is_ai_referral": True,
+                        "$ai_source": "ChatGPT",
+                        "$timezone": "America/New_York",
+                    },
+                ),
+                event_item("$form_submit", "ai-live", NOW - 40, "d-ai", **{"$pathname": "/signup"}),
+            ],
+            NOW,
+        ),
+        now=NOW,
+    )
+
+    overview = build_overview(store, OverviewQuery(hours=24), config, NOW)
+    metrics = overview["metrics"]
+    assert metrics["sessions"] == 3
+    assert metrics["pages_per_session"] == 1.67
+    assert metrics["avg_active_seconds"] == 6.0
+    assert metrics["new_sessions"] == 2
+    assert metrics["returning_sessions"] == 1
+    assert metrics["quick_backs"] == 1
+    assert metrics["sessions_with_quick_backs"] == 1
+
+    users = overview["users_overview"]
+    assert users["live_users"] == 1
+    assert users["unique_users"] == 3
+    assert (users["new_sessions"], users["returning_sessions"]) == (2, 1)
+    assert (users["new_pct"], users["returning_pct"]) == (66.7, 33.3)
+    assert users["top_visitor"]["sample_session_id"] == "ret-new"
+
+    qb = overview["quick_backs"]
+    assert (qb["count"], qb["sessions"], qb["share"]) == (1, 1, 33.3)
+    assert qb["top_pairs"][0]["from"] == "/" and qb["top_pairs"][0]["to"] == "/pricing"
+
+    events = {row["name"]: row for row in overview["smart_events"]}
+    assert events["cta_click"]["kind"] == "custom" and events["cta_click"]["sessions"] == 1
+    assert events["Form submitted"]["kind"] == "form" and events["Form submitted"]["sessions"] == 1
+
+    perf = overview["performance"]
+    assert perf["score"] == 50  # 3 good + 3 poor samples -> 50/100
+    assert (perf["good_pct"], perf["poor_pct"]) == (50.0, 50.0)
+    assert "new-poor" in perf["slow_session_ids"]
+
+    campaigns = overview["referrers"]["campaigns"]
+    assert campaigns == [
+        {
+            "campaign": "launch",
+            "source": "google",
+            "medium": "cpc",
+            "sessions": 1,
+            "share": 33.3,
+            "converted": 0,
+            "conversion_rate": 0.0,
+        }
+    ]
+
+    # Global cross-widget scope filters & signal filters
+    assert [
+        s["session_id"] for s in build_overview(store, OverviewQuery(hours=24, channel="ai"), config, NOW)["sessions"]
+    ] == ["ai-live"]
+    assert {
+        s["session_id"] for s in build_overview(store, OverviewQuery(hours=24, country="US"), config, NOW)["sessions"]
+    } == {
+        "ret-new",
+        "ai-live",
+    }
+    assert [
+        s["session_id"]
+        for s in build_overview(store, OverviewQuery(hours=24, status="returning"), config, NOW)["sessions"]
+    ] == ["ret-new"]
+    assert [
+        s["session_id"]
+        for s in build_overview(store, OverviewQuery(hours=24, status="quick_back"), config, NOW)["sessions"]
+    ] == ["ret-new"]
+    assert [
+        s["session_id"] for s in build_overview(store, OverviewQuery(hours=24, status="ai"), config, NOW)["sessions"]
+    ] == ["ai-live"]

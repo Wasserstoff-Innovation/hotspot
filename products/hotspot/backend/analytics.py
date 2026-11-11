@@ -16,13 +16,29 @@ from products.hotspot.backend.store import SessionStore
 ACTIVE_WINDOW_SECONDS = 300
 REALTIME_WINDOW_SECONDS = 1800
 BOUNCE_SECONDS = 15
+QUICK_BACK_SECONDS = 15.0
 MAX_SESSIONS_ANALYZED = 1000
 MAX_LIST_ROWS = 25
 TREND_MAX_BUCKETS = 91
 FLOW_DEPTH = 5
 FLOW_NODES_PER_STEP = 6
 STATUS_FILTERS = frozenset(
-    {"all", "converted", "rage", "error", "bounced", "engaged", "active", "identified", "dead", "broken"}
+    {
+        "all",
+        "converted",
+        "rage",
+        "error",
+        "bounced",
+        "engaged",
+        "active",
+        "identified",
+        "dead",
+        "broken",
+        "quick_back",
+        "new",
+        "returning",
+        "ai",
+    }
 )
 STEP_KINDS = frozenset({"path", "event", "click", "text"})
 CLICK_EVENTS = frozenset({"$autocapture", "$rageclick"})
@@ -85,6 +101,8 @@ class OverviewQuery:
     device_type: str = "all"
     browser: str = "all"
     os: str = "all"
+    channel: str = "all"
+    country: str = "all"
     site: str = "all"
     hours: int = 0
     limit: int = 200
@@ -97,12 +115,16 @@ class OverviewQuery:
     def from_params(cls, params: Mapping[str, str]) -> OverviewQuery:
         status = (params.get("status") or "all").strip().lower()
         funnel_raw = params.get("funnel") or ""
+        raw_country = (params.get("country") or "all").strip()[:12]
+        country = "all" if not raw_country or raw_country.lower() == "all" else raw_country.upper()
         return cls(
             search=(params.get("search") or "").strip()[:200],
             status=status if status in STATUS_FILTERS else "all",
             device_type=(params.get("device_type") or "all").strip().lower()[:40] or "all",
             browser=(params.get("browser") or "all").strip().lower()[:40] or "all",
             os=(params.get("os") or "all").strip().lower()[:40] or "all",
+            channel=(params.get("channel") or "all").strip().lower()[:40] or "all",
+            country=country,
             site=(params.get("site") or "all").strip().lower()[:100] or "all",
             hours=_bounded_int(params.get("hours"), default=0, low=0, high=24 * 90),
             limit=_bounded_int(params.get("limit"), default=200, low=1, high=MAX_SESSIONS_ANALYZED),
@@ -690,6 +712,8 @@ def compute_referrers(summaries: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     converted: Counter[str] = Counter()
     ai_sources: Counter[str] = Counter()
     ai_sessions = 0
+    campaign_sessions: Counter[tuple[str, str, str]] = Counter()
+    campaign_converted: Counter[tuple[str, str, str]] = Counter()
     for summary in summaries:
         host = str(summary.get("referrer_host") or "direct")
         sessions[host] += 1
@@ -698,6 +722,16 @@ def compute_referrers(summaries: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         if summary.get("is_ai_referral"):
             ai_sessions += 1
             ai_sources[str(summary.get("ai_source") or host)] += 1
+        utm = summary.get("utm") or {}
+        if isinstance(utm, Mapping) and utm:
+            camp = str(utm.get("utm_campaign") or "").strip()
+            src = str(utm.get("utm_source") or "").strip()
+            med = str(utm.get("utm_medium") or "").strip()
+            if camp or src or med:
+                key = (camp or "(unnamed)", src or "direct", med or "none")
+                campaign_sessions[key] += 1
+                if summary.get("converted"):
+                    campaign_converted[key] += 1
     total = sum(sessions.values())
     return {
         "sources": [
@@ -711,6 +745,18 @@ def compute_referrers(summaries: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
             for host, count in sessions.most_common(MAX_LIST_ROWS)
         ],
         "channels": compute_channels(summaries),
+        "campaigns": [
+            {
+                "campaign": camp,
+                "source": src,
+                "medium": med,
+                "sessions": count,
+                "share": _share(count, total),
+                "converted": campaign_converted[(camp, src, med)],
+                "conversion_rate": _share(campaign_converted[(camp, src, med)], count),
+            }
+            for (camp, src, med), count in campaign_sessions.most_common(MAX_LIST_ROWS)
+        ],
         "ai_sessions": ai_sessions,
         "ai_sources": [{"source": source, "sessions": count} for source, count in ai_sources.most_common(10)],
     }
@@ -881,10 +927,13 @@ def summarize_metrics(summaries: Sequence[Mapping[str, Any]], now: float) -> dic
     total = len(summaries)
     converted = sum(1 for summary in summaries if summary.get("converted"))
     bounced = sum(1 for summary in summaries if session_status(summary, now) == "bounced")
+    pageviews = sum(int(summary.get("pageview_count") or 0) for summary in summaries)
+    depths = [summary["max_scroll_depth"] for summary in summaries if summary.get("max_scroll_depth") is not None]
     return {
         "sessions": total,
         "visitors": len({str(summary.get("distinct_id") or "") for summary in summaries}),
-        "pageviews": sum(int(summary.get("pageview_count") or 0) for summary in summaries),
+        "pageviews": pageviews,
+        "pages_per_session": round(pageviews / total, 2) if total else 0.0,
         "converted_sessions": converted,
         "conversion_rate": _share(converted, total),
         "bounce_rate": _share(bounced, total),
@@ -893,6 +942,12 @@ def summarize_metrics(summaries: Sequence[Mapping[str, Any]], now: float) -> dic
         )
         if summaries
         else 0.0,
+        "avg_active_seconds": round(
+            statistics.mean(int(summary.get("active_seconds") or 0) for summary in summaries), 1
+        )
+        if summaries
+        else 0.0,
+        "avg_scroll_depth": round(statistics.mean(depths)) if depths else None,
     }
 
 
@@ -936,6 +991,297 @@ def compute_breakdowns(summaries: Sequence[Mapping[str, Any]]) -> dict[str, dict
     return result
 
 
+def _returning_session_ids(stored_sessions: Sequence[Mapping[str, Any]]) -> set[str]:
+    """Identify sessions belonging to a visitor who already started an earlier session."""
+    earliest_by_visitor: dict[str, tuple[float, str]] = {}
+    keys_by_session: dict[str, tuple[str, tuple[float, str]]] = {}
+    for summary in stored_sessions:
+        sid = str(summary.get("session_id") or "")
+        if not sid:
+            continue
+        visitor = str(summary.get("distinct_id") or sid)
+        key = (float(summary.get("first_seen") or summary.get("last_seen") or 0), sid)
+        keys_by_session[sid] = (visitor, key)
+        prev = earliest_by_visitor.get(visitor)
+        if prev is None or key < prev:
+            earliest_by_visitor[visitor] = key
+    return {sid for sid, (visitor, key) in keys_by_session.items() if key > earliest_by_visitor[visitor]}
+
+
+def compute_quick_backs(
+    sessions: Iterable[tuple[Mapping[str, Any], Sequence[Mapping[str, Any]]]],
+) -> tuple[dict[str, Any], set[str]]:
+    """Detect A -> B -> A page returns within QUICK_BACK_SECONDS (Clarity-style quick backs)."""
+    total_sessions = 0
+    total_quick_backs = 0
+    session_ids: set[str] = set()
+    ordered_sids: list[str] = []
+    pair_counts: Counter[tuple[str, str]] = Counter()
+    pair_sessions: dict[tuple[str, str], set[str]] = defaultdict(set)
+
+    for summary, events in sessions:
+        total_sessions += 1
+        sid = str(summary.get("session_id") or "")
+        pageviews: list[tuple[float, str]] = []
+        for event in events:
+            if event.get("event") != "$pageview":
+                continue
+            props = event.get("properties") or {}
+            pathname = props.get("$pathname")
+            if isinstance(pathname, str) and pathname:
+                pageviews.append((float(event.get("timestamp") or 0), pathname))
+        pageviews.sort(key=lambda item: item[0])
+        compressed: list[tuple[str, float]] = []
+        for ts, path in pageviews:
+            if not compressed or compressed[-1][0] != path:
+                compressed.append((path, ts))
+        matched = False
+        for idx in range(len(compressed) - 2):
+            p0, _t0 = compressed[idx]
+            p1, t1 = compressed[idx + 1]
+            p2, t2 = compressed[idx + 2]
+            if p0 == p2 and p0 != p1 and 0 <= (t2 - t1) <= QUICK_BACK_SECONDS:
+                total_quick_backs += 1
+                matched = True
+                pair_counts[(p0, p1)] += 1
+                if sid:
+                    pair_sessions[(p0, p1)].add(sid)
+        if matched and sid:
+            session_ids.add(sid)
+            ordered_sids.append(sid)
+
+    top_pairs = [
+        {
+            "from": p0,
+            "to": p1,
+            "count": count,
+            "sessions": len(pair_sessions[(p0, p1)]),
+            "sample_session_ids": sorted(pair_sessions[(p0, p1)])[:10],
+        }
+        for (p0, p1), count in pair_counts.most_common(10)
+    ]
+    return {
+        "count": total_quick_backs,
+        "sessions": len(session_ids),
+        "share": _share(len(session_ids), total_sessions),
+        "sample_session_ids": ordered_sids[:25],
+        "top_pairs": top_pairs,
+    }, session_ids
+
+
+def compute_users_overview(
+    summaries: Sequence[Mapping[str, Any]],
+    returning_ids: set[str],
+    now: float,
+) -> dict[str, Any]:
+    """Visitor breakdown: live users, unique visitors, new vs returning sessions, and top visitor."""
+    total = len(summaries)
+    live_distinct: set[str] = set()
+    live_sessions = 0
+    unique_visitors: set[str] = set()
+    new_sessions = 0
+    returning_sessions = 0
+    new_visitors: set[str] = set()
+    returning_visitors: set[str] = set()
+    by_visitor: dict[str, dict[str, Any]] = {}
+
+    for summary in summaries:
+        sid = str(summary.get("session_id") or "")
+        visitor = str(summary.get("distinct_id") or sid)
+        unique_visitors.add(visitor)
+        last_seen = float(summary.get("last_seen") or 0)
+        if now - last_seen < ACTIVE_WINDOW_SECONDS:
+            live_distinct.add(visitor)
+            live_sessions += 1
+        if sid in returning_ids:
+            returning_sessions += 1
+            returning_visitors.add(visitor)
+        else:
+            new_sessions += 1
+            new_visitors.add(visitor)
+
+        entry = by_visitor.get(visitor)
+        if entry is None:
+            by_visitor[visitor] = {
+                "sessions": 1,
+                "pageviews": int(summary.get("pageview_count") or 0),
+                "events": int(summary.get("event_count") or 0),
+                "latest": summary,
+            }
+        else:
+            entry["sessions"] += 1
+            entry["pageviews"] += int(summary.get("pageview_count") or 0)
+            entry["events"] += int(summary.get("event_count") or 0)
+            if last_seen >= float(entry["latest"].get("last_seen") or 0):
+                entry["latest"] = summary
+
+    top_visitor = None
+    if by_visitor:
+        top_key, top_data = max(
+            by_visitor.items(),
+            key=lambda kv: (
+                kv[1]["sessions"],
+                kv[1]["pageviews"],
+                kv[1]["events"],
+                float(kv[1]["latest"].get("last_seen") or 0),
+            ),
+        )
+        latest = top_data["latest"]
+        identity = latest.get("identity") or {}
+        top_visitor = {
+            "distinct_id": top_key,
+            "label": session_label(latest),
+            "email": identity.get("email"),
+            "sessions": top_data["sessions"],
+            "pageviews": top_data["pageviews"],
+            "country": latest.get("country"),
+            "device_type": latest.get("device_type"),
+            "last_seen": latest.get("last_seen"),
+            "sample_session_id": latest.get("session_id"),
+            "is_identified": bool(identity),
+        }
+
+    return {
+        "live_users": len(live_distinct),
+        "live_sessions": live_sessions,
+        "unique_users": len(unique_visitors),
+        "new_sessions": new_sessions,
+        "returning_sessions": returning_sessions,
+        "new_pct": _share(new_sessions, total),
+        "returning_pct": _share(returning_sessions, total),
+        "new_visitors": len(new_visitors),
+        "returning_visitors": len(returning_visitors),
+        "top_visitor": top_visitor,
+    }
+
+
+def compute_smart_events(
+    sessions: Iterable[tuple[Mapping[str, Any], Sequence[Mapping[str, Any]]]],
+    config: HotspotConfig,
+    conversion_event: str | None = None,
+) -> list[dict[str, Any]]:
+    """Aggregate key events: conversion goals, form submissions, custom events, and active element clicks."""
+    total_sessions = 0
+    buckets: dict[tuple[str, str], dict[str, Any]] = {}
+
+    def _hit(kind: str, name: str, sid: str) -> None:
+        key = (kind, name)
+        row = buckets.get(key)
+        if row is None:
+            row = {"kind": kind, "name": name, "count": 0, "sessions": set(), "sample_ids": []}
+            buckets[key] = row
+        row["count"] += 1
+        if sid and sid not in row["sessions"]:
+            row["sessions"].add(sid)
+            if len(row["sample_ids"]) < 25:
+                row["sample_ids"].append(sid)
+
+    goal_events = set(config.conversion_events or ())
+    if conversion_event:
+        goal_events.add(conversion_event)
+    for summary, events in sessions:
+        total_sessions += 1
+        sid = str(summary.get("session_id") or "")
+        for event in events:
+            name = str(event.get("event") or "")
+            props = event.get("properties") or {}
+            if not name:
+                continue
+            if name == "$form_submit":
+                _hit("form", "Form submitted", sid)
+            elif name in goal_events:
+                _hit("goal", f"Goal: {name}", sid)
+            elif not name.startswith("$"):
+                _hit("custom", name, sid)
+            elif name == "$autocapture" and not props.get("$is_dead_click"):
+                _hit("click", "Element clicked", sid)
+
+    rows = []
+    for (kind, _name), data in buckets.items():
+        session_count = len(data["sessions"])
+        rows.append(
+            {
+                "kind": kind,
+                "name": data["name"],
+                "count": data["count"],
+                "sessions": session_count,
+                "share": _share(session_count, total_sessions),
+                "sample_session_ids": data["sample_ids"],
+            }
+        )
+    # Show goal/form/custom actions before aggregate element clicks.
+    rows.sort(key=lambda r: (1 if r["kind"] == "click" else 0, -r["sessions"], -r["count"], r["name"]))
+    return rows[:10]
+
+
+def _vital_rating(metric: str, value: float) -> str:
+    if metric == "lcp_ms":
+        return "good" if value <= 2500 else ("needs" if value <= 4000 else "poor")
+    if metric == "inp_ms":
+        return "good" if value <= 200 else ("needs" if value <= 500 else "poor")
+    return "good" if value <= 0.1 else ("needs" if value <= 0.25 else "poor")
+
+
+def compute_performance_summary(
+    sessions: Iterable[tuple[Mapping[str, Any], Sequence[Mapping[str, Any]]]],
+    vitals_site: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Compute a 0-100 Core Web Vitals health score plus good/needs/poor rating distribution."""
+    totals: Counter[str] = Counter()
+    per_metric: dict[str, Counter[str]] = {
+        "lcp_ms": Counter(),
+        "inp_ms": Counter(),
+        "cls": Counter(),
+    }
+    slow_rank_by_session: dict[str, int] = {}
+
+    for summary, events in sessions:
+        sid = str(summary.get("session_id") or "")
+        for event in events:
+            if event.get("event") != "$web_vitals":
+                continue
+            props = event.get("properties") or {}
+            for field, prop_key in (("lcp_ms", "$lcp_ms"), ("inp_ms", "$inp_ms"), ("cls", "$cls")):
+                value = props.get(prop_key)
+                if isinstance(value, bool) or not isinstance(value, (int, float)) or value < 0:
+                    continue
+                rating = _vital_rating(field, float(value))
+                totals[rating] += 1
+                per_metric[field][rating] += 1
+                if sid and rating in ("needs", "poor"):
+                    rank = 2 if rating == "poor" else 1
+                    slow_rank_by_session[sid] = max(slow_rank_by_session.get(sid, 0), rank)
+
+    rated = totals["good"] + totals["needs"] + totals["poor"]
+    score = round((totals["good"] * 100 + totals["needs"] * 50) / rated) if rated else None
+    slow_session_ids = [sid for sid, _rank in sorted(slow_rank_by_session.items(), key=lambda kv: -kv[1])[:25]]
+    metric_cards: dict[str, dict[str, Any]] = {}
+    for field in ("lcp_ms", "inp_ms", "cls"):
+        p75 = vitals_site.get(field)
+        counts = per_metric[field]
+        metric_cards[field] = {
+            "p75": p75,
+            "rating": _vital_rating(field, float(p75)) if p75 is not None else None,
+            "good": counts["good"],
+            "needs": counts["needs"],
+            "poor": counts["poor"],
+        }
+
+    return {
+        "score": score,
+        "samples": int(vitals_site.get("samples") or 0),
+        "rated_samples": rated,
+        "good_pct": _share(totals["good"], rated),
+        "needs_pct": _share(totals["needs"], rated),
+        "poor_pct": _share(totals["poor"], rated),
+        "good_count": totals["good"],
+        "needs_count": totals["needs"],
+        "poor_count": totals["poor"],
+        "slow_session_ids": slow_session_ids,
+        "metrics": metric_cards,
+    }
+
+
 def build_overview(
     store: SessionStore,
     query: OverviewQuery,
@@ -962,6 +1308,8 @@ def build_overview(
             device_type=query.device_type,
             browser=query.browser,
             os=query.os,
+            channel=query.channel,
+            country=query.country,
             status=query.status,
             search=query.search,
             funnel=query.funnel,
@@ -976,20 +1324,38 @@ def build_overview(
             for summary in stored
             if record_in_scope(summary.get("host"), summary.get("project_id"), authorized_scope, allowed_sites)
         ]
+    all_sites = allowed_sites
+    site_by_key: dict[str, Mapping[str, Any]] = {}
+    for site_item in all_sites:
+        for k in ("domain", "id", "api_key"):
+            val = str(site_item.get(k) or "").strip().lower()
+            if val:
+                site_by_key[val] = site_item
+
+    returning_ids = _returning_session_ids(stored)
     in_range = stored
     if query.hours:
         cutoff = now - query.hours * 3600
         in_range = [summary for summary in stored if float(summary.get("last_seen") or 0) >= cutoff]
-    summaries = [summary for summary in in_range if _matches_scope(summary, query)]
+    summaries = [summary for summary in in_range if _matches_scope(summary, query, site_by_key)]
 
     with_events = [(summary, store.session_events(str(summary.get("session_id")))) for summary in summaries]
-    visible = [summary for summary in summaries if _matches_session_filter(summary, query, now)]
+    quick_backs_data, quick_back_ids = compute_quick_backs(with_events)
+    visible = [
+        summary
+        for summary in summaries
+        if _matches_session_filter(summary, query, now, returning_ids=returning_ids, quick_back_ids=quick_back_ids)
+    ]
     vitals = compute_web_vitals(with_events)
 
     steps = parse_funnel_steps(query.funnel, config)
     if query.conversion_event:
         steps = [*steps[:-1], _step("event", query.conversion_event)] if query.funnel else steps
     funnel = compute_funnel(with_events, steps)
+
+    users_overview = compute_users_overview(summaries, returning_ids, now)
+    smart_events = compute_smart_events(with_events, config, conversion_event=query.conversion_event)
+    performance = compute_performance_summary(with_events, vitals["site"])
 
     depths = [summary["max_scroll_depth"] for summary in summaries if summary.get("max_scroll_depth") is not None]
     with_rage = sum(1 for summary in summaries if summary.get("rage_click_count"))
@@ -1000,6 +1366,10 @@ def build_overview(
         "filtered_sessions": len(visible),
         "active_sessions": sum(1 for summary in summaries if now - float(summary.get("last_seen") or 0) < 300),
         "identified_sessions": sum(1 for summary in summaries if summary.get("identity")),
+        "new_sessions": users_overview["new_sessions"],
+        "returning_sessions": users_overview["returning_sessions"],
+        "quick_backs": quick_backs_data["count"],
+        "sessions_with_quick_backs": quick_backs_data["sessions"],
         "clicks": sum(int(summary.get("click_count") or 0) for summary in summaries),
         "rage_clicks": sum(int(summary.get("rage_click_count") or 0) for summary in summaries),
         "dead_clicks": sum(int(summary.get("dead_click_count") or 0) for summary in summaries),
@@ -1024,12 +1394,10 @@ def build_overview(
             summary
             for summary in stored
             if now - 2 * window <= float(summary.get("last_seen") or 0) < now - window
-            and _matches_scope(summary, query)
+            and _matches_scope(summary, query, site_by_key)
         ]
         comparison = summarize_metrics(previous, now)
     recent_events = store.recent_events(limit=config.max_events)
-
-    all_sites = allowed_sites
 
     sites_data = []
     for s in all_sites:
@@ -1084,6 +1452,8 @@ def build_overview(
             "device_type": query.device_type,
             "browser": query.browser,
             "os": query.os,
+            "channel": query.channel,
+            "country": query.country,
             "status": query.status,
             "search": query.search,
             "is_admin": authorized_scope == "*",
@@ -1096,6 +1466,10 @@ def build_overview(
         "setup": setup_info(store, config),
         "metrics": metrics,
         "comparison": comparison,
+        "users_overview": users_overview,
+        "smart_events": smart_events,
+        "quick_backs": quick_backs_data,
+        "performance": performance,
         "trend": compute_trend(with_events, query.hours, now, query.tz_offset),
         "sessions": [format_session(summary, now) for summary in visible[: query.limit]],
         "funnel": funnel,
@@ -1136,7 +1510,11 @@ def setup_info(store: SessionStore, config: HotspotConfig) -> dict[str, Any]:
     }
 
 
-def _matches_scope(summary: Mapping[str, Any], query: OverviewQuery) -> bool:
+def _matches_scope(
+    summary: Mapping[str, Any],
+    query: OverviewQuery,
+    site_by_key: Mapping[str, Mapping[str, Any]] | None = None,
+) -> bool:
     if query.site != "all":
         host = str(summary.get("host") or "").lower()
         if not host and summary.get("entry_url"):
@@ -1146,15 +1524,36 @@ def _matches_scope(summary: Mapping[str, Any], query: OverviewQuery) -> bool:
                 host = ""
         project_id = str(summary.get("project_id") or "").lower()
         wanted = query.site.lower()
-        if wanted not in (host, project_id) and not host.endswith("." + wanted):
+        matched_site = site_by_key.get(wanted) if site_by_key else None
+        if matched_site is not None:
+            if not record_in_scope(
+                host or None,
+                project_id or None,
+                str(matched_site.get("domain") or wanted),
+                [dict(matched_site)],
+            ):
+                return False
+        elif wanted not in (host, project_id) and not host.endswith("." + wanted):
             return False
     for field, wanted in (("device_type", query.device_type), ("browser", query.browser), ("os", query.os)):
         if wanted != "all" and str(summary.get(field) or "").lower() != wanted:
             return False
+    if query.channel != "all" and channel_for(summary) != query.channel:
+        return False
+    if query.country != "all" and str(summary.get("country") or "").upper() != query.country:
+        return False
     return True
 
 
-def _matches_session_filter(summary: Mapping[str, Any], query: OverviewQuery, now: float) -> bool:
+def _matches_session_filter(
+    summary: Mapping[str, Any],
+    query: OverviewQuery,
+    now: float,
+    *,
+    returning_ids: set[str] | frozenset[str] = frozenset(),
+    quick_back_ids: set[str] | frozenset[str] = frozenset(),
+) -> bool:
+    sid = str(summary.get("session_id") or "")
     status = session_status(summary, now)
     wanted = query.status
     if wanted == "identified":
@@ -1165,6 +1564,18 @@ def _matches_session_filter(summary: Mapping[str, Any], query: OverviewQuery, no
             return False
     elif wanted == "broken":
         if not (summary.get("rage_click_count") or summary.get("dead_click_count") or summary.get("error_count")):
+            return False
+    elif wanted == "quick_back":
+        if sid not in quick_back_ids:
+            return False
+    elif wanted == "returning":
+        if sid not in returning_ids:
+            return False
+    elif wanted == "new":
+        if sid in returning_ids:
+            return False
+    elif wanted == "ai":
+        if not summary.get("is_ai_referral"):
             return False
     elif wanted != "all" and status != wanted:
         return False
@@ -1180,6 +1591,7 @@ def _matches_session_filter(summary: Mapping[str, Any], query: OverviewQuery, no
                 identity.get("name"),
                 identity.get("company"),
                 summary.get("entry_page"),
+                summary.get("exit_page"),
                 summary.get("referrer_host"),
                 summary.get("country"),
                 " ".join(summary.get("pages") or []),

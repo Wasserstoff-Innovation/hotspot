@@ -641,3 +641,89 @@ def test_browser_connect_flow_login_register_isolation_and_single_use(tmp_path: 
         assert st_tok.json()["secret_key"].startswith("hs_sec_")
     finally:
         reset_service(None)
+
+
+def test_overview_api_supports_clarity_filters_via_django_and_starlette() -> None:
+    service = make_service(HOTSPOT_DASHBOARD_PASSWORD="pw")
+    reset_service(service)
+    try:
+        ok, site = service.create_site("Clarity Parity", "clarity-parity.example.com")
+        assert ok and isinstance(site, dict)
+        api_key = site["api_key"]
+        secret = site["secret_key"]
+        now = time.time()
+
+        # Session 1 + returning Session 2 with UTM campaign, quick back, and web vitals
+        service.capture(
+            batch_body(
+                [
+                    event_item(
+                        "$pageview", "s-1", now - 3600, "v-ret", **{"$pathname": "/", "$timezone": "America/New_York"}
+                    )
+                ],
+                api_key=api_key,
+            ),
+            headers={"User-Agent": "Mozilla/5.0"},
+        )
+        service.capture(
+            batch_body(
+                [
+                    event_item(
+                        "$pageview",
+                        "s-2",
+                        now - 30,
+                        "v-ret",
+                        **{
+                            "$pathname": "/",
+                            "$referrer": "https://chatgpt.com/",
+                            "$is_ai_referral": True,
+                            "$ai_source": "ChatGPT",
+                            "utm_campaign": "spring",
+                            "utm_source": "ai",
+                            "utm_medium": "organic",
+                            "$timezone": "America/New_York",
+                        },
+                    ),
+                    event_item("$pageview", "s-2", now - 25, "v-ret", **{"$pathname": "/pricing"}),
+                    event_item("$pageview", "s-2", now - 20, "v-ret", **{"$pathname": "/"}),
+                    event_item(
+                        "$web_vitals",
+                        "s-2",
+                        now - 18,
+                        "v-ret",
+                        **{"$pathname": "/", "$lcp_ms": 1400, "$inp_ms": 110, "$cls": 0.03},
+                    ),
+                    event_item("plan_selected", "s-2", now - 15, "v-ret", **{"$pathname": "/pricing"}),
+                ],
+                api_key=api_key,
+            ),
+            headers={"User-Agent": "Mozilla/5.0"},
+        )
+
+        django_client = Client()
+        auth_headers = {"HTTP_AUTHORIZATION": f"Bearer {secret}"}
+        dj_resp = django_client.get(
+            "/hotspot/api/overview/?hours=24&channel=ai&country=US&status=quick_back",
+            **auth_headers,
+        )
+        assert dj_resp.status_code == 200
+        dj_data = dj_resp.json()
+        assert [s["session_id"] for s in dj_data["sessions"]] == ["s-2"]
+        assert dj_data["users_overview"]["returning_sessions"] == 1
+        assert dj_data["quick_backs"]["count"] == 1
+        assert dj_data["performance"]["score"] == 100
+        assert dj_data["referrers"]["campaigns"][0]["campaign"] == "spring"
+        assert any(ev["name"] == "plan_selected" for ev in dj_data["smart_events"])
+
+        st_client = TestClient(standalone_server.app)
+        st_resp = st_client.get(
+            "/hotspot/api/overview/?hours=24&channel=ai&country=US&status=returning",
+            headers={"Authorization": f"Bearer {secret}"},
+        )
+        assert st_resp.status_code == 200
+        st_data = st_resp.json()
+        assert [s["session_id"] for s in st_data["sessions"]] == ["s-2"]
+        assert st_data["scope"]["channel"] == "ai"
+        assert st_data["scope"]["country"] == "US"
+    finally:
+        reset_service(None)
