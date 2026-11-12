@@ -395,3 +395,155 @@ def test_clarity_overview_metrics_users_quick_backs_smart_events_and_performance
     assert [
         s["session_id"] for s in build_overview(store, OverviewQuery(hours=24, status="ai"), config, NOW)["sessions"]
     ] == ["ai-live"]
+
+
+def test_site_switching_and_subdomain_isolation() -> None:
+    config = make_config()
+    store = SessionStore(MemoryBackend(config), config)
+    litt = store.save_site("Litt", "litt.law", "hs_live_litt", "hs_sec_litt")
+    test_litt = store.save_site("Staging Litt", "test.litt.law", "hs_live_test_litt", "hs_sec_test_litt")
+    store.save_site("Empty Site", "empty.example.com", "hs_live_empty", "hs_sec_empty")
+
+    # Returning visitor on litt.law: older session + active session (America/New_York -> US)
+    store.record(
+        capture_events(
+            config,
+            [
+                event_item(
+                    "$pageview",
+                    "litt-old",
+                    NOW - 7200,
+                    "shared-visitor",
+                    **{
+                        "$pathname": "/pricing",
+                        "$host": "www.litt.law",
+                        "$current_url": "https://www.litt.law/pricing",
+                        "$timezone": "America/New_York",
+                    },
+                ),
+            ],
+            NOW,
+            api_key=litt["api_key"],
+        ),
+        now=NOW,
+    )
+    store.record(
+        capture_events(
+            config,
+            [
+                event_item(
+                    "$pageview",
+                    "litt-active",
+                    NOW - 30,
+                    "shared-visitor",
+                    **{
+                        "$pathname": "/home",
+                        "$host": "litt.law:443",
+                        "$current_url": "https://litt.law/home",
+                        "$timezone": "America/New_York",
+                    },
+                ),
+            ],
+            NOW,
+            api_key=litt["api_key"],
+        ),
+        now=NOW,
+    )
+    # Active mobile visitor on sibling subdomain test.litt.law with same distinct_id
+    store.record(
+        capture_events(
+            config,
+            [
+                event_item(
+                    "$pageview",
+                    "staging-active",
+                    NOW - 45,
+                    "shared-visitor",
+                    **{
+                        "$pathname": "/staging-only",
+                        "$host": "test.litt.law:3000",
+                        "$current_url": "https://test.litt.law:3000/staging-only",
+                        "$timezone": "Europe/Berlin",
+                    },
+                ),
+                event_item(
+                    "$rageclick",
+                    "staging-active",
+                    NOW - 40,
+                    "shared-visitor",
+                    **{
+                        "$pathname": "/staging-only",
+                        "$host": "test.litt.law:3000",
+                    },
+                ),
+            ],
+            NOW,
+            api_key=test_litt["api_key"],
+            user_agent=SAFARI_IPHONE,
+        ),
+        now=NOW,
+    )
+    # Legacy/unkeyed session from test.litt.law should resolve by host specificity to test.litt.law, not litt.law
+    store.record(
+        capture_events(
+            config,
+            [
+                event_item(
+                    "$pageview",
+                    "staging-legacy",
+                    NOW - 5400,
+                    "legacy-visitor",
+                    **{
+                        "$pathname": "/legacy-staging",
+                        "$host": "test.litt.law:8080",
+                    },
+                ),
+            ],
+            NOW,
+            api_key="unregistered-key",
+        ),
+        now=NOW,
+    )
+
+    ov_litt = build_overview(store, OverviewQuery(hours=24, site="litt.law"), config, NOW)
+    assert ov_litt["scope"]["sessions_stored"] == 2
+    assert ov_litt["scope"]["sessions_in_range"] == 2
+    assert ov_litt["metrics"]["sessions"] == 2
+    assert [s["session_id"] for s in ov_litt["sessions"]] == ["litt-active", "litt-old"]
+    assert ov_litt["realtime"]["active_now"] == 1
+    assert ov_litt["realtime"]["active_in_window"] == 1
+    assert ov_litt["realtime"]["pages"] == [{"pathname": "/home", "sessions": 1}]
+    assert ov_litt["realtime"]["countries"] == [{"country": "US", "sessions": 1}]
+    assert sum(ov_litt["activity"]["events_per_minute"]) == 1
+    assert ov_litt["breakdowns"]["device_type"] == {"desktop": 2}
+    assert ov_litt["audience_breakdowns"]["device_type"] == {"desktop": 2}
+    site_counts = {s["domain"]: s["total_sessions"] for s in ov_litt["sites"]}
+    assert site_counts == {"litt.law": 2, "test.litt.law": 2, "empty.example.com": 0}
+
+    ov_litt_mobile = build_overview(store, OverviewQuery(hours=24, site="litt.law", device_type="mobile"), config, NOW)
+    assert ov_litt_mobile["breakdowns"]["device_type"] == {"desktop": 2}
+    assert ov_litt_mobile["audience_breakdowns"]["device_type"] == {}
+    assert ov_litt_mobile["sessions"] == []
+
+    ov_staging = build_overview(store, OverviewQuery(hours=24, site="test.litt.law"), config, NOW)
+    assert ov_staging["scope"]["sessions_stored"] == 2
+    assert ov_staging["scope"]["sessions_in_range"] == 2
+    assert ov_staging["metrics"]["sessions"] == 2
+    assert ov_staging["metrics"]["returning_sessions"] == 0
+    assert [s["session_id"] for s in ov_staging["sessions"]] == ["staging-active", "staging-legacy"]
+    assert ov_staging["realtime"]["active_now"] == 1
+    assert ov_staging["realtime"]["pages"] == [{"pathname": "/staging-only", "sessions": 1}]
+    assert ov_staging["realtime"]["countries"] == [{"country": "DE", "sessions": 1}]
+    assert sum(ov_staging["activity"]["events_per_minute"]) == 2
+    assert ov_staging["breakdowns"]["device_type"] == {"mobile": 1, "desktop": 1}
+
+    ov_empty = build_overview(store, OverviewQuery(hours=24, site="empty.example.com"), config, NOW)
+    assert ov_empty["scope"]["sessions_stored"] == 0
+    assert ov_empty["scope"]["sessions_in_range"] == 0
+    assert ov_empty["metrics"]["sessions"] == 0
+    assert ov_empty["realtime"]["active_now"] == 0
+    assert ov_empty["realtime"]["active_in_window"] == 0
+    assert ov_empty["realtime"]["pages"] == []
+    assert ov_empty["realtime"]["countries"] == []
+    assert ov_empty["breakdowns"]["device_type"] == {}
+    assert sum(ov_empty["activity"]["events_per_minute"]) == 0

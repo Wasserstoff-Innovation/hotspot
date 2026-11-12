@@ -1322,7 +1322,14 @@ def build_overview(
         stored = [
             summary
             for summary in stored
-            if record_in_scope(summary.get("host"), summary.get("project_id"), authorized_scope, allowed_sites)
+            if record_in_scope(
+                summary.get("host"),
+                summary.get("project_id"),
+                authorized_scope,
+                allowed_sites,
+                all_sites=all_sites_raw,
+                url=summary.get("entry_url"),
+            )
         ]
     all_sites = allowed_sites
     site_by_key: dict[str, Mapping[str, Any]] = {}
@@ -1332,12 +1339,31 @@ def build_overview(
             if val:
                 site_by_key[val] = site_item
 
-    returning_ids = _returning_session_ids(stored)
+    if query.site == "__unauthorized__":
+        site_stored: list[dict[str, Any]] = []
+    elif query.site != "all":
+        site_stored = [
+            summary
+            for summary in stored
+            if record_matches_site(
+                summary.get("host"),
+                summary.get("project_id"),
+                query.site,
+                all_sites_raw,
+                url=summary.get("entry_url"),
+            )
+        ]
+    else:
+        site_stored = stored
+
+    returning_ids = _returning_session_ids(site_stored)
     in_range = stored
+    site_in_range = site_stored
     if query.hours:
         cutoff = now - query.hours * 3600
         in_range = [summary for summary in stored if float(summary.get("last_seen") or 0) >= cutoff]
-    summaries = [summary for summary in in_range if _matches_scope(summary, query, site_by_key)]
+        site_in_range = [summary for summary in site_stored if float(summary.get("last_seen") or 0) >= cutoff]
+    summaries = [summary for summary in site_in_range if _matches_scope(summary, query, site_by_key, all_sites_raw)]
 
     with_events = [(summary, store.session_events(str(summary.get("session_id")))) for summary in summaries]
     quick_backs_data, quick_back_ids = compute_quick_backs(with_events)
@@ -1394,23 +1420,56 @@ def build_overview(
             summary
             for summary in stored
             if now - 2 * window <= float(summary.get("last_seen") or 0) < now - window
-            and _matches_scope(summary, query, site_by_key)
+            and _matches_scope(summary, query, site_by_key, all_sites_raw)
         ]
         comparison = summarize_metrics(previous, now)
-    recent_events = store.recent_events(limit=config.max_events)
+    raw_recent_events = store.recent_events(limit=config.max_events)
+    recent_events = [
+        ev
+        for ev in raw_recent_events
+        if (
+            authorized_domains is None
+            or record_in_scope(
+                ev.get("host") or (ev.get("properties") or {}).get("$host"),
+                ev.get("project_id"),
+                authorized_scope,
+                allowed_sites,
+                all_sites=all_sites_raw,
+                url=(ev.get("properties") or {}).get("$current_url") or (ev.get("properties") or {}).get("$href"),
+            )
+        )
+        and (
+            query.site == "all"
+            or (
+                query.site != "__unauthorized__"
+                and record_matches_site(
+                    ev.get("host") or (ev.get("properties") or {}).get("$host"),
+                    ev.get("project_id"),
+                    query.site,
+                    all_sites_raw,
+                    url=(ev.get("properties") or {}).get("$current_url") or (ev.get("properties") or {}).get("$href"),
+                )
+            )
+        )
+    ]
 
     sites_data = []
     for s in all_sites:
-        s_domain = s.get("domain", "").lower()
-        s_key = s.get("api_key", "").lower()
-        s_id = s.get("id", "").lower()
+        s_domain = str(s.get("domain") or "").strip().lower()
+        s_key = str(s.get("api_key") or "").strip().lower()
+        s_id = str(s.get("id") or "").strip().lower()
+        target_site_key = s_domain or s_key or s_id
         matching_sessions = [
             sum_item
             for sum_item in in_range
-            if (sum_item.get("host") or "").lower() == s_domain
-            or (sum_item.get("host") or "").lower().endswith("." + s_domain)
-            or (sum_item.get("project_id") or "").lower() == s_key
-            or (sum_item.get("project_id") or "").lower() == s_id
+            if target_site_key
+            and record_matches_site(
+                sum_item.get("host"),
+                sum_item.get("project_id"),
+                target_site_key,
+                all_sites_raw,
+                url=sum_item.get("entry_url"),
+            )
         ]
         active_now = sum(
             1 for sum_item in matching_sessions if now - float(sum_item.get("last_seen") or 0) < ACTIVE_WINDOW_SECONDS
@@ -1460,8 +1519,8 @@ def build_overview(
             "authorized_site": None if authorized_scope == "*" else authorized_scope,
             "authorized_sites": None if authorized_domains is None else list(authorized_domains),
             "sessions_analyzed": len(summaries),
-            "sessions_in_range": len(in_range),
-            "sessions_stored": len(stored),
+            "sessions_in_range": len(site_in_range),
+            "sessions_stored": len(site_stored),
         },
         "setup": setup_info(store, config),
         "metrics": metrics,
@@ -1480,10 +1539,11 @@ def build_overview(
         "referrers": compute_referrers(summaries),
         "errors": compute_errors(with_events),
         "activity": compute_activity(recent_events, summaries, now),
-        # Realtime ignores the time range: it is always the last 30 minutes across every session.
-        "realtime": compute_realtime(stored, recent_events, now),
-        # Computed before the device, browser and OS scope so filter menus keep every option.
-        "breakdowns": compute_breakdowns(in_range),
+        # Realtime ignores the time range: it is always the last 30 minutes across the selected site's sessions.
+        "realtime": compute_realtime(site_stored, recent_events, now),
+        # Computed before the device, browser and OS scope so filter menus keep every option for the selected site.
+        "breakdowns": compute_breakdowns(site_in_range),
+        "audience_breakdowns": compute_breakdowns(summaries),
     }
 
 
@@ -1514,26 +1574,26 @@ def _matches_scope(
     summary: Mapping[str, Any],
     query: OverviewQuery,
     site_by_key: Mapping[str, Mapping[str, Any]] | None = None,
+    all_sites: Sequence[Mapping[str, Any]] | None = None,
 ) -> bool:
     if query.site != "all":
-        host = str(summary.get("host") or "").lower()
-        if not host and summary.get("entry_url"):
-            try:
-                host = str(urlsplit(summary["entry_url"]).hostname or "").lower()
-            except Exception:
-                host = ""
-        project_id = str(summary.get("project_id") or "").lower()
-        wanted = query.site.lower()
-        matched_site = site_by_key.get(wanted) if site_by_key else None
-        if matched_site is not None:
-            if not record_in_scope(
-                host or None,
-                project_id or None,
-                str(matched_site.get("domain") or wanted),
-                [dict(matched_site)],
-            ):
-                return False
-        elif wanted not in (host, project_id) and not host.endswith("." + wanted):
+        known_sites: Sequence[Mapping[str, Any]] | None = all_sites
+        if known_sites is None and site_by_key:
+            seen_ids: set[int] = set()
+            deduped: list[Mapping[str, Any]] = []
+            for site_item in site_by_key.values():
+                ident = id(site_item)
+                if ident not in seen_ids:
+                    seen_ids.add(ident)
+                    deduped.append(site_item)
+            known_sites = deduped
+        if not record_matches_site(
+            summary.get("host"),
+            summary.get("project_id"),
+            query.site,
+            known_sites,
+            url=summary.get("entry_url"),
+        ):
             return False
     for field, wanted in (("device_type", query.device_type), ("browser", query.browser), ("os", query.os)):
         if wanted != "all" and str(summary.get(field) or "").lower() != wanted:
@@ -1657,24 +1717,167 @@ def site_in_scope(site: Mapping[str, Any], authorized_scope: str | None) -> bool
     return False
 
 
+def normalize_host(host: str | None, url: str | None = None) -> str:
+    raw = str(host or "").strip().lower()
+    if raw:
+        if "://" in raw:
+            try:
+                parsed = str(urlsplit(raw).hostname or "").strip().lower()
+                if parsed:
+                    return parsed
+            except Exception:
+                pass
+        if raw.startswith("["):
+            try:
+                parsed = str(urlsplit(f"//{raw}").hostname or "").strip().lower()
+                if parsed:
+                    return parsed
+            except Exception:
+                pass
+        return raw.split("/")[0].split(":")[0].strip()
+    if url:
+        try:
+            return str(urlsplit(str(url)).hostname or "").strip().lower()
+        except Exception:
+            return ""
+    return ""
+
+
+def _host_matches_domain(clean_host: str, domain: str) -> bool:
+    return bool(
+        clean_host and domain and (clean_host == domain or ("." in domain and clean_host.endswith("." + domain)))
+    )
+
+
+def _site_identity(site: Mapping[str, Any]) -> tuple[str, str, str]:
+    return (
+        str(site.get("id") or "").strip().lower(),
+        normalize_host(site.get("domain")) or str(site.get("domain") or "").strip().lower(),
+        str(site.get("api_key") or "").strip().lower(),
+    )
+
+
+def _find_site_by_target(target: str, known_sites: Sequence[Mapping[str, Any]]) -> Mapping[str, Any] | None:
+    wanted = str(target or "").strip().lower()
+    if not wanted:
+        return None
+    wanted_host = normalize_host(wanted)
+    for site in known_sites:
+        s_domain = normalize_host(site.get("domain")) or str(site.get("domain") or "").strip().lower()
+        s_id = str(site.get("id") or "").strip().lower()
+        s_key = str(site.get("api_key") or "").strip().lower()
+        if wanted in {v for v in (s_domain, s_id, s_key) if v} or (
+            wanted_host and s_domain and wanted_host == s_domain
+        ):
+            return site
+    return None
+
+
+def _owner_site_for_record(
+    host: str | None,
+    project_id: str | None,
+    known_sites: Sequence[Mapping[str, Any]],
+    *,
+    url: str | None = None,
+) -> Mapping[str, Any] | None:
+    if not known_sites:
+        return None
+    pid = str(project_id or "").strip().lower()
+    candidates: Sequence[Mapping[str, Any]] = known_sites
+    if pid:
+        matched_by_pid = [
+            site
+            for site in known_sites
+            if pid
+            in {
+                v
+                for v in (
+                    str(site.get("api_key") or "").strip().lower(),
+                    str(site.get("id") or "").strip().lower(),
+                    normalize_host(site.get("domain")) or str(site.get("domain") or "").strip().lower(),
+                )
+                if v
+            }
+        ]
+        if len(matched_by_pid) == 1:
+            return matched_by_pid[0]
+        if len(matched_by_pid) > 1:
+            candidates = matched_by_pid
+
+    clean_host = normalize_host(host, url)
+    if clean_host:
+        best_suffix_site: Mapping[str, Any] | None = None
+        best_suffix_len = -1
+        for site in candidates:
+            s_domain = normalize_host(site.get("domain")) or str(site.get("domain") or "").strip().lower()
+            if not s_domain:
+                continue
+            if clean_host == s_domain:
+                return site
+            if "." in s_domain and clean_host.endswith("." + s_domain) and len(s_domain) > best_suffix_len:
+                best_suffix_len = len(s_domain)
+                best_suffix_site = site
+        if best_suffix_site is not None:
+            return best_suffix_site
+
+    if candidates is not known_sites:
+        return candidates[0]
+    return None
+
+
+def record_matches_site(
+    host: str | None,
+    project_id: str | None,
+    target_site: str,
+    known_sites: Sequence[Mapping[str, Any]] | None = None,
+    *,
+    url: str | None = None,
+) -> bool:
+    wanted = str(target_site or "").strip().lower()
+    if not wanted or wanted == "__unauthorized__":
+        return False
+    if wanted == "all":
+        return True
+    sites = tuple(known_sites or ())
+    target_obj = _find_site_by_target(wanted, sites) if sites else None
+    owner = _owner_site_for_record(host, project_id, sites, url=url) if sites else None
+    if owner is not None and target_obj is not None:
+        return _site_identity(owner) == _site_identity(target_obj)
+    if owner is None and target_obj is not None:
+        return False
+    clean_host = normalize_host(host, url)
+    pid = str(project_id or "").strip().lower()
+    wanted_domain = normalize_host(wanted) or wanted
+    return pid == wanted or _host_matches_domain(clean_host, wanted_domain)
+
+
 def record_in_scope(
     host: str | None,
     project_id: str | None,
     authorized_scope: str | None,
     allowed_sites: list[dict[str, Any]] | None = None,
+    *,
+    all_sites: Sequence[Mapping[str, Any]] | None = None,
+    url: str | None = None,
 ) -> bool:
     domains = scope_domains(authorized_scope)
     if domains is None:
         return True
     if not domains:
         return False
-    allowed_hosts = {d.lower() for d in domains}
-    allowed_tokens = set(allowed_hosts)
+    if all_sites:
+        owner = _owner_site_for_record(host, project_id, all_sites, url=url)
+        if owner is not None:
+            return site_in_scope(owner, authorized_scope)
+    allowed_hosts = {normalize_host(d) or d.lower() for d in domains}
+    allowed_tokens = {d.lower() for d in domains} | allowed_hosts
     for site in allowed_sites or ():
         for key in ("domain", "id"):
             val = str(site.get(key) or "").strip().lower()
             if val:
-                allowed_hosts.add(val)
+                norm = normalize_host(val) if key == "domain" else val
+                if norm:
+                    allowed_hosts.add(norm)
                 allowed_tokens.add(val)
         api_key = str(site.get("api_key") or "").strip().lower()
         if api_key:
@@ -1682,9 +1885,9 @@ def record_in_scope(
     pid = str(project_id or "").strip().lower()
     if pid and pid in allowed_tokens:
         return True
-    clean_host = str(host or "").strip().lower()
+    clean_host = normalize_host(host, url)
     if clean_host:
         for candidate in allowed_hosts:
-            if clean_host == candidate or ("." in candidate and clean_host.endswith("." + candidate)):
+            if _host_matches_domain(clean_host, candidate):
                 return True
     return False

@@ -336,7 +336,11 @@ async def session_detail(request: Request) -> Response:
     ok, scope = _authorized_scope(request)
     if not ok:
         return _unauthorized()
-    detail = _service().session_detail(request.path_params["session_id"], authorized_scope=scope)
+    detail = _service().session_detail(
+        request.path_params["session_id"],
+        authorized_scope=scope,
+        site=(request.query_params.get("site") or None),
+    )
     if detail is None:
         return _json({"status": 0, "error": "Session not found"}, status=404)
     return _json(detail)

@@ -727,3 +727,154 @@ def test_overview_api_supports_clarity_filters_via_django_and_starlette() -> Non
         assert st_data["scope"]["country"] == "US"
     finally:
         reset_service(None)
+
+
+def test_events_feed_and_session_detail_strict_site_isolation() -> None:
+    service = make_service(HOTSPOT_DASHBOARD_PASSWORD="master-secret-password")
+    reset_service(service)
+    try:
+        _, litt = service.create_site("Litt", "litt.law")
+        _, test_litt = service.create_site("Staging Litt", "test.litt.law")
+        _, noisy = service.create_site("Noisy", "noisy.example.com")
+        service.create_site("Quiet", "quiet.example.com")
+        assert isinstance(litt, dict) and isinstance(test_litt, dict) and isinstance(noisy, dict)
+
+        now = time.time()
+        django_client = Client()
+        st_client = TestClient(standalone_server.app)
+
+        # Record a session + recording on litt.law
+        assert (
+            django_client.post(
+                "/hotspot/batch/",
+                data=batch_body(
+                    [
+                        event_item(
+                            "$pageview",
+                            "sess-litt",
+                            now - 100,
+                            "v-litt",
+                            **{"$host": "litt.law", "$current_url": "https://litt.law/home"},
+                        )
+                    ],
+                    api_key=litt["api_key"],
+                ),
+                content_type="text/plain",
+            ).status_code
+            == 200
+        )
+        assert (
+            django_client.post(
+                "/hotspot/replay/",
+                data=json.dumps(
+                    {
+                        "api_key": litt["api_key"],
+                        "session_id": "sess-litt",
+                        "events": [{"type": 4, "timestamp": int((now - 100) * 1000)}],
+                    }
+                ),
+                content_type="text/plain",
+            ).status_code
+            == 200
+        )
+
+        # Record events on test.litt.law BEFORE flooding noisy.example.com
+        assert (
+            django_client.post(
+                "/hotspot/batch/",
+                data=batch_body(
+                    [
+                        event_item(
+                            "$pageview",
+                            "sess-test-1",
+                            now - 90,
+                            "v-test",
+                            **{"$host": "test.litt.law:3000", "$current_url": "https://test.litt.law:3000/app"},
+                        ),
+                        event_item(
+                            "$autocapture",
+                            "sess-test-1",
+                            now - 85,
+                            "v-test",
+                            **{"$host": "test.litt.law:3000", "$pathname": "/app"},
+                        ),
+                    ],
+                    api_key=test_litt["api_key"],
+                ),
+                content_type="text/plain",
+            ).status_code
+            == 200
+        )
+
+        # Flood 60 newer events on noisy.example.com so limit=10 would crowd out test.litt.law if sliced early
+        noisy_batch = [
+            event_item(
+                "$pageview",
+                f"sess-noisy-{i}",
+                now - 60 + i,
+                f"v-noisy-{i}",
+                **{"$host": "noisy.example.com", "$current_url": "https://noisy.example.com/"},
+            )
+            for i in range(60)
+        ]
+        assert (
+            django_client.post(
+                "/hotspot/batch/",
+                data=batch_body(noisy_batch, api_key=noisy["api_key"]),
+                content_type="text/plain",
+            ).status_code
+            == 200
+        )
+
+        auth_headers = {"HTTP_AUTHORIZATION": "Bearer master-secret-password"}
+        st_headers = {"Authorization": "Bearer master-secret-password"}
+
+        # Events feed must keep test.litt.law events despite noisy flood and exclude litt.law/noisy
+        feed_test = django_client.get("/hotspot/api/events/?site=test.litt.law&limit=10", **auth_headers).json()
+        assert len(feed_test["events"]) == 2
+        assert {e["session_id"] for e in feed_test["events"]} == {"sess-test-1"}
+
+        feed_litt = st_client.get("/hotspot/api/events/?site=litt.law&limit=50", headers=st_headers).json()
+        assert len(feed_litt["events"]) == 1
+        assert feed_litt["events"][0]["session_id"] == "sess-litt"
+
+        feed_quiet = django_client.get("/hotspot/api/events/?site=quiet.example.com&limit=50", **auth_headers).json()
+        assert feed_quiet["events"] == []
+
+        # session_detail & recording enforce optional ?site= when a specific site is selected
+        assert (
+            django_client.get("/hotspot/api/sessions/sess-litt/?site=test.litt.law", **auth_headers).status_code == 404
+        )
+        assert django_client.get("/hotspot/api/sessions/sess-litt/?site=litt.law", **auth_headers).status_code == 200
+        assert (
+            django_client.get(
+                "/hotspot/api/sessions/sess-litt/recording/?site=test.litt.law", **auth_headers
+            ).status_code
+            == 404
+        )
+        assert (
+            django_client.get("/hotspot/api/sessions/sess-litt/recording/?site=litt.law", **auth_headers).status_code
+            == 200
+        )
+
+        assert (
+            st_client.get("/hotspot/api/sessions/sess-litt/?site=test.litt.law", headers=st_headers).status_code == 404
+        )
+        assert st_client.get("/hotspot/api/sessions/sess-litt/?site=litt.law", headers=st_headers).status_code == 200
+        assert (
+            st_client.get(
+                "/hotspot/api/sessions/sess-litt/recording/?site=test.litt.law", headers=st_headers
+            ).status_code
+            == 404
+        )
+        assert (
+            st_client.get("/hotspot/api/sessions/sess-litt/recording/?site=litt.law", headers=st_headers).status_code
+            == 200
+        )
+
+        # Dashboard HTML contains async sequence guards & per-site state isolation helpers
+        dash_html = st_client.get("/dashboard/", headers=st_headers).text
+        for token in ("overviewSeq", "detailSeq", "funnelStorageKey", "site: reqSite"):
+            assert token in dash_html
+    finally:
+        reset_service(None)

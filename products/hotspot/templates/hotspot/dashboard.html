@@ -2586,12 +2586,14 @@
         funnel: null,
         overview: null,
         loadedAt: 0,
+        overviewSeq: 0,
         inflight: false,
         pending: false,
         failing: false,
         selectedId: null,
         reselect: false,
         detail: null,
+        detailSeq: 0,
         detailInflight: false,
         trendMetric: 'sessions',
         eventsMode: 'count',
@@ -2604,7 +2606,7 @@
 
     var funnelEditor = { dirty: false, filledSig: null };
 
-    var live = { lastTs: null, paused: false, inflight: false, count: 0, failing: false };
+    var live = { lastTs: null, paused: false, inflight: false, seq: 0, count: 0, failing: false };
 
     var world = { data: null, loading: false, failed: false, svg: null, paths: {} };
 
@@ -2716,11 +2718,15 @@
         loadOverview();
     }
 
-    function loadOverview() {
-        if (state.inflight) { state.pending = true; return; }
+    function loadOverview(force) {
+        if (state.inflight && !force) { state.pending = true; return; }
         state.inflight = true;
+        state.pending = false;
+        state.overviewSeq += 1;
+        var seq = state.overviewSeq;
         renderUpdated();
         api('/hotspot/api/overview/', overviewParams()).then(function (data) {
+            if (seq !== state.overviewSeq) { return; }
             if (
                 state.site &&
                 state.site !== 'all' &&
@@ -2730,8 +2736,11 @@
             ) {
                 state.site = data.sites.length === 1 ? data.sites[0].domain : 'all';
                 store('selected_site', state.site);
+                state.funnel = loadFunnel(state.site);
+                funnelEditor.dirty = false;
+                funnelEditor.filledSig = null;
                 state.inflight = false;
-                loadOverview();
+                loadOverview(true);
                 return;
             }
             state.overview = data;
@@ -2740,10 +2749,11 @@
             hideNotice('network');
             render();
         }).catch(function (err) {
-            if (err.unauthorized) { return; }
+            if (err.unauthorized || seq !== state.overviewSeq) { return; }
             state.failing = true;
             showNotice('network', 'danger', err.status ? 'The server answered ' + err.status + '. Retrying.' : "Couldn't reach the server. Retrying.", false);
         }).then(function () {
+            if (seq !== state.overviewSeq) { return; }
             state.inflight = false;
             renderUpdated();
             if (state.pending) { state.pending = false; loadOverview(); }
@@ -3401,7 +3411,7 @@
     }
 
     function renderAudience(o) {
-        var breakdowns = o.breakdowns || {};
+        var breakdowns = o.audience_breakdowns || o.breakdowns || {};
         var kind = state.audience;
         Array.prototype.forEach.call($('audienceSeg').children, function (button) {
             button.classList.toggle('active', button.getAttribute('data-kind') === kind);
@@ -3811,12 +3821,16 @@
         $('liveCount').textContent = live.count ? plural(live.count, 'event shown', 'events shown') : '';
     }
 
-    function pollLive() {
-        if (state.tab !== 'realtime' || document.hidden || live.paused || live.inflight) { return; }
+    function pollLive(force) {
+        if (state.tab !== 'realtime' || document.hidden || live.paused || (live.inflight && !force)) { return; }
         live.inflight = true;
-        var params = { limit: '100' };
+        live.seq += 1;
+        var seq = live.seq;
+        var reqSite = state.site || 'all';
+        var params = { limit: '100', site: reqSite };
         if (live.lastTs !== null) { params.since = String(live.lastTs); }
         api('/hotspot/api/events/', params).then(function (data) {
+            if (seq !== live.seq || (state.site || 'all') !== reqSite) { return; }
             live.failing = false;
             var events = data.events || [];
             var bodyNode = $('liveBody');
@@ -3834,10 +3848,12 @@
             $('liveEmpty').hidden = live.count > 0;
             setLiveStatus();
         }).catch(function (err) {
-            if (err.unauthorized) { return; }
+            if (err.unauthorized || seq !== live.seq || (state.site || 'all') !== reqSite) { return; }
             live.failing = true;
             setLiveStatus();
-        }).then(function () { live.inflight = false; });
+        }).then(function () {
+            if (seq === live.seq) { live.inflight = false; }
+        });
     }
 
     function toggleLivePause() {
@@ -4016,7 +4032,21 @@
         }
         emptyCard.hidden = !showEmpty;
         split.hidden = !!showEmpty;
-        if (showEmpty) { return; }
+        if (showEmpty) {
+            state.selectedId = null;
+            state.detail = null;
+            state.detailSeq += 1;
+            state.detailInflight = false;
+            replay.loadSeq += 1;
+            replay.loading = false;
+            if (replay.session || replay.player) {
+                teardownPlayer();
+                replay.session = null;
+            }
+            clear($('sessionList'));
+            $('sessionsMeta').textContent = '';
+            return;
+        }
 
         var listedText = sessions.length === m.sessions ? plural(sessions.length, 'session', 'sessions') : fmtNum(sessions.length) + ' of ' + plural(m.sessions, 'session', 'sessions');
         $('sessionsMeta').textContent = listedText;
@@ -4030,7 +4060,7 @@
             fillSessionRow);
 
         var listed = sessions.some(function (s) { return s.session_id === state.selectedId; });
-        if (state.reselect && !listed && sessions.length) {
+        if (!listed && sessions.length) {
             state.reselect = false;
             selectSession(sessions[0].session_id);
         } else if (!state.selectedId && sessions.length) {
@@ -4079,17 +4109,23 @@
 
     function loadDetail(id, keepPosition) {
         state.detailInflight = true;
+        state.detailSeq += 1;
+        var seq = state.detailSeq;
+        var reqSite = state.site || 'all';
         if (!keepPosition) { showPaneMessage('Loading session', 'Fetching the events for this session.'); }
-        api('/hotspot/api/sessions/' + encodeURIComponent(id) + '/').then(function (data) {
-            if (state.selectedId !== id) { return; }
+        var params = reqSite && reqSite !== 'all' ? { site: reqSite } : {};
+        api('/hotspot/api/sessions/' + encodeURIComponent(id) + '/', params).then(function (data) {
+            if (seq !== state.detailSeq || state.selectedId !== id || (state.site || 'all') !== reqSite) { return; }
             state.detail = data;
             renderDetail(data);
         }).catch(function (err) {
-            if (err.unauthorized || state.selectedId !== id) { return; }
+            if (err.unauthorized || seq !== state.detailSeq || state.selectedId !== id || (state.site || 'all') !== reqSite) { return; }
             if (err.status === 404) { showPaneMessage('Session not found', 'This session has expired or was removed. Pick another one from the list.'); }
             else { showPaneMessage("Couldn't load this session", 'The dashboard retries on the next refresh.'); }
             state.detail = null;
-        }).then(function () { state.detailInflight = false; });
+        }).then(function () {
+            if (seq === state.detailSeq) { state.detailInflight = false; }
+        });
     }
 
     // The strip above the player: who this is, the pages they walked through and a few facts.
@@ -4358,17 +4394,20 @@
         replay.loading = true;
         replay.loadSeq += 1;
         var seq = replay.loadSeq;
+        var reqSite = state.site || 'all';
         var first = !replay.player;
         if (first && replay.session && replay.session.has_recording) { showStageMessage('Loading the recording'); }
-        api('/hotspot/api/sessions/' + encodeURIComponent(id) + '/recording/', { from: String(from) }).then(function (data) {
-            if (seq !== replay.loadSeq || state.selectedId !== id || !replay.session) { return; }
+        var params = { from: String(from) };
+        if (reqSite && reqSite !== 'all') { params.site = reqSite; }
+        api('/hotspot/api/sessions/' + encodeURIComponent(id) + '/recording/', params).then(function (data) {
+            if (seq !== replay.loadSeq || state.selectedId !== id || !replay.session || (state.site || 'all') !== reqSite) { return; }
             if (isNum(data.next)) { replay.cursor = data.next; }
             if (data.truncated) { $('truncNote').hidden = false; }
             var incoming = sortRecording((data.events || []).map(patchMeta));
             if (!incoming.length) { return; }
             if (replay.player) { appendRecording(incoming); } else { startRecording(incoming); }
         }).catch(function (err) {
-            if (err.unauthorized || seq !== replay.loadSeq || state.selectedId !== id) { return; }
+            if (err.unauthorized || seq !== replay.loadSeq || state.selectedId !== id || (state.site || 'all') !== reqSite) { return; }
             if (err.status === 404) { replay.gone = true; }
             if (!replay.player) { showStageMessage(err.status === 404 ? 'This recording is no longer available.' : "Couldn't load the recording. The dashboard retries in a few seconds."); }
         }).then(function () {
@@ -5084,9 +5123,16 @@
         return FUNNEL_KINDS.filter(function (def) { return def.id === id; })[0] || FUNNEL_KINDS[0];
     }
 
-    function loadFunnel() {
+    function funnelStorageKey(siteKey) {
+        var key = String(siteKey !== undefined ? siteKey : (state.site || 'all')).trim().toLowerCase() || 'all';
+        return 'funnel.' + key;
+    }
+
+    function loadFunnel(siteKey) {
         try {
-            var raw = store('funnel');
+            var key = String(siteKey !== undefined ? siteKey : (state.site || 'all')).trim().toLowerCase() || 'all';
+            var raw = store(funnelStorageKey(key));
+            if (!raw && key === 'all') { raw = store('funnel'); }
             if (!raw) { return null; }
             var parsed = JSON.parse(raw);
             if (!Array.isArray(parsed)) { return null; }
@@ -5210,7 +5256,7 @@
     function applyFunnel() {
         var steps = readFunnelEditor();
         state.funnel = steps.length ? steps : null;
-        if (state.funnel) { store('funnel', JSON.stringify(state.funnel)); } else { store('funnel', null); }
+        if (state.funnel) { store(funnelStorageKey(), JSON.stringify(state.funnel)); } else { store(funnelStorageKey(), null); }
         funnelEditor.dirty = false;
         funnelEditor.filledSig = null;
         loadOverview();
@@ -5218,7 +5264,8 @@
 
     function resetFunnel() {
         state.funnel = null;
-        store('funnel', null);
+        store(funnelStorageKey(), null);
+        if ((state.site || 'all').toLowerCase() === 'all') { store('funnel', null); }
         funnelEditor.dirty = false;
         funnelEditor.filledSig = null;
         loadOverview();
@@ -5752,13 +5799,79 @@
     }
 
     function selectSite(siteDomain) {
-        state.site = siteDomain;
-        store('selected_site', siteDomain);
+        var nextSite = siteDomain || 'all';
+        state.site = nextSite;
+        store('selected_site', nextSite);
         var menu = $('siteDropdownMenu');
         var btn = $('siteSwitcherBtn');
         if (menu) menu.hidden = true;
         if (btn) btn.setAttribute('aria-expanded', 'false');
-        reloadForFilters();
+
+        // Invalidate any in-flight requests from the previous site
+        state.overviewSeq += 1;
+        state.detailSeq += 1;
+        live.seq += 1;
+        replay.loadSeq += 1;
+        state.inflight = false;
+        state.pending = false;
+        state.detailInflight = false;
+        live.inflight = false;
+        replay.loading = false;
+
+        // Reset per-site filters, search, breakage, flow, funnel, and session selection
+        state.status = 'all';
+        state.device = 'all';
+        state.browser = 'all';
+        state.os = 'all';
+        state.channel = 'all';
+        state.country = 'all';
+        state.search = '';
+        breakageSearchQuery = '';
+        currentBreakageCategory = 'all';
+        breakageCache = { rage: [], dead: [], errors: [], total: 0 };
+        if ($('breakageSearch')) $('breakageSearch').value = '';
+        Array.prototype.forEach.call(document.querySelectorAll('.b-tab'), function (b) {
+            b.classList.toggle('active', b.getAttribute('data-tab-name') === 'all');
+        });
+
+        flowState.signature = null;
+        clear($('flowWrap'));
+        $('flowMeta').textContent = '';
+
+        state.funnel = loadFunnel(nextSite);
+        funnelEditor.dirty = false;
+        funnelEditor.filledSig = null;
+
+        state.selectedId = null;
+        state.detail = null;
+        state.reselect = true;
+        if (replay.session || replay.player) {
+            teardownPlayer();
+            replay.session = null;
+        }
+        clear($('sessionList'));
+        $('sessionsMeta').textContent = '';
+        showPaneMessage('Loading session', 'Fetching sessions for ' + (nextSite === 'all' ? 'all tracked sites' : nextSite) + '.');
+
+        live.lastTs = null;
+        live.failing = false;
+        clearLive();
+
+        var verifyBtnEl = $('btnVerifyConnection');
+        if (verifyBtnEl) { verifyBtnEl.disabled = false; }
+        var verifyText = $('verifyStatusText');
+        if (verifyText) {
+            verifyText.textContent = 'Click to verify whether telemetry from your site is reaching Hotspot.';
+        }
+
+        if (state.overview && state.overview.sites) {
+            renderSiteSwitcher(state.overview.sites, nextSite);
+            renderSitesTab(state.overview.sites, nextSite, state.overview.setup);
+        }
+
+        applyFilterControls();
+        loadOverview(true);
+        if (state.tab === 'realtime') { pollLive(true); }
     }
 
     function generateEmbedSnippet(apiKey, domain) {
@@ -5886,6 +5999,8 @@
         var snippetCode = generateEmbedSnippet(activeKey, activeDomain);
         var snippetEl = $('snippetInstallDynamic');
         if (snippetEl) snippetEl.textContent = snippetCode;
+        var emptySnippetEl = $('snippetEmpty');
+        if (emptySnippetEl) emptySnippetEl.textContent = snippetCode;
 
         var copyBtn = $('btnCopyInstallDynamic');
         if (copyBtn) {
@@ -6259,16 +6374,22 @@
             verifyBtn.addEventListener('click', function () {
                 verifyBtn.disabled = true;
                 verifyText.textContent = 'Connecting to telemetry pipeline...';
-                var checkDomain = (state.site && state.site !== 'all') ? state.site : '';
+                var reqSite = state.site || 'all';
+                var checkDomain = reqSite !== 'all' ? reqSite : '';
                 api('/hotspot/api/overview/', { hours: '1', site: checkDomain, limit: '20' }).then(function (data) {
+                    if ((state.site || 'all') !== reqSite) { return; }
                     verifyBtn.disabled = false;
                     var count = (data.metrics && data.metrics.sessions) || 0;
+                    clear(verifyText);
                     if (count > 0) {
-                        verifyText.innerHTML = '<b style="color: var(--success);">✓ Telemetry verified!</b> ' + count + ' session' + (count === 1 ? '' : 's') + ' captured from ' + (checkDomain || 'your tracked sites') + '.';
+                        verifyText.appendChild(el('b', { style: 'color: var(--success);', text: '✓ Telemetry verified!' }));
+                        verifyText.appendChild(document.createTextNode(' ' + count + ' session' + (count === 1 ? '' : 's') + ' captured from ' + (checkDomain || 'your tracked sites') + '.'));
                     } else {
-                        verifyText.innerHTML = '<span style="color: var(--warning);">⚡ Telemetry endpoint ready.</span> Listening for incoming events from ' + (checkDomain || 'your site') + '. Open your site and click around to record the first session.';
+                        verifyText.appendChild(el('span', { style: 'color: var(--warning);', text: '⚡ Telemetry endpoint ready.' }));
+                        verifyText.appendChild(document.createTextNode(' Listening for incoming events from ' + (checkDomain || 'your site') + '. Open your site and click around to record the first session.'));
                     }
                 }).catch(function () {
+                    if ((state.site || 'all') !== reqSite) { return; }
                     verifyBtn.disabled = false;
                     verifyText.textContent = 'Could not verify telemetry right now. Please refresh the dashboard.';
                 });

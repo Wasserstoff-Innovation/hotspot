@@ -152,22 +152,42 @@ class HotspotService:
         session_id: str,
         authorized_scope: str = "*",
         now: float | None = None,
+        site: str | None = None,
     ) -> dict[str, Any] | None:
         moment = time.time() if now is None else now
         detail = self.store.session(session_id)
         if detail is None:
             return None
-        if authorized_scope != "*":
-            from products.hotspot.backend.analytics import record_in_scope  # noqa: PLC0415
+        requested_site = (site or "").strip()
+        need_scope_check = authorized_scope != "*" or (requested_site and requested_site.lower() != "all")
+        if need_scope_check:
+            from products.hotspot.backend.analytics import (  # noqa: PLC0415
+                record_in_scope,
+                record_matches_site,
+                site_in_scope,
+            )
 
-            allowed_sites = self.list_sites(authorized_scope=authorized_scope)
-            if not record_in_scope(
-                detail.get("host"),
-                detail.get("project_id"),
-                authorized_scope,
-                allowed_sites,
-            ):
-                return None
+            all_sites = self.store.sites()
+            if authorized_scope != "*":
+                allowed_sites = [s for s in all_sites if site_in_scope(s, authorized_scope)]
+                if not record_in_scope(
+                    detail.get("host"),
+                    detail.get("project_id"),
+                    authorized_scope,
+                    allowed_sites,
+                    all_sites=all_sites,
+                    url=detail.get("entry_url"),
+                ):
+                    return None
+            if requested_site and requested_site.lower() != "all":
+                if not record_matches_site(
+                    detail.get("host"),
+                    detail.get("project_id"),
+                    requested_site,
+                    all_sites,
+                    url=detail.get("entry_url"),
+                ):
+                    return None
         events = sorted(detail.pop("events", []), key=lambda event: float(event.get("timestamp") or 0))
         return {
             "status": 1,
@@ -192,17 +212,36 @@ class HotspotService:
         summary = self.store.summary(session_id)
         if summary is None:
             return None
-        if authorized_scope != "*":
-            from products.hotspot.backend.analytics import record_in_scope  # noqa: PLC0415
+        requested_site = (params.get("site") or "").strip()
+        need_scope_check = authorized_scope != "*" or (requested_site and requested_site.lower() != "all")
+        if need_scope_check:
+            from products.hotspot.backend.analytics import (  # noqa: PLC0415
+                record_in_scope,
+                record_matches_site,
+                site_in_scope,
+            )
 
-            allowed_sites = self.list_sites(authorized_scope=authorized_scope)
-            if not record_in_scope(
-                summary.get("host"),
-                summary.get("project_id"),
-                authorized_scope,
-                allowed_sites,
-            ):
-                return None
+            all_sites = self.store.sites()
+            if authorized_scope != "*":
+                allowed_sites = [s for s in all_sites if site_in_scope(s, authorized_scope)]
+                if not record_in_scope(
+                    summary.get("host"),
+                    summary.get("project_id"),
+                    authorized_scope,
+                    allowed_sites,
+                    all_sites=all_sites,
+                    url=summary.get("entry_url"),
+                ):
+                    return None
+            if requested_site and requested_site.lower() != "all":
+                if not record_matches_site(
+                    summary.get("host"),
+                    summary.get("project_id"),
+                    requested_site,
+                    all_sites,
+                    url=summary.get("entry_url"),
+                ):
+                    return None
         start = _int_param(params.get("from"), default=0, low=0, high=MAX_RECORDING_CURSOR)
         chunks = self.store.recording_chunks(session_id, start)
         parts = []
@@ -232,45 +271,60 @@ class HotspotService:
         moment = time.time() if now is None else now
         since = _float_param(params.get("since"))
         limit = _int_param(params.get("limit"), default=100, low=1, high=MAX_FEED_EVENTS)
-        events = self.store.recent_events(limit=limit, since=since)
-        if authorized_scope != "*":
-            from products.hotspot.backend.analytics import record_in_scope  # noqa: PLC0415
-
-            allowed_sites = self.list_sites(authorized_scope=authorized_scope)
-            events = [
-                e
-                for e in events
-                if record_in_scope(
-                    (e.get("properties") or {}).get("$host"),
-                    e.get("project_id"),
-                    authorized_scope,
-                    allowed_sites,
-                )
-            ]
         requested_site = (params.get("site") or "").strip()
-        if requested_site and requested_site != "all":
-            from products.hotspot.backend.analytics import record_in_scope  # noqa: PLC0415
 
-            requested_sites = [
-                s
-                for s in self.list_sites(authorized_scope=authorized_scope)
-                if requested_site.lower()
-                in {
-                    str(s.get("domain") or "").lower(),
-                    str(s.get("id") or "").lower(),
-                    str(s.get("api_key") or "").lower(),
-                }
-            ]
-            events = [
-                e
-                for e in events
-                if record_in_scope(
-                    (e.get("properties") or {}).get("$host"),
-                    e.get("project_id"),
-                    requested_site,
-                    requested_sites,
-                )
-            ]
+        from products.hotspot.backend.analytics import (  # noqa: PLC0415
+            record_in_scope,
+            record_matches_site,
+            scope_domains,
+            site_in_scope,
+        )
+
+        authorized_domains = scope_domains(authorized_scope)
+        if authorized_domains is not None and len(authorized_domains) == 0:
+            events: list[dict[str, Any]] = []
+        else:
+            site_filter = requested_site if requested_site and requested_site.lower() != "all" else ""
+            if not site_filter and authorized_domains is not None and len(authorized_domains) == 1:
+                site_filter = authorized_domains[0]
+            all_sites = self.store.sites()
+            allowed_sites = (
+                all_sites
+                if authorized_domains is None
+                else [s for s in all_sites if site_in_scope(s, authorized_scope)]
+            )
+            fetch_limit = self.config.max_events if (authorized_domains is not None or site_filter) else limit
+            events = self.store.recent_events(limit=fetch_limit, since=since)
+            if authorized_domains is not None or site_filter:
+                filtered: list[dict[str, Any]] = []
+                for e in events:
+                    props = e.get("properties") or {}
+                    ev_host = e.get("host") or props.get("$host")
+                    ev_url = props.get("$current_url") or props.get("$href")
+                    ev_pid = e.get("project_id")
+                    if authorized_domains is not None and not record_in_scope(
+                        ev_host,
+                        ev_pid,
+                        authorized_scope,
+                        allowed_sites,
+                        all_sites=all_sites,
+                        url=ev_url,
+                    ):
+                        continue
+                    if site_filter and not record_matches_site(
+                        ev_host,
+                        ev_pid,
+                        site_filter,
+                        all_sites,
+                        url=ev_url,
+                    ):
+                        continue
+                    filtered.append(e)
+                    if len(filtered) >= limit:
+                        break
+                events = filtered
+            else:
+                events = events[:limit]
         return {
             "status": 1,
             "now": moment,

@@ -327,7 +327,7 @@ def session_detail(request: HttpRequest, session_id: str) -> HttpResponse:
     ok, scope = _authorized_scope(request)
     if not ok:
         return _unauthorized()
-    detail = get_service().session_detail(session_id, authorized_scope=scope)
+    detail = get_service().session_detail(session_id, authorized_scope=scope, site=(request.GET.get("site") or None))
     if detail is None:
         return _json({"status": 0, "error": "Session not found"}, status=404)
     return _json(detail)
