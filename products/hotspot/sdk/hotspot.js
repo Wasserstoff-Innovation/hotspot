@@ -39,6 +39,7 @@
     var DEVICE_ID_KEY = STORAGE_PREFIX + 'device_id'
     var OPT_OUT_KEY = STORAGE_PREFIX + 'opt_out'
     var SUPER_PROPS_KEY = STORAGE_PREFIX + 'super_props'
+    var IDENTITY_TRAITS_KEY = STORAGE_PREFIX + 'identity_traits'
     var HUD_CLICKS_KEY = STORAGE_PREFIX + 'hud_clicks'
     var MAX_RETRY_QUEUE = 50
     var MAX_STACK_LENGTH = 2000
@@ -190,12 +191,44 @@
         var now = Date.now()
         var lastSeen = parseInt(storage.get(SESSION_TIMESTAMP_KEY) || '0', 10)
         var sessionId = storage.get(SESSION_ID_KEY)
+
+        // Payment redirect continuity: check for hs_ref in URL params (e.g. return from Stripe/Paddle)
+        if (window.location && window.location.search) {
+            try {
+                var refMatch = window.location.search.match(/[?&]hs_ref=([a-zA-Z0-9_-]{8,64})/)
+                if (refMatch && refMatch[1]) {
+                    sessionId = refMatch[1]
+                    storage.set(SESSION_ID_KEY, sessionId)
+                }
+            } catch (e) {}
+        }
+
         if (!sessionId || now - lastSeen > config.session_timeout_ms) {
             sessionId = uuidv4()
             storage.set(SESSION_ID_KEY, sessionId)
         }
         storage.set(SESSION_TIMESTAMP_KEY, String(now))
         return sessionId
+    }
+
+    function getStoredTraits() {
+        try {
+            var raw = storage.get(IDENTITY_TRAITS_KEY)
+            return raw ? JSON.parse(raw) : {}
+        } catch (e) {
+            return {}
+        }
+    }
+
+    function setStoredTraits(traits) {
+        if (!traits || typeof traits !== 'object') return
+        var current = getStoredTraits()
+        for (var name in traits) {
+            if (Object.prototype.hasOwnProperty.call(traits, name)) current[name] = traits[name]
+        }
+        try {
+            storage.set(IDENTITY_TRAITS_KEY, JSON.stringify(current))
+        } catch (e) {}
     }
 
     function getSuperProperties() {
@@ -1352,14 +1385,36 @@
         capture: function (eventName, properties) {
             if (typeof eventName === 'string' && eventName) record(eventName, properties || {})
         },
-        identify: function (distinctId, properties) {
+        identify: function (distinctId, properties, options) {
             if (!distinctId) return
             var previous = getDistinctId()
-            storage.set(DISTINCT_ID_KEY, String(distinctId))
-            record('$identify', { $anon_distinct_id: previous, $identified_id: String(distinctId), $set: properties || {} })
+            var currentId = String(distinctId)
+            var props = properties && typeof properties === 'object' ? properties : {}
+
+            // Account switching defense: if user identity changed in same browser, rotate session immediately
+            var storedId = storage.get(DISTINCT_ID_KEY)
+            if (storedId && storedId !== currentId && storedId !== previous) {
+                storage.set(SESSION_ID_KEY, uuidv4())
+            }
+
+            storage.set(DISTINCT_ID_KEY, currentId)
+            setStoredTraits(props)
+
+            var payload = {
+                $anon_distinct_id: previous !== currentId ? previous : null,
+                $identified_id: currentId,
+                $set: props,
+            }
+            if (options && options.hashIdentifier) {
+                payload.$hash_identifier = true
+            }
+            record('$identify', payload)
         },
         setPersonProperties: function (properties) {
-            record('$set', { $set: properties || {} })
+            if (properties && typeof properties === 'object') {
+                setStoredTraits(properties)
+                record('$set', { $set: properties })
+            }
         },
         register: function (properties) {
             if (properties && typeof properties === 'object') setSuperProperties(properties)
@@ -1369,6 +1424,40 @@
             storage.remove(SESSION_ID_KEY)
             storage.remove(SESSION_TIMESTAMP_KEY)
             storage.remove(SUPER_PROPS_KEY)
+            storage.remove(IDENTITY_TRAITS_KEY)
+            // Immediately start a clean anonymous session to prevent cross-account contamination
+            var newAnonId = uuidv4()
+            var newSessionId = uuidv4()
+            storage.set(DISTINCT_ID_KEY, newAnonId)
+            storage.set(SESSION_ID_KEY, newSessionId)
+            storage.set(SESSION_TIMESTAMP_KEY, String(Date.now()))
+        },
+        trackPurchase: function (details) {
+            if (!details || typeof details !== 'object') return
+            // Zero-PII sanitization: ensure no raw card numbers, cvv, secrets
+            var safe = {}
+            for (var key in details) {
+                if (Object.prototype.hasOwnProperty.call(details, key)) {
+                    if (/card|num|cvv|expir|passw|token|secret|pin|ssn|auth/i.test(key)) continue
+                    safe[key] = details[key]
+                }
+            }
+            if (!safe.plan && safe.tier) safe.plan = safe.tier
+            record('$purchase', safe)
+        },
+        trackPaymentFailure: function (details) {
+            if (!details || typeof details !== 'object') return
+            var safe = {}
+            for (var key in details) {
+                if (Object.prototype.hasOwnProperty.call(details, key)) {
+                    if (/card|num|cvv|expir|passw|token|secret|pin|ssn|auth/i.test(key)) continue
+                    safe[key] = details[key]
+                }
+            }
+            record('$payment_failed', safe)
+        },
+        trackHesitation: function (details) {
+            record('$price_hesitation', details || {})
         },
         optOut: function () {
             storage.set(OPT_OUT_KEY, 'true')

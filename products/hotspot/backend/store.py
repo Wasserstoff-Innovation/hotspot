@@ -12,6 +12,7 @@ import hmac
 import json
 import time
 import zlib
+import hashlib
 import logging
 import secrets
 import threading
@@ -31,9 +32,24 @@ MAX_PAGES_PER_SESSION = 200
 RECORDING_COMPRESSION_LEVEL = 6
 _IDENTITY_KEYS = {
     "email": ("email", "$email"),
-    "name": ("name", "$name", "full_name"),
+    "name": ("name", "$name", "full_name", "username"),
     "company": ("company", "$company", "organization", "org"),
+    "plan": ("plan", "$plan", "tier", "subscription_tier"),
+    "role": ("role", "$role", "user_role"),
+    "cycle": ("cycle", "billing_cycle", "$billing_cycle"),
+    "value_tier": ("value_tier", "valueTier", "mrr_tier"),
 }
+
+
+def compute_user_hash(site_key: str, raw_user_id: str) -> str:
+    """Deterministic, collision-free HMAC-SHA256 salted hash scoped to the site."""
+    if not raw_user_id or raw_user_id == "anonymous":
+        return ""
+    key_bytes = (site_key or "hotspot_salt").encode("utf-8")
+    raw_bytes = str(raw_user_id).encode("utf-8")
+    return hmac.new(key_bytes, raw_bytes, hashlib.sha256).hexdigest()[:16]
+
+
 _SESSION_PROPERTY_FIELDS = {
     "$browser": "browser",
     "$browser_version": "browser_version",
@@ -698,6 +714,12 @@ def new_session_summary(session_id: str, distinct_id: str, project_id: str, time
         "language": None,
         "timezone": None,
         "identity": {},
+        "is_registered": False,
+        "user_hash": None,
+        "plan": None,
+        "payment_failed": False,
+        "payment_error_code": None,
+        "hesitation_detected": False,
         "converted": False,
         "conversion_event": None,
         "converted_at": None,
@@ -782,6 +804,36 @@ def apply_event(summary: dict[str, Any], event: CapturedEvent, config: HotspotCo
         identified = props.get("$identified_id")
         if name == "$identify" and isinstance(identified, str) and identified:
             summary["distinct_id"] = identified[:200]
+            summary["is_registered"] = True
+            site_key = str(summary.get("project_id") or "")
+            summary["user_hash"] = compute_user_hash(site_key, identified)
+        if summary.get("identity"):
+            summary["is_registered"] = True
+            plan = summary["identity"].get("plan")
+            if plan:
+                summary["plan"] = plan
+    elif name in ("$purchase", "subscription_success", "$subscription_success"):
+        summary["converted"] = True
+        summary["conversion_event"] = name
+        summary["converted_at"] = event.timestamp
+        summary["is_registered"] = True
+        plan = props.get("plan") or props.get("tier") or (summary.get("identity") or {}).get("plan")
+        if plan:
+            summary["plan"] = str(plan)[:50]
+            summary.setdefault("identity", {})["plan"] = str(plan)[:50]
+        cycle = props.get("cycle") or props.get("billing_cycle")
+        if cycle:
+            summary.setdefault("identity", {})["cycle"] = str(cycle)[:50]
+        value_tier = props.get("value_tier") or props.get("valueTier")
+        if value_tier:
+            summary.setdefault("identity", {})["value_tier"] = str(value_tier)[:50]
+    elif name in ("$payment_failed", "subscription_failed", "$subscription_failed"):
+        summary["payment_failed"] = True
+        err = props.get("error_code") or props.get("errorCode") or props.get("error")
+        if err:
+            summary["payment_error_code"] = str(err)[:100]
+    elif name in ("$price_hesitation", "$hesitation"):
+        summary["hesitation_detected"] = True
     elif not name.startswith("$"):
         summary["custom_event_count"] += 1
 
@@ -803,6 +855,12 @@ def _merge_identity(summary: dict[str, Any], props: Mapping[str, Any]) -> None:
                 identity[field] = value.strip()[:200]
                 break
     summary["identity"] = identity
+    summary["is_registered"] = True
+    if identity.get("plan"):
+        summary["plan"] = identity["plan"]
+    if summary.get("distinct_id") and summary.get("distinct_id") != "anonymous" and not summary.get("user_hash"):
+        site_key = str(summary.get("project_id") or "")
+        summary["user_hash"] = compute_user_hash(site_key, summary["distinct_id"])
 
 
 def build_store(config: HotspotConfig, redis_client: Any | None = None) -> SessionStore:

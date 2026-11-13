@@ -814,8 +814,51 @@
         .chip.replay { background: #F0FDFA; border-color: #99F6E4; color: #0F766E; }
         .chip.ok { background: #ECFDF5; border-color: #A7F3D0; color: #047857; }
         .chip.warn { background: #FFFBEB; border-color: #FDE68A; color: #92400E; }
+        .chip.plan { background: #EEF2FF; border-color: #C7D2FE; color: #4338CA; font-weight: 700; text-transform: uppercase; }
+        .chip.vip { background: #FEF3C7; border-color: #FCD34D; color: #92400E; font-weight: 700; }
+        .chip.payment-failed { background: #FEF2F2; border-color: #F87171; color: #991B1B; font-weight: 600; }
+        .chip.reg { background: #F0FDF4; border-color: #BBF7D0; color: #166534; }
         .chip .ico { width: 10px; height: 10px; }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+        /* VIP Radar & CRM Styles */
+        .vip-radar-card { margin-top: 18px; }
+        .vip-radar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+        .vip-radar-item { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; transition: border-color 0.15s ease; }
+        .vip-radar-item:hover { border-color: var(--brand); }
+        .vip-radar-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .vip-radar-user { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13px; color: var(--text); }
+        .vip-radar-meta { font-size: 12px; color: var(--text-2); display: flex; gap: 8px; flex-wrap: wrap; }
+        .vip-radar-issues { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+        .vip-radar-issue { font-size: 11.5px; color: #DC2626; display: flex; align-items: center; gap: 4px; background: #FEF2F2; padding: 3px 8px; border-radius: 4px; }
+
+        /* Dropoff Intelligence */
+        .dropoff-intel-card { margin-top: 18px; }
+        .dropoff-intel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+        .dropoff-intel-item { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 8px; border-left: 3px solid #F59E0B; }
+        .dropoff-intel-item.dead { border-left-color: #F59E0B; }
+        .dropoff-intel-item.error { border-left-color: #EF4444; }
+        .dropoff-intel-item.payment { border-left-color: #DC2626; }
+        .dropoff-intel-item.hesitation { border-left-color: #8B5CF6; }
+        .dropoff-intel-item.rage { border-left-color: #F97316; }
+        .dropoff-intel-item.bounce { border-left-color: #64748B; }
+        .dropoff-intel-head { display: flex; align-items: center; justify-content: space-between; }
+        .dropoff-intel-title { font-weight: 600; font-size: 13px; color: var(--text); }
+        .dropoff-intel-stat { font-size: 20px; font-weight: 700; color: var(--text); }
+        .dropoff-intel-desc { font-size: 12px; color: var(--text-2); line-height: 1.4; }
+
+        /* User Profile Modal / Drawer */
+        .u-profile-header { display: flex; align-items: center; gap: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+        .u-profile-av { width: 44px; height: 44px; border-radius: 50%; background: #EEF2FF; color: #4338CA; font-weight: 700; font-size: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .u-profile-name { font-size: 16px; font-weight: 700; color: var(--text); }
+        .u-profile-badges { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+        .u-profile-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 0; }
+        .u-profile-kpi { background: var(--subtle); border-radius: 8px; padding: 10px; text-align: center; }
+        .u-profile-kpi-val { font-size: 16px; font-weight: 700; color: var(--text); }
+        .u-profile-kpi-lbl { font-size: 11px; color: var(--text-2); margin-top: 2px; }
+        .u-profile-history-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+        .u-profile-sessions { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; }
+        .u-profile-session-row { display: flex; align-items: center; justify-content: space-between; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 12px; }
 
         /* Notices */
         .notice { display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; border-radius: 10px; border: 1px solid; font-size: 13px; margin-bottom: 12px; line-height: 1.5; }
@@ -1486,7 +1529,11 @@
                     <option value="active">Active now</option>
                     <option value="new">New visitors</option>
                     <option value="returning">Returning visitors</option>
+                    <option value="registered">Registered users</option>
+                    <option value="anonymous">Anonymous visitors</option>
+                    <option value="vip">VIP / Paid customers</option>
                     <option value="converted">Converted</option>
+                    <option value="failed_purchase">Failed purchases</option>
                     <option value="ai">AI referred</option>
                     <option value="rage">Rage clicks</option>
                     <option value="dead">Dead clicks</option>
@@ -1497,7 +1544,7 @@
                     <option value="engaged">Engaged</option>
                     <option value="identified">Known people</option>
                 </select>
-                <div class="search gf-search"><span class="ico" id="searchIcon"></span><input class="input" id="fSearch" type="search" placeholder="Search email, page, referrer" aria-label="Search sessions"></div>
+                <div class="search gf-search"><span class="ico" id="searchIcon"></span><input class="input" id="fSearch" type="search" placeholder="Search user, email, plan, page..." aria-label="Search sessions"></div>
                 <button class="btn ghost sm" type="button" data-action="clear-filters" id="clearFilters" hidden>Clear all</button>
             </div>
             <div class="gf-chips" id="filterChips" hidden></div>
@@ -1567,6 +1614,20 @@
                             </span>
                         </div>
                         <div class="chart" id="trendChart"></div>
+                    </div>
+
+                    <!-- High-Value Customer VIP Radar -->
+                    <div class="card section-gap vip-radar-card" id="vipRadarCard" style="display: none;">
+                        <div class="card-head">
+                            <div>
+                                <h2>High-Value Customer Radar</h2>
+                                <span class="meta" id="vipRadarMeta">Paid customers encountering errors, payment issues, or rage clicks</span>
+                            </div>
+                            <button class="btn ghost sm" type="button" data-action="filter-vip" id="btnFilterVip">Watch All VIP Friction Sessions</button>
+                        </div>
+                        <div class="card-body">
+                            <div class="vip-radar-grid" id="vipRadarGrid"></div>
+                        </div>
                     </div>
 
                     <!-- Clarity Row 2: Traffic Sources + Technology & Geo (Donut) + Top Pages -->
@@ -1894,6 +1955,20 @@
                             </div>
                             <p class="fhelp">Visitors count for a step only after completing all previous steps in order during the same visit. Page paths and element selectors can end with <code>*</code> to match prefixes, like <code>/blog/*</code>.</p>
                         </div>
+                    </div>
+                </div>
+
+                <!-- "Why Did Users Drop Off?" Diagnostic Intelligence Card -->
+                <div class="card dropoff-intel-card section-gap" id="dropoffIntelCard" style="display: none;">
+                    <div class="card-head">
+                        <div>
+                            <h2>Why Did Users Drop Off?</h2>
+                            <span class="meta" id="dropoffIntelMeta">Root-cause friction diagnostics for abandoned funnels</span>
+                        </div>
+                        <button class="btn ghost sm" type="button" id="btnWatchAllDropoffs" style="display: none;">Watch Dropped Sessions</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="dropoff-intel-grid" id="dropoffIntelGrid"></div>
                     </div>
                 </div>
             </section>
@@ -2293,6 +2368,48 @@
             <div class="modal-actions" style="margin-top: 16px;">
                 <button type="button" class="btn" id="btnAddAnotherSite">+ Add Another</button>
                 <button type="button" class="btn primary" id="btnDoneAddSite">Done &amp; View in Dashboard</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: User Profile Drawer -->
+<div class="modal-overlay" id="userProfileModal" hidden>
+    <div class="modal-card" style="max-width: 580px;">
+        <div class="modal-header">
+            <div>
+                <h2 class="modal-title">Customer Journey</h2>
+                <p class="modal-subtitle">Lifetime sessions, CRM profile traits, and friction history.</p>
+            </div>
+            <button class="modal-close" type="button" id="closeUserProfileModal" aria-label="Close">&times;</button>
+        </div>
+        <div style="padding: 16px 20px;">
+            <div class="u-profile-header">
+                <div class="u-profile-av" id="upAv">U</div>
+                <div style="flex: 1; min-width: 0;">
+                    <div class="u-profile-name" id="upName">Visitor</div>
+                    <div style="font-size: 12px; color: var(--text-2); margin-top: 2px;" id="upEmail"></div>
+                    <div class="u-profile-badges" id="upBadges"></div>
+                </div>
+            </div>
+            <div class="u-profile-grid">
+                <div class="u-profile-kpi">
+                    <div class="u-profile-kpi-val" id="upKpiSessions">0</div>
+                    <div class="u-profile-kpi-lbl">Lifetime Sessions</div>
+                </div>
+                <div class="u-profile-kpi">
+                    <div class="u-profile-kpi-val" id="upKpiActive">0m</div>
+                    <div class="u-profile-kpi-lbl">Active Time</div>
+                </div>
+                <div class="u-profile-kpi">
+                    <div class="u-profile-kpi-val" id="upKpiFriction">0</div>
+                    <div class="u-profile-kpi-lbl">Friction Incidents</div>
+                </div>
+            </div>
+            <div class="u-profile-history-title">Session History</div>
+            <div class="u-profile-sessions" id="upSessionsList"></div>
+            <div class="modal-actions" style="margin-top: 16px;">
+                <button type="button" class="btn" id="btnCloseUpProfile">Close</button>
             </div>
         </div>
     </div>
@@ -3169,6 +3286,23 @@
             ])
         ]));
 
+        if (isNum(u.registered_users)) {
+            box.appendChild(el('div', { class: 'u-legend', style: 'margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border);' }, [
+                el('div', { class: 'u-legend-row' }, [
+                    el('span', { class: 'u-swatch', style: 'background: #10B981;' }),
+                    el('span', { class: 'u-name', text: 'Registered users (' + (u.registered_return_pct || 0) + '% return)' }),
+                    el('span', { class: 'u-num', text: fmtNum(u.registered_users || 0) + ' users' }),
+                    u.registered_sessions ? watchBtn({ status: 'registered', title: 'Watch registered user sessions' }) : null
+                ]),
+                el('div', { class: 'u-legend-row' }, [
+                    el('span', { class: 'u-swatch', style: 'background: #94A3B8;' }),
+                    el('span', { class: 'u-name', text: 'Anonymous visitors (' + (u.anonymous_return_pct || 0) + '% return)' }),
+                    el('span', { class: 'u-num', text: fmtNum(u.anonymous_users || 0) + ' visitors' }),
+                    u.anonymous_sessions ? watchBtn({ status: 'anonymous', title: 'Watch anonymous visitor sessions' }) : null
+                ])
+            ]));
+        }
+
         var tv = u.top_visitor;
         if (tv) {
             var initials = String(tv.label || 'V').replace(/[^A-Za-z0-9]/g, '').slice(0, 2).toUpperCase() || 'V';
@@ -3178,16 +3312,163 @@
                 tv.device_type || null,
                 tv.country ? flagOf(tv.country) + ' ' + countryName(tv.country) : null
             ].filter(Boolean).join(' · ');
+            var whoEl = el('div', {
+                class: 'u-who',
+                text: tv.email || tv.label || tv.distinct_id,
+                title: 'Click to view customer journey',
+                style: 'cursor: pointer; text-decoration: underline;'
+            });
+            whoEl.addEventListener('click', function () {
+                openUserProfileModal(tv.distinct_id, o.sessions || []);
+            });
             box.appendChild(el('div', { class: 'u-top-visitor' }, [
                 el('div', { class: 'u-av', text: initials }),
                 el('div', { class: 'u-info' }, [
                     el('div', { class: 'u-title', text: 'Top user' }),
-                    el('div', { class: 'u-who', text: tv.email || tv.label || tv.distinct_id, title: tv.distinct_id }),
+                    whoEl,
                     el('div', { class: 'u-meta', text: tvMeta })
                 ]),
                 tv.sample_session_id ? watchBtn({ sessionId: tv.sample_session_id, title: 'Watch top user replay' }) : null
             ]));
         }
+    }
+
+    function openUserProfileModal(distinctId, allSessions) {
+        var modal = $('userProfileModal');
+        if (!modal) return;
+        var userSessions = (allSessions || []).filter(function (s) {
+            return s.distinct_id === distinctId || (s.user_hash && s.user_hash === distinctId);
+        });
+        var sample = userSessions[0] || {};
+        var ident = sample.identity || {};
+        var label = sample.label || distinctId;
+        var email = ident.email || (sample.distinct_id && sample.distinct_id.indexOf('@') !== -1 ? sample.distinct_id : '');
+        var plan = sample.plan || ident.plan || 'Free';
+        var role = ident.role || 'Member';
+        var company = ident.company || '';
+
+        $('upAv').textContent = String(label).replace(/[^A-Za-z0-9]/g, '').slice(0, 2).toUpperCase() || 'U';
+        $('upName').textContent = label;
+        $('upEmail').textContent = email ? (email + (company ? ' · ' + company : '')) : (company || (sample.user_hash ? 'User #' + sample.user_hash.slice(0, 8) : ''));
+
+        var badges = $('upBadges');
+        clear(badges);
+        badges.appendChild(el('span', { class: 'chip plan', text: plan.toUpperCase() }));
+        if (role) badges.appendChild(el('span', { class: 'chip', text: role }));
+        if (sample.is_vip) badges.appendChild(el('span', { class: 'chip vip' }, 'VIP Customer'));
+        if (sample.user_hash) badges.appendChild(el('span', { class: 'chip mono', text: '#' + sample.user_hash.slice(0, 8) }));
+
+        $('upKpiSessions').textContent = fmtNum(userSessions.length);
+        var totalActive = userSessions.reduce(function (acc, s) { return acc + (s.active_seconds || s.duration_seconds || 0); }, 0);
+        $('upKpiActive').textContent = fmtDuration(totalActive);
+        var totalFriction = userSessions.reduce(function (acc, s) {
+            return acc + (s.error_count || 0) + (s.rage_click_count || 0) + (s.dead_click_count || 0) + (s.payment_failed ? 1 : 0);
+        }, 0);
+        $('upKpiFriction').textContent = fmtNum(totalFriction);
+
+        var list = $('upSessionsList');
+        clear(list);
+        if (!userSessions.length) {
+            list.appendChild(el('p', { class: 'muted', text: 'No session details available for this user in current filter.' }));
+        } else {
+            userSessions.forEach(function (s) {
+                var row = el('div', { class: 'u-profile-session-row' }, [
+                    el('div', { style: 'flex: 1; min-width: 0;' }, [
+                        el('div', { style: 'font-weight: 600; color: var(--text);' }, (s.entry_page || '/') + (s.exit_page && s.exit_page !== s.entry_page ? ' → ' + s.exit_page : '')),
+                        el('div', { style: 'font-size: 11px; color: var(--text-2); margin-top: 2px;' }, [
+                            agoFromTs(s.last_seen),
+                            ' · ' + fmtDuration(s.duration_seconds),
+                            s.error_count ? ' · ' + s.error_count + ' error(s)' : '',
+                            s.payment_failed ? ' · Payment failed' : ''
+                        ].filter(Boolean).join(''))
+                    ]),
+                    el('button', {
+                        class: 'btn sm ghost',
+                        type: 'button',
+                        text: 'Watch Replay',
+                        onclick: function () {
+                            modal.hidden = true;
+                            navTo('sessions');
+                            selectSession(s.session_id);
+                        }
+                    })
+                ]);
+                list.appendChild(row);
+            });
+        }
+        modal.hidden = false;
+    }
+
+    function renderVipRadar(o) {
+        var card = $('vipRadarCard');
+        if (!card) return;
+        var grid = $('vipRadarGrid');
+        clear(grid);
+        var u = o.users_overview || {};
+        var radar = u.vip_radar || [];
+        if (!radar.length) {
+            card.style.display = 'none';
+            return;
+        }
+        card.style.display = 'block';
+        $('vipRadarMeta').textContent = plural(radar.length, 'high-value customer', 'high-value customers') + ' encountered errors, payment issues, or rage clicks';
+        var filterBtn = $('btnFilterVip');
+        if (filterBtn) {
+            filterBtn.onclick = function () {
+                var statusSel = $('fStatus');
+                if (statusSel) {
+                    statusSel.value = 'vip';
+                    state.status = 'vip';
+                    reloadForFilters();
+                }
+                navTo('sessions');
+            };
+        }
+
+        radar.forEach(function (item) {
+            var issuesList = el('div', { class: 'vip-radar-issues' });
+            (item.issues || []).forEach(function (iss) {
+                issuesList.appendChild(el('div', { class: 'vip-radar-issue' }, [icon('alert'), iss]));
+            });
+
+            var initials = String(item.label || 'V').replace(/[^A-Za-z0-9]/g, '').slice(0, 2).toUpperCase() || 'V';
+            var metaParts = [
+                item.role || null,
+                item.company || null,
+                plural(item.sessions || 1, 'session', 'sessions'),
+                item.last_seen ? agoFromTs(item.last_seen) : null
+            ].filter(Boolean).join(' · ');
+
+            var cardEl = el('div', { class: 'vip-radar-item' }, [
+                el('div', { class: 'vip-radar-head' }, [
+                    el('div', { class: 'vip-radar-user' }, [
+                        el('div', { class: 'u-av', style: 'width: 28px; height: 28px; font-size: 11px;', text: initials }),
+                        el('div', {
+                            style: 'cursor: pointer; text-decoration: underline;',
+                            text: item.label,
+                            title: 'View customer journey',
+                            onclick: function () {
+                                openUserProfileModal(item.distinct_id, o.sessions || []);
+                            }
+                        })
+                    ]),
+                    el('span', { class: 'chip plan', text: item.plan || 'PRO' })
+                ]),
+                el('div', { class: 'vip-radar-meta', text: metaParts }),
+                issuesList,
+                item.sample_session_id ? el('button', {
+                    class: 'btn sm',
+                    type: 'button',
+                    style: 'margin-top: 6px; align-self: flex-start;',
+                    text: 'Watch Friction Replay →',
+                    onclick: function () {
+                        navTo('sessions');
+                        selectSession(item.sample_session_id);
+                    }
+                }) : null
+            ]);
+            grid.appendChild(cardEl);
+        });
     }
 
     function renderFrustrationInsights(o) {
@@ -3650,6 +3931,7 @@
         renderUsersOverview(o);
         renderFrustrationInsights(o);
         renderSmartEvents(o);
+        renderVipRadar(o);
         renderTrend(o.trend);
         renderTopPages(o);
         renderChannels(o);
@@ -3960,14 +4242,25 @@
 
     function fillSessionRow(row, s) {
         clear(row);
+        var nameSpan = el('span', { class: 'name', text: s.label || 'Visitor', title: 'Click to view customer journey' });
+        nameSpan.style.cursor = 'pointer';
+        nameSpan.addEventListener('click', function (ev) {
+            ev.stopPropagation();
+            openUserProfileModal(s.distinct_id || s.user_hash || s.session_id, state.overview && state.overview.sessions ? state.overview.sessions : []);
+        });
+
         var l1 = el('div', { class: 'l1' }, [
-            el('span', { class: 'name', text: s.label || 'Visitor', title: s.label || '' }),
+            nameSpan,
             statusChip(s.status),
+            s.is_vip ? el('span', { class: 'chip vip', title: 'High-value customer' }, 'VIP') : null,
+            s.plan ? el('span', { class: 'chip plan', title: 'Plan: ' + s.plan }, s.plan.toUpperCase()) : null,
+            s.payment_failed ? el('span', { class: 'chip payment-failed', title: s.payment_error_code || 'Payment declined' }, 'Payment Failed') : null,
             el('span', { class: 'ago', text: agoFromTs(s.last_seen) })
         ]);
         var l2 = el('div', { class: 'l2' });
         if (s.has_recording) { l2.appendChild(el('span', { class: 'chip replay', title: 'This session has a replay' }, [icon('play'), 'Replay'])); }
         if (s.is_ai_referral) { l2.appendChild(el('span', { class: 'chip ai', title: 'Referred by AI assistant' }, s.ai_source || 'AI')); }
+        if (s.is_registered && !s.plan) { l2.appendChild(el('span', { class: 'chip reg', title: 'Registered user' }, 'Registered')); }
         var email = s.identity && s.identity.email;
         if (email && email !== s.label) { l2.appendChild(el('span', { class: 'email', text: email })); }
         if (s.entry_page) {
@@ -5406,6 +5699,52 @@
             }
             insightsBar.style.display = 'grid';
         }
+        renderDropoffIntelligence(f.dropoff_intelligence);
+    }
+
+    function renderDropoffIntelligence(dropIntel) {
+        var card = $('dropoffIntelCard');
+        if (!card) return;
+        var grid = $('dropoffIntelGrid');
+        clear(grid);
+        if (!dropIntel || !dropIntel.total_dropoffs || !dropIntel.reasons || !dropIntel.reasons.length) {
+            card.style.display = 'none';
+            return;
+        }
+        card.style.display = 'block';
+        $('dropoffIntelMeta').textContent = 'Analyzed ' + plural(dropIntel.total_dropoffs, 'abandoned session', 'abandoned sessions') + ' across funnel steps';
+        var watchAllBtn = $('btnWatchAllDropoffs');
+        if (watchAllBtn) {
+            watchAllBtn.style.display = 'inline-flex';
+            watchAllBtn.onclick = function () {
+                if (dropIntel.all_dropoff_session_ids && dropIntel.all_dropoff_session_ids.length) {
+                    navTo('sessions');
+                    selectSession(dropIntel.all_dropoff_session_ids[0]);
+                }
+            };
+        }
+
+        dropIntel.reasons.forEach(function (r) {
+            var item = el('div', { class: 'dropoff-intel-item ' + (r.kind || 'dead') }, [
+                el('div', { class: 'dropoff-intel-head' }, [
+                    el('span', { class: 'dropoff-intel-title', text: r.title }),
+                    el('span', { class: 'chip ' + (r.kind === 'error' || r.kind === 'payment' ? 'error' : r.kind === 'dead' ? 'dead' : 'warn'), text: r.pct + '%' })
+                ]),
+                el('div', { class: 'dropoff-intel-stat', text: plural(r.count, 'session', 'sessions') + ' (' + r.pct + '%)' }),
+                el('div', { class: 'dropoff-intel-desc', text: r.description }),
+                r.sample_session_ids && r.sample_session_ids.length ? el('button', {
+                    class: 'btn sm ghost',
+                    type: 'button',
+                    style: 'margin-top: 6px; align-self: flex-start;',
+                    text: 'Watch sample replay →',
+                    onclick: function () {
+                        navTo('sessions');
+                        selectSession(r.sample_session_ids[0]);
+                    }
+                }) : null
+            ]);
+            grid.appendChild(item);
+        });
     }
 
     // ---------- Breakage ----------
@@ -6234,6 +6573,17 @@
 
         function closeModal() {
             if (modal) modal.hidden = true;
+        }
+
+        var upModal = $('userProfileModal');
+        var closeUpBtn = $('closeUserProfileModal');
+        var btnCloseUp = $('btnCloseUpProfile');
+        if (closeUpBtn) closeUpBtn.addEventListener('click', function () { if (upModal) upModal.hidden = true; });
+        if (btnCloseUp) btnCloseUp.addEventListener('click', function () { if (upModal) upModal.hidden = true; });
+        if (upModal) {
+            upModal.addEventListener('click', function (e) {
+                if (e.target === upModal) upModal.hidden = true;
+            });
         }
 
         openBtns.forEach(function (btn) {

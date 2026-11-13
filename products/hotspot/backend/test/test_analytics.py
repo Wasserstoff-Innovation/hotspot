@@ -547,3 +547,162 @@ def test_site_switching_and_subdomain_isolation() -> None:
     assert ov_empty["realtime"]["countries"] == []
     assert ov_empty["breakdowns"]["device_type"] == {}
     assert sum(ov_empty["activity"]["events_per_minute"]) == 0
+
+
+def test_crm_identity_and_dropoff_intelligence() -> None:
+    config = make_config()
+    store = SessionStore(MemoryBackend(config), config)
+    t = NOW - 1000
+
+    # 1. Anonymous visitor who drops off at checkout due to dead clicks and payment failure
+    store.record(
+        capture_events(
+            config,
+            [
+                *visit("s-anon-drop", t, ["/", "/pricing", "/checkout"]),
+                event_item(
+                    "$autocapture",
+                    "s-anon-drop",
+                    t + 30,
+                    "$anon-1",
+                    **{"$is_dead_click": True, "$el_selector": "button#pay"},
+                ),
+                event_item(
+                    "$autocapture",
+                    "s-anon-drop",
+                    t + 32,
+                    "$anon-1",
+                    **{"$is_dead_click": True, "$el_selector": "button#pay"},
+                ),
+                event_item(
+                    "$payment_failed",
+                    "s-anon-drop",
+                    t + 35,
+                    "$anon-1",
+                    **{"error_code": "card_declined", "plan": "pro"},
+                ),
+                event_item("$price_hesitation", "s-anon-drop", t + 36, "$anon-1"),
+            ],
+            NOW,
+            api_key="crm-site",
+        ),
+        now=NOW,
+    )
+
+    # 2. Registered VIP user (Pro plan) who encounters a JavaScript error
+    store.record(
+        capture_events(
+            config,
+            [
+                *visit("s-vip-1", t + 100, ["/app/dashboard", "/app/billing"], distinct_id="user-pro-99"),
+                event_item(
+                    "$identify",
+                    "s-vip-1",
+                    t + 105,
+                    "user-pro-99",
+                    **{
+                        "$identified_id": "user-pro-99",
+                        "$set": {
+                            "name": "Sarah Connor",
+                            "plan": "pro",
+                            "role": "admin",
+                            "company": "Cyberdyne",
+                        },
+                    },
+                ),
+                event_item("$exception", "s-vip-1", t + 120, "user-pro-99", **{"$error_message": "Uncaught TypeError"}),
+                event_item(
+                    "$purchase",
+                    "s-vip-1",
+                    t + 130,
+                    "user-pro-99",
+                    **{"plan": "pro", "cycle": "annual", "value_tier": "$100-$250"},
+                ),
+            ],
+            NOW,
+            api_key="crm-site",
+        ),
+        now=NOW,
+    )
+
+    # 3. Same VIP user returns for a second session (multi-session retention)
+    store.record(
+        capture_events(
+            config,
+            [
+                *visit("s-vip-2", t + 500, ["/app/dashboard", "/app/reports"], distinct_id="user-pro-99"),
+                event_item(
+                    "$set",
+                    "s-vip-2",
+                    t + 505,
+                    "user-pro-99",
+                    **{"$set": {"plan": "pro", "name": "Sarah Connor"}},
+                ),
+            ],
+            NOW,
+            api_key="crm-site",
+        ),
+        now=NOW,
+    )
+
+    query = OverviewQuery(funnel=("/pricing", "/checkout", "/success"))
+    overview = build_overview(store, query, config, NOW)
+
+    # Verify metrics
+    metrics = overview["metrics"]
+    assert metrics["sessions"] == 3
+    assert metrics["registered_sessions"] == 2
+    assert metrics["anonymous_sessions"] == 1
+    assert metrics["vip_sessions"] == 2
+    assert metrics["sessions_with_payment_failed"] == 1
+
+    # Verify users overview & CRM telemetry
+    users_ov = overview["users_overview"]
+    assert users_ov["unique_users"] == 2
+    assert users_ov["registered_users"] == 1
+    assert users_ov["anonymous_users"] == 1
+    assert users_ov["registered_return_pct"] == 100.0  # 1 registered user with 2 sessions = 100% return rate
+    assert "pro" in users_ov["by_plan"]
+    assert users_ov["by_plan"]["pro"]["users"] == 1
+    assert users_ov["by_plan"]["pro"]["sessions"] == 2
+
+    # Verify VIP Radar
+    vip_radar = users_ov["vip_radar"]
+    assert len(vip_radar) == 1
+    assert vip_radar[0]["label"] == "Sarah Connor"
+    assert vip_radar[0]["plan"] == "PRO"
+    assert any("JS error" in issue for issue in vip_radar[0]["issues"])
+
+    # Verify Drop-off intelligence on Funnel
+    funnel = overview["funnel"]
+    drop_intel = funnel["dropoff_intelligence"]
+    assert drop_intel["total_dropoffs"] == 1
+    reasons = {r["kind"]: r for r in drop_intel["reasons"]}
+    assert "dead" in reasons
+    assert reasons["dead"]["count"] == 1
+    assert "payment" in reasons
+    assert "hesitation" in reasons
+    assert drop_intel["top_driver"] is not None
+
+    # Verify Filtering: registered only
+    ov_reg = build_overview(store, OverviewQuery(status="registered"), config, NOW)
+    assert len(ov_reg["sessions"]) == 2
+    assert all(s["is_registered"] for s in ov_reg["sessions"])
+
+    # Verify Filtering: anonymous only
+    ov_anon = build_overview(store, OverviewQuery(status="anonymous"), config, NOW)
+    assert len(ov_anon["sessions"]) == 1
+    assert not ov_anon["sessions"][0]["is_registered"]
+
+    # Verify Filtering: VIP only
+    ov_vip = build_overview(store, OverviewQuery(status="vip"), config, NOW)
+    assert len(ov_vip["sessions"]) == 2
+    assert all(s["is_vip"] for s in ov_vip["sessions"])
+
+    # Verify Search by plan and user_hash
+    ov_search_plan = build_overview(store, OverviewQuery(search="pro"), config, NOW)
+    assert len(ov_search_plan["sessions"]) == 2
+    user_hash = ov_vip["sessions"][0]["user_hash"]
+    assert user_hash is not None
+    ov_search_hash = build_overview(store, OverviewQuery(search=user_hash[:6]), config, NOW)
+    assert len(ov_search_hash["sessions"]) == 2

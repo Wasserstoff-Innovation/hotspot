@@ -32,6 +32,10 @@ STATUS_FILTERS = frozenset(
         "engaged",
         "active",
         "identified",
+        "registered",
+        "anonymous",
+        "vip",
+        "failed_purchase",
         "dead",
         "broken",
         "quick_back",
@@ -167,17 +171,31 @@ def session_label(summary: Mapping[str, Any]) -> str:
     distinct_id = str(summary.get("distinct_id") or "")
     if distinct_id and distinct_id != "anonymous" and "@" in distinct_id:
         return distinct_id
+    user_hash = summary.get("user_hash") or identity.get("user_hash")
+    if user_hash:
+        return f"User #{user_hash[:8]}"
     session_id = str(summary.get("session_id") or "")
     return f"Visitor {session_id[-6:]}" if session_id else "Visitor"
 
 
 def format_session(summary: Mapping[str, Any], now: float) -> dict[str, Any]:
     identity = summary.get("identity") or {}
+    plan = summary.get("plan") or identity.get("plan")
+    is_vip = bool(plan and str(plan).lower() not in ("free", "starter", "trial"))
     return {
         "session_id": summary.get("session_id"),
         "distinct_id": summary.get("distinct_id"),
+        "user_hash": summary.get("user_hash") or identity.get("user_hash"),
         "label": session_label(summary),
         "identity": identity or None,
+        "is_registered": bool(summary.get("is_registered") or identity),
+        "plan": plan,
+        "role": identity.get("role"),
+        "company": identity.get("company"),
+        "is_vip": is_vip,
+        "payment_failed": bool(summary.get("payment_failed")),
+        "payment_error_code": summary.get("payment_error_code"),
+        "hesitation_detected": bool(summary.get("hesitation_detected")),
         "status": session_status(summary, now),
         "first_seen": summary.get("first_seen"),
         "last_seen": summary.get("last_seen"),
@@ -294,14 +312,135 @@ def _path_matches(wanted: str, pathname: Any) -> bool:
     return pathname.rstrip("/") == wanted.rstrip("/")
 
 
+def compute_dropoff_intelligence(
+    sessions: Sequence[tuple[Mapping[str, Any], Sequence[Mapping[str, Any]]]],
+    steps: Sequence[FunnelStep],
+) -> dict[str, Any]:
+    if not steps or len(steps) < 2:
+        return {"total_dropoffs": 0, "reasons": [], "top_driver": None, "all_dropoff_session_ids": []}
+
+    dropoffs: list[Mapping[str, Any]] = []
+    for summary, events in sessions:
+        index = 0
+        for event in sorted(events, key=lambda item: float(item.get("timestamp") or 0)):
+            if index >= len(steps):
+                break
+            if step_matches(steps[index], event):
+                index += 1
+        # Reached at least step 1, but dropped off before completing the funnel
+        if 0 < index < len(steps):
+            dropoffs.append(summary)
+
+    total = len(dropoffs)
+    if not total:
+        return {"total_dropoffs": 0, "reasons": [], "top_driver": None, "all_dropoff_session_ids": []}
+
+    reasons: list[dict[str, Any]] = []
+
+    # 1. Dead Clicks
+    dead_sessions = [str(s.get("session_id")) for s in dropoffs if int(s.get("dead_click_count") or 0) > 0]
+    if dead_sessions:
+        reasons.append(
+            {
+                "kind": "dead",
+                "title": "Dead clicks on inactive elements or forms",
+                "description": "Users clicked disabled submit buttons or unclickable UI elements without visual feedback",
+                "count": len(dead_sessions),
+                "pct": round(len(dead_sessions) / total * 100, 1),
+                "sample_session_ids": dead_sessions[:10],
+            }
+        )
+
+    # 2. JavaScript Errors
+    error_sessions = [str(s.get("session_id")) for s in dropoffs if int(s.get("error_count") or 0) > 0]
+    if error_sessions:
+        reasons.append(
+            {
+                "kind": "error",
+                "title": "JavaScript runtime errors",
+                "description": "Client-side exceptions interrupted form submission, checkout flow, or page rendering",
+                "count": len(error_sessions),
+                "pct": round(len(error_sessions) / total * 100, 1),
+                "sample_session_ids": error_sessions[:10],
+            }
+        )
+
+    # 3. Payment Gateway declines / failures
+    payment_sessions = [str(s.get("session_id")) for s in dropoffs if s.get("payment_failed")]
+    if payment_sessions:
+        reasons.append(
+            {
+                "kind": "payment",
+                "title": "Payment gateway declines & errors",
+                "description": "Card declined, insufficient funds, or gateway validation errors halted purchase completion",
+                "count": len(payment_sessions),
+                "pct": round(len(payment_sessions) / total * 100, 1),
+                "sample_session_ids": payment_sessions[:10],
+            }
+        )
+
+    # 4. Price Hesitation (oscillating between tiers or toggle)
+    hesitation_sessions = [str(s.get("session_id")) for s in dropoffs if s.get("hesitation_detected")]
+    if hesitation_sessions:
+        reasons.append(
+            {
+                "kind": "hesitation",
+                "title": "Pricing & billing cycle hesitation",
+                "description": "Visitors repeatedly toggled monthly/annual pricing or oscillated between plans before exiting",
+                "count": len(hesitation_sessions),
+                "pct": round(len(hesitation_sessions) / total * 100, 1),
+                "sample_session_ids": hesitation_sessions[:10],
+            }
+        )
+
+    # 5. Rage Clicks (frustration from slow/broken UI)
+    rage_sessions = [str(s.get("session_id")) for s in dropoffs if int(s.get("rage_click_count") or 0) > 0]
+    if rage_sessions:
+        reasons.append(
+            {
+                "kind": "rage",
+                "title": "Rage clicks from user frustration",
+                "description": "Rapid repeated clicking on sluggish or non-responsive checkout/navigation controls",
+                "count": len(rage_sessions),
+                "pct": round(len(rage_sessions) / total * 100, 1),
+                "sample_session_ids": rage_sessions[:10],
+            }
+        )
+
+    # 6. Immediate bounce (<5s active time)
+    bounce_sessions = [str(s.get("session_id")) for s in dropoffs if int(s.get("duration_seconds") or 0) < 5]
+    if bounce_sessions:
+        reasons.append(
+            {
+                "kind": "bounce",
+                "title": "Immediate exit (<5 seconds on step)",
+                "description": "Visitors bounced almost instantly, often caused by unexpected paywalls or slow load times",
+                "count": len(bounce_sessions),
+                "pct": round(len(bounce_sessions) / total * 100, 1),
+                "sample_session_ids": bounce_sessions[:10],
+            }
+        )
+
+    reasons.sort(key=lambda r: (r["count"], r["pct"]), reverse=True)
+    top_driver = reasons[0] if reasons else None
+
+    return {
+        "total_dropoffs": total,
+        "reasons": reasons,
+        "top_driver": top_driver,
+        "all_dropoff_session_ids": [str(s.get("session_id")) for s in dropoffs if s.get("session_id")][:50],
+    }
+
+
 def compute_funnel(
     sessions: Iterable[tuple[Mapping[str, Any], Sequence[Mapping[str, Any]]]], steps: Sequence[FunnelStep]
 ) -> dict[str, Any]:
+    session_list = list(sessions)
     reached = [0] * len(steps)
     gaps: list[list[float]] = [[] for _ in steps]
     dropoff_session_ids: list[list[str]] = [[] for _ in steps]
     total = 0
-    for summary, events in sessions:
+    for summary, events in session_list:
         total += 1
         index = 0
         previous_ts: float | None = None
@@ -348,6 +487,7 @@ def compute_funnel(
         "steps": rows,
         "sessions_analyzed": total,
         "conversion_rate": round(last / first * 100, 1) if first else 0.0,
+        "dropoff_intelligence": compute_dropoff_intelligence(session_list, steps),
     }
 
 
@@ -1106,12 +1246,38 @@ def compute_users_overview(
                 "sessions": 1,
                 "pageviews": int(summary.get("pageview_count") or 0),
                 "events": int(summary.get("event_count") or 0),
+                "errors": int(summary.get("error_count") or 0),
+                "rage_clicks": int(summary.get("rage_click_count") or 0),
+                "dead_clicks": int(summary.get("dead_click_count") or 0),
+                "payment_failed": bool(summary.get("payment_failed")),
+                "payment_error_code": summary.get("payment_error_code"),
+                "friction_session_id": sid
+                if (
+                    summary.get("error_count")
+                    or summary.get("rage_click_count")
+                    or summary.get("dead_click_count")
+                    or summary.get("payment_failed")
+                )
+                else None,
                 "latest": summary,
             }
         else:
             entry["sessions"] += 1
             entry["pageviews"] += int(summary.get("pageview_count") or 0)
             entry["events"] += int(summary.get("event_count") or 0)
+            entry["errors"] += int(summary.get("error_count") or 0)
+            entry["rage_clicks"] += int(summary.get("rage_click_count") or 0)
+            entry["dead_clicks"] += int(summary.get("dead_click_count") or 0)
+            if summary.get("payment_failed"):
+                entry["payment_failed"] = True
+                entry["payment_error_code"] = summary.get("payment_error_code")
+            if (
+                summary.get("error_count")
+                or summary.get("rage_click_count")
+                or summary.get("dead_click_count")
+                or summary.get("payment_failed")
+            ):
+                entry["friction_session_id"] = sid
             if last_seen >= float(entry["latest"].get("last_seen") or 0):
                 entry["latest"] = summary
 
@@ -1141,6 +1307,77 @@ def compute_users_overview(
             "is_identified": bool(identity),
         }
 
+    registered_visitors: set[str] = set()
+    registered_sessions = 0
+    registered_returners = 0
+
+    anon_visitors: set[str] = set()
+    anon_sessions = 0
+    anon_returners = 0
+
+    by_plan: dict[str, dict[str, int]] = {}
+    vip_radar: list[dict[str, Any]] = []
+
+    for visitor, data in by_visitor.items():
+        latest = data["latest"]
+        identity = latest.get("identity") or {}
+        is_reg = bool(latest.get("is_registered") or identity)
+        sessions_count = data["sessions"]
+        plan = latest.get("plan") or identity.get("plan")
+
+        if is_reg:
+            registered_visitors.add(visitor)
+            registered_sessions += sessions_count
+            if sessions_count > 1:
+                registered_returners += 1
+        else:
+            anon_visitors.add(visitor)
+            anon_sessions += sessions_count
+            if sessions_count > 1:
+                anon_returners += 1
+
+        if plan:
+            pkey = str(plan).lower()
+            if pkey not in by_plan:
+                by_plan[pkey] = {"users": 0, "sessions": 0}
+            by_plan[pkey]["users"] += 1
+            by_plan[pkey]["sessions"] += sessions_count
+
+        # VIP Radar: High-value paying customer experiencing friction
+        if plan and str(plan).lower() not in ("free", "starter", "trial"):
+            has_error = int(data.get("errors") or 0) > 0
+            has_rage = int(data.get("rage_clicks") or 0) > 0
+            has_dead = int(data.get("dead_clicks") or 0) > 0
+            has_payment_fail = bool(data.get("payment_failed"))
+            if has_error or has_rage or has_dead or has_payment_fail:
+                issues: list[str] = []
+                if has_payment_fail:
+                    issues.append(f"Payment failed ({data.get('payment_error_code') or 'declined'})")
+                if has_error:
+                    issues.append(f"{data.get('errors')} JS error(s)")
+                if has_rage:
+                    issues.append(f"{data.get('rage_clicks')} rage click(s)")
+                if has_dead:
+                    issues.append(f"{data.get('dead_clicks')} dead click(s)")
+
+                vip_radar.append(
+                    {
+                        "distinct_id": visitor,
+                        "user_hash": latest.get("user_hash"),
+                        "label": session_label(latest),
+                        "email": identity.get("email"),
+                        "plan": str(plan).upper(),
+                        "company": identity.get("company"),
+                        "role": identity.get("role"),
+                        "sessions": sessions_count,
+                        "last_seen": latest.get("last_seen"),
+                        "sample_session_id": data.get("friction_session_id") or latest.get("session_id"),
+                        "issues": issues,
+                    }
+                )
+
+    vip_radar.sort(key=lambda item: float(item.get("last_seen") or 0), reverse=True)
+
     return {
         "live_users": len(live_distinct),
         "live_sessions": live_sessions,
@@ -1151,6 +1388,14 @@ def compute_users_overview(
         "returning_pct": _share(returning_sessions, total),
         "new_visitors": len(new_visitors),
         "returning_visitors": len(returning_visitors),
+        "registered_users": len(registered_visitors),
+        "anonymous_users": len(anon_visitors),
+        "registered_sessions": registered_sessions,
+        "anonymous_sessions": anon_sessions,
+        "registered_return_pct": _share(registered_returners, len(registered_visitors)),
+        "anonymous_return_pct": _share(anon_returners, len(anon_visitors)),
+        "by_plan": by_plan,
+        "vip_radar": vip_radar[:25],
         "top_visitor": top_visitor,
     }
 
@@ -1392,6 +1637,20 @@ def build_overview(
         "filtered_sessions": len(visible),
         "active_sessions": sum(1 for summary in summaries if now - float(summary.get("last_seen") or 0) < 300),
         "identified_sessions": sum(1 for summary in summaries if summary.get("identity")),
+        "registered_sessions": sum(
+            1 for summary in summaries if summary.get("is_registered") or summary.get("identity")
+        ),
+        "anonymous_sessions": sum(
+            1 for summary in summaries if not (summary.get("is_registered") or summary.get("identity"))
+        ),
+        "vip_sessions": sum(
+            1
+            for summary in summaries
+            if (summary.get("plan") or (summary.get("identity") or {}).get("plan"))
+            and str(summary.get("plan") or (summary.get("identity") or {}).get("plan")).lower()
+            not in ("free", "starter", "trial")
+        ),
+        "sessions_with_payment_failed": sum(1 for summary in summaries if summary.get("payment_failed")),
         "new_sessions": users_overview["new_sessions"],
         "returning_sessions": users_overview["returning_sessions"],
         "quick_backs": quick_backs_data["count"],
@@ -1616,8 +1875,18 @@ def _matches_session_filter(
     sid = str(summary.get("session_id") or "")
     status = session_status(summary, now)
     wanted = query.status
-    if wanted == "identified":
-        if not summary.get("identity"):
+    if wanted in ("identified", "registered"):
+        if not (summary.get("is_registered") or summary.get("identity")):
+            return False
+    elif wanted == "anonymous":
+        if summary.get("is_registered") or summary.get("identity"):
+            return False
+    elif wanted == "vip":
+        plan = summary.get("plan") or (summary.get("identity") or {}).get("plan")
+        if not plan or str(plan).lower() in ("free", "starter", "trial"):
+            return False
+    elif wanted == "failed_purchase":
+        if not summary.get("payment_failed"):
             return False
     elif wanted == "dead":
         if not summary.get("dead_click_count"):
@@ -1647,9 +1916,12 @@ def _matches_session_filter(
             for value in (
                 summary.get("session_id"),
                 summary.get("distinct_id"),
+                summary.get("user_hash"),
                 identity.get("email"),
                 identity.get("name"),
                 identity.get("company"),
+                identity.get("plan") or summary.get("plan"),
+                identity.get("role"),
                 summary.get("entry_page"),
                 summary.get("exit_page"),
                 summary.get("referrer_host"),

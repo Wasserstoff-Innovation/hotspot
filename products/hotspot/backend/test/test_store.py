@@ -12,7 +12,7 @@ import fakeredis
 from products.hotspot.backend.analytics import format_session
 from products.hotspot.backend.config import HotspotConfig
 from products.hotspot.backend.ingestion import RecordingChunk, parse_recording
-from products.hotspot.backend.store import MemoryBackend, RedisBackend, SessionStore
+from products.hotspot.backend.store import MemoryBackend, RedisBackend, SessionStore, compute_user_hash
 from products.hotspot.backend.test.helpers import capture_events, event_item, make_config, visit
 
 NOW = 1_700_000_000.0
@@ -139,3 +139,73 @@ def test_recording_chunks_keep_their_order_and_stop_at_the_byte_budget(name: str
 
 def store_chunks(store: SessionStore, session_id: str, start: int) -> list[list[dict[str, Any]]]:
     return [json.loads(zlib.decompress(blob)) for blob in store.recording_chunks(session_id, start=start)]
+
+
+def test_compute_user_hash_and_crm_traits() -> None:
+    # Determinism & tenant salt isolation
+    hash1 = compute_user_hash("site_a", "user_123")
+    hash2 = compute_user_hash("site_a", "user_123")
+    hash3 = compute_user_hash("site_b", "user_123")
+    assert hash1 == hash2
+    assert hash1 != hash3
+    assert len(hash1) == 16
+    assert compute_user_hash("site_a", "") == ""
+    assert compute_user_hash("site_a", "anonymous") == ""
+
+    # CRM traits & purchase telemetry folding
+    config = make_config()
+    store = SessionStore(MemoryBackend(config), config)
+    items = [
+        event_item("$pageview", "crm-sess", NOW, **{"$pathname": "/pricing"}),
+        event_item(
+            "$identify",
+            "crm-sess",
+            NOW + 5,
+            **{
+                "$identified_id": "usr-42",
+                "$set": {
+                    "name": "Alex Murphy",
+                    "plan": "enterprise",
+                    "role": "compliance_lead",
+                    "company": "OCP Corp",
+                    "cycle": "annual",
+                },
+            },
+        ),
+        event_item("$price_hesitation", "crm-sess", NOW + 10),
+        event_item(
+            "$purchase",
+            "crm-sess",
+            NOW + 20,
+            **{"plan": "enterprise", "cycle": "annual", "value_tier": "$500+"},
+        ),
+    ]
+    store.record(capture_events(config, items, NOW), now=NOW)
+
+    (summary,) = store.sessions()
+    assert summary["distinct_id"] == "usr-42"
+    assert summary["is_registered"] is True
+    assert summary["user_hash"] is not None
+    assert summary["plan"] == "enterprise"
+    assert summary["identity"]["role"] == "compliance_lead"
+    assert summary["identity"]["company"] == "OCP Corp"
+    assert summary["identity"]["value_tier"] == "$500+"
+    assert summary["hesitation_detected"] is True
+    assert summary["converted"] is True
+    assert summary["conversion_event"] == "$purchase"
+
+    # Payment failure telemetry folding
+    store.record(
+        capture_events(
+            config,
+            [
+                event_item("$pageview", "fail-sess", NOW + 50, **{"$pathname": "/checkout"}),
+                event_item("$payment_failed", "fail-sess", NOW + 55, **{"error_code": "insufficient_funds"}),
+            ],
+            NOW,
+        ),
+        now=NOW,
+    )
+    fail_summary = next(s for s in store.sessions() if s["session_id"] == "fail-sess")
+    assert fail_summary["payment_failed"] is True
+    assert fail_summary["payment_error_code"] == "insufficient_funds"
