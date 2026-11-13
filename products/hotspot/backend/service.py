@@ -16,6 +16,14 @@ from products.hotspot import __version__
 from products.hotspot.backend.analytics import OverviewQuery, build_overview, format_session, setup_info
 from products.hotspot.backend.auth import make_dashboard_token, password_matches, verify_dashboard_token
 from products.hotspot.backend.config import HotspotConfig, load_config
+from products.hotspot.backend.docs_data import (
+    DOC_CATEGORIES,
+    DOCS_PAGES,
+    generate_doc_json_ld,
+    generate_robots_txt,
+    generate_sitemap_xml,
+    get_doc_page,
+)
 from products.hotspot.backend.ingestion import IngestionError, RequestContext, parse_batch, parse_recording
 from products.hotspot.backend.store import SessionStore, build_store
 
@@ -1020,6 +1028,85 @@ class HotspotService:
             "env_lines": env_lines,
             "credentials_json": credentials_json,
         }
+
+    def docs_context(self, slug: str | None, nonce: str) -> dict[str, Any]:
+        doc = get_doc_page(slug)
+        base = self.config.site_url.rstrip("/")
+        current_slug = doc["slug"]
+
+        sidebar_parts = []
+        category_name = "Getting Started"
+        for cat in DOC_CATEGORIES:
+            if current_slug in cat["slugs"]:
+                category_name = cat["title"]
+            sidebar_parts.append(
+                f'<div class="sidebar-cat"><div class="sidebar-cat-title">{cat["title"]}</div><ul class="sidebar-list">'
+            )
+            for item_slug in cat["slugs"]:
+                item = DOCS_PAGES.get(item_slug)
+                if not item:
+                    continue
+                is_active = " active" if item_slug == current_slug else ""
+                badge_html = (
+                    f'<span class="badge-pill {item.get("badge", "").lower()}">{item["badge"]}</span>'
+                    if item.get("badge")
+                    else ""
+                )
+                sidebar_parts.append(
+                    f'<li class="sidebar-item"><a class="sidebar-link{is_active}" href="/docs/{item_slug}/">'
+                    f"<span>{item['nav_label']}</span>{badge_html}</a></li>"
+                )
+            sidebar_parts.append("</ul></div>")
+        sidebar_html = "\n".join(sidebar_parts)
+
+        prev_card = ""
+        if doc.get("prev_slug"):
+            prev_doc = DOCS_PAGES.get(doc["prev_slug"])
+            if prev_doc:
+                prev_card = (
+                    f'<a class="doc-nav-card prev" href="/docs/{prev_doc["slug"]}/">'
+                    f'<span class="doc-nav-sub">&larr; Previous</span>'
+                    f'<span class="doc-nav-title">{prev_doc["title"]}</span></a>'
+                )
+
+        next_card = ""
+        if doc.get("next_slug"):
+            next_doc = DOCS_PAGES.get(doc["next_slug"])
+            if next_doc:
+                next_card = (
+                    f'<a class="doc-nav-card next" href="/docs/{next_doc["slug"]}/">'
+                    f'<span class="doc-nav-sub">Next &rarr;</span>'
+                    f'<span class="doc-nav-title">{next_doc["title"]}</span></a>'
+                )
+
+        canonical_url = f"{base}/docs/{current_slug}/" if current_slug != "overview" else f"{base}/docs/"
+        json_ld = generate_doc_json_ld(doc, base)
+
+        return {
+            "page_title": f"{doc['title']} — Hotspot Docs",
+            "doc_title": doc["title"],
+            "doc_description": doc["description"],
+            "doc_keywords": ", ".join(doc.get("keywords", [])),
+            "doc_nav_label": doc["nav_label"],
+            "doc_category_name": category_name,
+            "doc_content": doc["content_html"],
+            "sidebar_html": sidebar_html,
+            "prev_nav_card": prev_card,
+            "next_nav_card": next_card,
+            "canonical_url": canonical_url,
+            "doc_json_ld": json_ld,
+            "site_url": base,
+            "csp_nonce": nonce,
+            "version": __version__,
+            "demo_enabled": "1" if self.config.demo_enabled else "",
+            "storage": self.store.backend_name,
+        }
+
+    def sitemap_xml(self) -> str:
+        return generate_sitemap_xml(self.config.site_url)
+
+    def robots_txt(self) -> str:
+        return generate_robots_txt(self.config.site_url)
 
 
 _service: HotspotService | None = None

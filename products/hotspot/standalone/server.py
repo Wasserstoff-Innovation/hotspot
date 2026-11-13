@@ -232,6 +232,31 @@ async def connect_page(request: Request) -> Response:
     return response
 
 
+async def docs_page(request: Request) -> Response:
+    slug = request.path_params.get("slug")
+    nonce = generate_nonce()
+    ctx = _service().docs_context(slug, nonce)
+    html = render_template("docs.html", ctx)
+    response = HTMLResponse(html, status_code=200)
+    response.headers["Content-Security-Policy"] = page_csp(nonce, replay=False)
+    response.headers["Cache-Control"] = "public, max-age=3600"
+    return response
+
+
+async def sitemap_xml(request: Request) -> Response:
+    xml = _service().sitemap_xml()
+    response = Response(xml, media_type="application/xml; charset=utf-8")
+    response.headers["Cache-Control"] = "public, max-age=86400"
+    return response
+
+
+async def robots_txt(request: Request) -> Response:
+    txt = _service().robots_txt()
+    response = PlainTextResponse(txt)
+    response.headers["Cache-Control"] = "public, max-age=86400"
+    return response
+
+
 async def _json_body(request: Request) -> dict[str, Any]:
     try:
         parsed = await request.json()
@@ -595,6 +620,12 @@ routes = [
     Route("/hotspot.js", sdk),
     Route("/hotspot/assets/{name}", asset),
     Route("/llms.txt", llms_txt),
+    Route("/sitemap.xml", sitemap_xml),
+    Route("/robots.txt", robots_txt),
+    Route("/docs/", docs_page),
+    Route("/docs", docs_page),
+    Route("/docs/{slug}/", docs_page),
+    Route("/docs/{slug}", docs_page),
     Route("/skill.md", skill_md),
     Route("/SKILL.md", skill_md),
     Route("/hotspot/skill.md", skill_md),

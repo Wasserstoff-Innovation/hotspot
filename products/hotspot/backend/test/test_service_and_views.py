@@ -15,7 +15,7 @@ from starlette.testclient import TestClient
 
 from products.hotspot.backend import views
 from products.hotspot.backend.auth import DASHBOARD_COOKIE, make_dashboard_token, verify_dashboard_token
-from products.hotspot.backend.service import HotspotService, reset_service
+from products.hotspot.backend.service import HotspotService, get_service, reset_service
 from products.hotspot.backend.templating import render_string
 from products.hotspot.backend.test.helpers import batch_body, event_item, make_service
 from products.hotspot.mcp import save_credentials_bundle
@@ -53,9 +53,10 @@ def test_authorization_is_open_only_without_a_password() -> None:
 
 def test_placeholder_renderer_escapes_values() -> None:
     rendered = render_string(
-        "<a href='{{ site_url }}'>{{page_title}}</a>{{ missing }}", {"site_url": 'x"><s>', "page_title": "A & B"}
+        "<a href='{{ site_url }}'>{{page_title}}</a>{{ missing }}<div>{{ content|safe }}</div>",
+        {"site_url": 'x"><s>', "page_title": "A & B", "content": "<b>Safe HTML</b>"},
     )
-    assert rendered == "<a href='x&quot;&gt;&lt;s&gt;'>A &amp; B</a>"
+    assert rendered == "<a href='x&quot;&gt;&lt;s&gt;'>A &amp; B</a><div><b>Safe HTML</b></div>"
 
 
 def test_dashboard_and_api_require_sign_in_when_protected(protected_service: HotspotService) -> None:
@@ -878,3 +879,60 @@ def test_events_feed_and_session_detail_strict_site_isolation() -> None:
             assert token in dash_html
     finally:
         reset_service(None)
+
+
+def test_docs_sitemap_and_robots() -> None:
+    service = get_service()
+
+    # 1. Test docs_context
+    ctx = service.docs_context(None, "testnonce")
+    assert "Hotspot Docs" in ctx["page_title"]
+    assert "Overview & Architecture" in ctx["doc_title"]
+    assert "sidebar_html" in ctx
+    assert "doc_json_ld" in ctx
+    assert "canonical_url" in ctx
+
+    # Test sub-page
+    ctx_quick = service.docs_context("quickstart", "testnonce")
+    assert "Quickstart" in ctx_quick["doc_title"]
+    assert "/docs/quickstart/" in ctx_quick["canonical_url"]
+    assert ctx_quick["next_nav_card"] != ""
+
+    # Test unknown slug fallback
+    ctx_unknown = service.docs_context("non-existent-xyz", "testnonce")
+    assert ctx_unknown["doc_title"] == "Overview & Architecture"
+
+    # 2. Test sitemap and robots generators
+    sitemap = service.sitemap_xml()
+    assert sitemap.startswith('<?xml version="1.0" encoding="UTF-8"?>')
+    assert "<url><loc>" in sitemap
+    assert "/docs/quickstart/" in sitemap
+    assert "</urlset>" in sitemap
+
+    robots = service.robots_txt()
+    assert "User-agent: *" in robots
+    assert "Allow: /docs/" in robots
+    assert "Sitemap:" in robots
+
+    # 3. Test HTTP endpoints via Starlette TestClient
+    st_client = TestClient(standalone_server.app)
+
+    resp_docs = st_client.get("/docs/")
+    assert resp_docs.status_code == 200
+    assert "Hotspot" in resp_docs.text
+    assert "Overview & Architecture" in resp_docs.text
+    assert resp_docs.headers["content-type"].startswith("text/html")
+    assert "content-security-policy" in resp_docs.headers
+
+    resp_sub = st_client.get("/docs/crm-identity/")
+    assert resp_sub.status_code == 200
+    assert "Zero-PII CRM Identity" in resp_sub.text
+
+    resp_sitemap = st_client.get("/sitemap.xml")
+    assert resp_sitemap.status_code == 200
+    assert resp_sitemap.headers["content-type"].startswith("application/xml")
+    assert "<loc>" in resp_sitemap.text
+
+    resp_robots = st_client.get("/robots.txt")
+    assert resp_robots.status_code == 200
+    assert "User-agent: *" in resp_robots.text

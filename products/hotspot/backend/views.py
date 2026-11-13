@@ -148,6 +148,29 @@ def connect_page(request: HttpRequest) -> HttpResponse:
     return response
 
 
+def docs(request: HttpRequest, slug: str | None = None) -> HttpResponse:
+    nonce = getattr(request, "csp_nonce", None) or generate_nonce()
+    ctx = get_service().docs_context(slug, nonce)
+    response = render(request, "hotspot/docs.html", ctx)
+    response["Content-Security-Policy"] = page_csp(nonce, replay=False)
+    response["Cache-Control"] = "public, max-age=3600"
+    return response
+
+
+def sitemap_xml(request: HttpRequest) -> HttpResponse:
+    xml = get_service().sitemap_xml()
+    response = HttpResponse(xml, content_type="application/xml; charset=utf-8")
+    response["Cache-Control"] = "public, max-age=86400"
+    return response
+
+
+def robots_txt(request: HttpRequest) -> HttpResponse:
+    txt = get_service().robots_txt()
+    response = HttpResponse(txt, content_type="text/plain; charset=utf-8")
+    response["Cache-Control"] = "public, max-age=86400"
+    return response
+
+
 def _json_body(request: HttpRequest) -> dict[str, Any]:
     if not request.body:
         return {}

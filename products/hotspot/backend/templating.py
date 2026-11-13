@@ -12,13 +12,18 @@ from collections.abc import Mapping
 from pathlib import Path
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates" / "hotspot"
-_PLACEHOLDER = re.compile(r"\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}")
+_PLACEHOLDER = re.compile(r"\{\{\s*([A-Za-z_][A-Za-z0-9_]*)(?:\|\s*([A-Za-z_][A-Za-z0-9_]*))?\s*\}\}")
 
 
 def render_string(source: str, context: Mapping[str, object]) -> str:
     def substitute(match: re.Match[str]) -> str:
-        value = context.get(match.group(1))
-        return "" if value is None else html.escape(str(value), quote=True)
+        key = match.group(1)
+        is_safe = match.group(2) == "safe"
+        value = context.get(key)
+        if value is None:
+            return ""
+        s = str(value)
+        return s if is_safe else html.escape(s, quote=True)
 
     return _PLACEHOLDER.sub(substitute, source)
 
