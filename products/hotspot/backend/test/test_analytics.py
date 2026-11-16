@@ -706,3 +706,133 @@ def test_crm_identity_and_dropoff_intelligence() -> None:
     assert user_hash is not None
     ov_search_hash = build_overview(store, OverviewQuery(search=user_hash[:6]), config, NOW)
     assert len(ov_search_hash["sessions"]) == 2
+
+
+def test_cpo_intelligence_and_customer_directory():
+    """Verify CPO intelligence health radar, executive synthesis, recommendations, and customer directory."""
+    config = make_config()
+    store = SessionStore(MemoryBackend(config), config)
+    t = NOW - 1000
+
+    # Session 1: High-value VIP customer experiencing JS error & dead click
+    store.record(
+        capture_events(
+            config,
+            [
+                *visit("sess-cpo-1", t + 100, ["/app/billing"], distinct_id="vip-alice"),
+                event_item(
+                    "$identify",
+                    "sess-cpo-1",
+                    t + 105,
+                    "vip-alice",
+                    **{
+                        "$identified_id": "vip-alice",
+                        "$set": {
+                            "name": "Alice Smith",
+                            "email": "alice@corp.com",
+                            "plan": "ENTERPRISE",
+                            "role": "VP Product",
+                            "company": "Corp Inc",
+                        },
+                    },
+                ),
+                event_item(
+                    "$exception",
+                    "sess-cpo-1",
+                    t + 120,
+                    "vip-alice",
+                    **{"$error_message": "TypeError: null in checkout"},
+                ),
+                event_item(
+                    "$autocapture",
+                    "sess-cpo-1",
+                    t + 130,
+                    "vip-alice",
+                    **{"$is_dead_click": True, "$el_text": "Upgrade Plan"},
+                ),
+            ],
+            NOW,
+        ),
+        now=NOW,
+    )
+
+    # Session 2: AI referral that converted
+    store.record(
+        capture_events(
+            config,
+            [
+                event_item(
+                    "$pageview",
+                    "sess-cpo-2",
+                    t + 200,
+                    "anon-bob",
+                    **{"$pathname": "/signup", "$referrer": "https://chatgpt.com/"},
+                ),
+                event_item(
+                    "$pageview",
+                    "sess-cpo-2",
+                    t + 210,
+                    "anon-bob",
+                    **{"$pathname": "/pricing"},
+                ),
+                event_item(
+                    "$conversion",
+                    "sess-cpo-2",
+                    t + 250,
+                    "anon-bob",
+                    **{"event": "subscription_purchased"},
+                ),
+            ],
+            NOW,
+        ),
+        now=NOW,
+    )
+
+    ov = build_overview(store, OverviewQuery(), config, NOW)
+    cpo = ov["cpo_intelligence"]
+    assert cpo is not None
+    assert cpo["pro_mode"] is True
+
+    # Health radar checks
+    radar = cpo["health_radar"]
+    assert "activation_score" in radar
+    assert "friction_index" in radar
+    assert "retention_velocity" in radar
+    assert "funnel_health" in radar
+    assert radar["activation_score"] > 0
+    assert radar["friction_index"] > 0
+
+    # Executive briefing checks
+    briefing = cpo["executive_briefing"]
+    assert "primary_intent" in briefing
+    assert "top_friction_culprit" in briefing
+    assert "persona_stickiness" in briefing
+    assert "revenue_churn_risk" in briefing
+    assert (
+        "dead click" in briefing["top_friction_culprit"].lower()
+        or "exception" in briefing["top_friction_culprit"].lower()
+    )
+
+    # Recommendations checks
+    recs = cpo["recommendations"]
+    assert len(recs) >= 1
+    assert any("P0" in r["priority"] or "P1" in r["priority"] for r in recs)
+    assert any("expected_impact" in r for r in recs)
+
+    # Customer directory checks
+    cust_dir = cpo["customer_directory"]
+    assert len(cust_dir) == 2
+    alice = next(c for c in cust_dir if c["distinct_id"] == "vip-alice")
+    assert alice["plan"] == "ENTERPRISE"
+    assert alice["is_vip"] is True
+    assert alice["has_friction"] is True
+    assert alice["friction_count"] == 2  # 1 exception + 1 dead click
+
+    # Per-session CPO takeaway in sessions list
+    sess_vip = next(s for s in ov["sessions"] if s["session_id"] == "sess-cpo-1")
+    takeaway = sess_vip["cpo_takeaway"]
+    assert takeaway is not None
+    assert "intent" in takeaway
+    assert "friction" in takeaway
+    assert "verdict" in takeaway
+    assert takeaway["sentiment"] in ("warning", "critical")

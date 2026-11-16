@@ -860,6 +860,50 @@
         .u-profile-sessions { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; }
         .u-profile-session-row { display: flex; align-items: center; justify-content: space-between; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 12px; }
 
+        /* CPO Intelligence & Executive Styling */
+        .cpo-hero-card { background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%); border: 1px solid rgba(99, 102, 241, 0.35); border-radius: 12px; padding: 24px; color: #F8FAFC; box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.25); margin-bottom: 20px; }
+        .cpo-hero-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
+        .cpo-hero-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.8px; color: #A5B4FC; margin-bottom: 6px; }
+        .cpo-pro-pill { background: linear-gradient(135deg, #6366F1, #8B5CF6); color: #FFFFFF; font-size: 9.5px; font-weight: 800; padding: 2px 7px; border-radius: 4px; letter-spacing: 0.5px; margin-left: 6px; }
+        .cpo-hero-title { font-size: 20px; font-weight: 700; color: #FFFFFF; margin: 0 0 4px 0; }
+        .cpo-hero-subtitle { font-size: 13px; color: #94A3B8; margin: 0; line-height: 1.4; }
+        .cpo-status-indicator { display: flex; align-items: center; gap: 7px; font-size: 12px; color: #34D399; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(52, 211, 153, 0.3); padding: 6px 12px; border-radius: 20px; font-weight: 500; }
+        .cpo-pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: #10B981; animation: blink 2s infinite ease-in-out; }
+        .cpo-kpis-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+        @media (max-width: 900px) { .cpo-kpis-grid { grid-template-columns: repeat(2, 1fr); } }
+        .cpo-kpi-card { background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 14px 16px; }
+        .cpo-kpi-lbl { font-size: 11.5px; font-weight: 600; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .cpo-kpi-val { font-size: 24px; font-weight: 800; color: #FFFFFF; line-height: 1.2; }
+        .cpo-kpi-desc { font-size: 11px; color: #64748B; margin-top: 4px; }
+        .cpo-narrative-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+        @media (max-width: 800px) { .cpo-narrative-grid { grid-template-columns: 1fr; } }
+        .cpo-narrative-card { background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px; padding: 16px; border-left: 3px solid #6366F1; }
+        .cpo-narrative-card.friction-culprit { border-left-color: #EF4444; }
+        .cpo-narrative-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+        .cpo-narrative-title { font-size: 13.5px; font-weight: 700; color: #F1F5F9; }
+        .cpo-narrative-text { font-size: 12.5px; color: #CBD5E1; line-height: 1.5; margin: 0; }
+
+        /* Recommendations */
+        .cpo-recs-grid { display: flex; flex-direction: column; gap: 10px; }
+        .cpo-rec-item { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; transition: border-color 0.15s ease; }
+        .cpo-rec-item:hover { border-color: var(--brand); }
+        .cpo-rec-prio { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+        .cpo-rec-prio.p0 { background: #FEF2F2; color: #DC2626; border: 1px solid #FECACA; }
+        .cpo-rec-prio.p1 { background: #FFFBEB; color: #D97706; border: 1px solid #FDE68A; }
+        .cpo-rec-prio.p2 { background: #EEF2FF; color: #4F46E5; border: 1px solid #C7D2FE; }
+        .cpo-rec-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+        .cpo-rec-desc { font-size: 12.5px; color: var(--text-2); line-height: 1.45; }
+        .cpo-rec-impact { background: #F0FDF4; border: 1px solid #BBF7D0; color: #15803D; font-size: 11.5px; font-weight: 700; padding: 4px 10px; border-radius: 6px; white-space: nowrap; align-self: center; }
+
+        /* Replay Player CPO Takeaway */
+        .cpo-session-takeaway { background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 8px; padding: 10px 14px; margin: 8px 12px 10px; color: #F8FAFC; }
+        .cpo-takeaway-badge { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; color: #A5B4FC; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.6px; }
+        .cpo-takeaway-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+        @media (max-width: 768px) { .cpo-takeaway-grid { grid-template-columns: 1fr; } }
+        .cpo-takeaway-col { display: flex; flex-direction: column; gap: 2px; }
+        .cpo-takeaway-lbl { font-size: 10.5px; font-weight: 600; color: #94A3B8; text-transform: uppercase; }
+        .cpo-takeaway-val { font-size: 12px; color: #E2E8F0; line-height: 1.35; }
+
         /* Notices */
         .notice { display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; border-radius: 10px; border: 1px solid; font-size: 13px; margin-bottom: 12px; line-height: 1.5; }
         .notice .ico { margin-top: 2px; }
@@ -1442,6 +1486,11 @@
                 <span class="ico" data-icon="activity"></span>
                 <span class="label">Realtime</span><span class="count" id="navCountRealtime"></span>
             </button>
+            <button class="nav-btn" type="button" data-action="nav" data-tab="intelligence" title="CPO Intelligence &amp; Customers">
+                <span class="ico" data-icon="sparkles"></span>
+                <span class="label">Intelligence</span>
+                <span class="chip" style="margin-left: auto; font-size: 9px; font-weight: 700; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; padding: 2px 5px; border-radius: 4px; letter-spacing: 0.5px;">PRO</span>
+            </button>
             <button class="nav-btn" type="button" data-action="nav" data-tab="sessions" title="Sessions">
                 <span class="ico" data-icon="users"></span>
                 <span class="label">Sessions</span><span class="count" id="navCountSessions"></span>
@@ -1760,6 +1809,158 @@
                 </div>
             </section>
 
+            <!-- Intelligence: CPO Executive Briefing & Customer CRM -->
+            <section class="tab" data-tab="intelligence" id="tab-intelligence">
+                <!-- CPO Executive Hero -->
+                <div class="card cpo-hero-card">
+                    <div class="cpo-hero-header">
+                        <div>
+                            <div class="cpo-hero-badge">
+                                <span class="ico" data-icon="sparkles"></span>
+                                <span>CHIEF PRODUCT OFFICER • EXECUTIVE SYNTHESIS</span>
+                                <span class="cpo-pro-pill">PRO MODE</span>
+                            </div>
+                            <h2 class="cpo-hero-title">What We Learned As CPO / Product</h2>
+                            <p class="cpo-hero-subtitle" id="cpoHeroSubtitle">Autonomous behavioral intelligence synthesizing visitor intent, friction roadblocks, and customer journeys.</p>
+                        </div>
+                        <div class="cpo-hero-actions">
+                            <div class="cpo-status-indicator">
+                                <span class="cpo-pulse-dot"></span>
+                                <span>Autonomous Engine Active</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CPO Health Radar KPIs -->
+                    <div class="cpo-kpis-grid">
+                        <div class="cpo-kpi-card">
+                            <div class="cpo-kpi-lbl">Visitor Activation</div>
+                            <div class="cpo-kpi-val" id="cpoKpiActivation">--</div>
+                            <div class="cpo-kpi-desc">Sessions engaged &gt; 15s or &gt; 1 page</div>
+                        </div>
+                        <div class="cpo-kpi-card">
+                            <div class="cpo-kpi-lbl">Friction Index</div>
+                            <div class="cpo-kpi-val" id="cpoKpiFriction">--</div>
+                            <div class="cpo-kpi-desc" id="cpoKpiFrictionDesc">Errors, rage clicks &amp; dead clicks</div>
+                        </div>
+                        <div class="cpo-kpi-card">
+                            <div class="cpo-kpi-lbl">Retention Velocity</div>
+                            <div class="cpo-kpi-val" id="cpoKpiRetention">--</div>
+                            <div class="cpo-kpi-desc">Ratio of returning visitors</div>
+                        </div>
+                        <div class="cpo-kpi-card">
+                            <div class="cpo-kpi-lbl">Funnel Health</div>
+                            <div class="cpo-kpi-val" id="cpoKpiFunnel">--</div>
+                            <div class="cpo-kpi-desc">Multi-step goal completion rate</div>
+                        </div>
+                    </div>
+
+                    <!-- Executive Narrative Cards (2x2) -->
+                    <div class="cpo-narrative-grid">
+                        <div class="cpo-narrative-card">
+                            <div class="cpo-narrative-head">
+                                <span class="ico" data-icon="trend"></span>
+                                <span class="cpo-narrative-title">Primary User Intent</span>
+                            </div>
+                            <p class="cpo-narrative-text" id="cpoNarrativeIntent">Analyzing traffic corridors and exploration patterns...</p>
+                        </div>
+                        <div class="cpo-narrative-card friction-culprit">
+                            <div class="cpo-narrative-head">
+                                <span class="ico" data-icon="alert"></span>
+                                <span class="cpo-narrative-title">The #1 Friction Culprit</span>
+                            </div>
+                            <p class="cpo-narrative-text" id="cpoNarrativeFriction">Detecting drop-off hurdles and broken UI elements...</p>
+                        </div>
+                        <div class="cpo-narrative-card">
+                            <div class="cpo-narrative-head">
+                                <span class="ico" data-icon="users"></span>
+                                <span class="cpo-narrative-title">Cohort Stickiness &amp; Retention</span>
+                            </div>
+                            <p class="cpo-narrative-text" id="cpoNarrativeStickiness">Comparing registered vs anonymous return rates...</p>
+                        </div>
+                        <div class="cpo-narrative-card">
+                            <div class="cpo-narrative-head">
+                                <span class="ico" data-icon="bolt"></span>
+                                <span class="cpo-narrative-title">Revenue &amp; Churn Signals</span>
+                            </div>
+                            <p class="cpo-narrative-text" id="cpoNarrativeRevenue">Evaluating paying customer friction and checkout gates...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Prioritized CPO Recommendations -->
+                <div class="card section-gap">
+                    <div class="card-head">
+                        <div>
+                            <h3>Prioritized CPO Recommendations</h3>
+                            <p class="muted">Ranked action items to optimize product conversion and remove user blockers.</p>
+                        </div>
+                    </div>
+                    <div class="cpo-recs-grid" id="cpoRecsGrid">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- VIP Customer Radar (Always Visible in Intelligence Tab) -->
+                <div class="card section-gap" id="cpoVipRadarCard">
+                    <div class="card-head">
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span class="ico" data-icon="alert" style="color: #F59E0B;"></span>
+                                <h3 style="margin: 0;">High-Value VIP Customer Radar</h3>
+                            </div>
+                            <p class="muted" id="cpoVipRadarMeta">Monitoring Pro &amp; Enterprise subscribers for friction and errors.</p>
+                        </div>
+                    </div>
+                    <div class="vip-radar-grid" id="cpoVipRadarGrid">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- Customer Intelligence Directory (CRM Table) -->
+                <div class="card section-gap">
+                    <div class="card-head">
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span class="ico" data-icon="users"></span>
+                                <h3 style="margin: 0;">Customer Directory</h3>
+                            </div>
+                            <p class="muted">Searchable directory of tracked visitors, identity traits, and friction history.</p>
+                        </div>
+                        <div class="right" style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                            <input type="search" class="input sm" id="custSearch" placeholder="Search by name, email, hash..." style="min-width: 220px;">
+                            <div class="seg" id="custFilterSeg">
+                                <button type="button" class="active" data-action="cust-filter" data-cust-filter="all">All (<span id="cntCustAll">0</span>)</button>
+                                <button type="button" data-action="cust-filter" data-cust-filter="vip">VIP (<span id="cntCustVip">0</span>)</button>
+                                <button type="button" data-action="cust-filter" data-cust-filter="friction">With Friction (<span id="cntCustFriction">0</span>)</button>
+                                <button type="button" data-action="cust-filter" data-cust-filter="registered">Registered (<span id="cntCustReg">0</span>)</button>
+                                <button type="button" data-action="cust-filter" data-cust-filter="anon">Anonymous (<span id="cntCustAnon">0</span>)</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="table-wrap">
+                        <table class="t" id="custTable">
+                            <thead>
+                                <tr>
+                                    <th style="min-width: 200px;">Customer / Visitor</th>
+                                    <th style="width: 130px;">Plan &amp; Role</th>
+                                    <th style="width: 140px;">Lifetime Activity</th>
+                                    <th style="width: 140px;">Friction Incidents</th>
+                                    <th style="width: 140px;">Last Active</th>
+                                    <th style="width: 160px; text-align: right;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="custTableBody">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="empty" id="custEmpty" hidden style="padding: 30px; text-align: center;">
+                        <p class="muted">No customers match the current filter or search criteria.</p>
+                    </div>
+                </div>
+            </section>
+
             <!-- Sessions -->
             <section class="tab" data-tab="sessions" id="tab-sessions">
                 <div class="card" id="sessionsEmpty" hidden>
@@ -1817,6 +2018,27 @@
                             <div class="replay-sub" id="replaySub">
                                 <div class="trail" id="rsTrail"></div>
                                 <div class="facts" id="rsFacts"></div>
+                            </div>
+                            <div class="cpo-session-takeaway" id="rsCpoTakeaway">
+                                <div class="cpo-takeaway-badge">
+                                    <span class="ico" data-icon="sparkles"></span>
+                                    <span>CPO Session Intelligence</span>
+                                    <span class="cpo-pro-pill">PRO</span>
+                                </div>
+                                <div class="cpo-takeaway-grid">
+                                    <div class="cpo-takeaway-col">
+                                        <div class="cpo-takeaway-lbl">User Intent</div>
+                                        <div class="cpo-takeaway-val" id="cpoIntentVal">Evaluating product</div>
+                                    </div>
+                                    <div class="cpo-takeaway-col">
+                                        <div class="cpo-takeaway-lbl">Friction Encountered</div>
+                                        <div class="cpo-takeaway-val" id="cpoFrictionVal">Clean experience</div>
+                                    </div>
+                                    <div class="cpo-takeaway-col">
+                                        <div class="cpo-takeaway-lbl">CPO Verdict &amp; Next Action</div>
+                                        <div class="cpo-takeaway-val" id="cpoVerdictVal">Smooth flow</div>
+                                    </div>
+                                </div>
                             </div>
                             <div class="empty replay-empty" id="replayEmpty" hidden>
                                 <h3>No replay for this session</h3>
@@ -2436,9 +2658,9 @@
         replayEnabled: body.getAttribute('data-replay') === '1',
         storage: body.getAttribute('data-storage') || ''
     };
-    var TABS = ['overview', 'realtime', 'sessions', 'flow', 'funnel', 'breakage', 'pages', 'install'];
+    var TABS = ['overview', 'realtime', 'intelligence', 'sessions', 'flow', 'funnel', 'breakage', 'pages', 'install'];
     // Links and bookmarks from earlier versions keep working.
-    var TAB_ALIASES = { paths: 'flow', friction: 'breakage', errors: 'breakage', live: 'realtime' };
+    var TAB_ALIASES = { paths: 'flow', friction: 'breakage', errors: 'breakage', live: 'realtime', customers: 'intelligence', crm: 'intelligence', cpo: 'intelligence' };
     var STATUS_VALUES = ['all', 'active', 'new', 'returning', 'converted', 'ai', 'rage', 'dead', 'quick_back', 'error', 'broken', 'bounced', 'engaged', 'identified'];
     var HOURS_VALUES = [1, 24, 168, 720, 0];
     var STEP_KINDS = ['path', 'event', 'click', 'text'];
@@ -2473,6 +2695,7 @@
                 if (value === null || value === undefined || value === false) { return; }
                 if (key === 'class') { node.className = value; }
                 else if (key === 'text') { node.textContent = value; }
+                else if (typeof value === 'function' && key.slice(0, 2) === 'on') { node[key] = value; }
                 else { node.setAttribute(key, value); }
             });
         }
@@ -2970,6 +3193,7 @@
         renderSitesTab(o.sites, o.current_site || state.site, o.setup);
         renderOverview(o);
         renderRealtime(o);
+        renderIntelligence(o);
         renderFilters(o.breakdowns, o.referrers);
         renderSessions(o);
         renderFunnelPresets(o.funnel, o);
@@ -3412,9 +3636,23 @@
         var u = o.users_overview || {};
         var radar = u.vip_radar || [];
         if (!radar.length) {
-            card.style.display = 'none';
+            card.style.display = 'block';
+            $('vipRadarMeta').textContent = 'VIP accounts active. 0 paying subscribers experiencing errors or payment roadblocks.';
+            grid.appendChild(el('div', { class: 'vip-radar-item', style: 'border-left: 4px solid #10B981; background: #F0FDF4; grid-column: 1 / -1; padding: 14px 18px;' }, [
+                el('div', { style: 'display: flex; align-items: center; gap: 8px; font-weight: 700; color: #166534; font-size: 13.5px;' }, [
+                    icon('check'),
+                    document.createTextNode('VIP Customer Health: All Clear')
+                ]),
+                el('div', { style: 'font-size: 12px; color: #15803D; margin-top: 3px;' }, [
+                    document.createTextNode('All Pro & Enterprise subscribers are operating with 0 JavaScript errors, rage clicks, or payment declines in this period.')
+                ])
+            ]));
+            var fb = $('btnFilterVip');
+            if (fb) fb.style.display = 'none';
             return;
         }
+        var fbActive = $('btnFilterVip');
+        if (fbActive) fbActive.style.display = '';
         card.style.display = 'block';
         $('vipRadarMeta').textContent = plural(radar.length, 'high-value customer', 'high-value customers') + ' encountered errors, payment issues, or rage clicks';
         var filterBtn = $('btnFilterVip');
@@ -3945,6 +4183,240 @@
         renderInsights(o);
     }
 
+    // ---------- Intelligence & Customer CRM ----------
+
+    var custFilter = 'all';
+    var custSearchTerm = '';
+
+    function renderIntelligence(o) {
+        var cpo = o.cpo_intelligence || {};
+        var radar = cpo.health_radar || {};
+        var briefing = cpo.executive_briefing || {};
+        var recs = cpo.recommendations || [];
+        var u = o.users_overview || {};
+
+        var actEl = $('cpoKpiActivation');
+        if (actEl) actEl.textContent = (radar.activation_score !== undefined ? radar.activation_score : '--') + '%';
+        var fricEl = $('cpoKpiFriction');
+        if (fricEl) fricEl.textContent = (radar.friction_index !== undefined ? radar.friction_index : '--') + ' / 100';
+        var retEl = $('cpoKpiRetention');
+        if (retEl) retEl.textContent = (radar.retention_velocity !== undefined ? radar.retention_velocity : '--') + '%';
+        var funEl = $('cpoKpiFunnel');
+        if (funEl) funEl.textContent = (radar.funnel_health !== undefined ? radar.funnel_health : '--') + '%';
+
+        var nIntent = $('cpoNarrativeIntent');
+        if (nIntent) nIntent.textContent = briefing.primary_intent || 'No visitor traffic recorded yet.';
+        var nFriction = $('cpoNarrativeFriction');
+        if (nFriction) nFriction.textContent = briefing.top_friction_culprit || 'Zero friction detected.';
+        var nStickiness = $('cpoNarrativeStickiness');
+        if (nStickiness) nStickiness.textContent = briefing.persona_stickiness || 'No persona data available.';
+        var nRevenue = $('cpoNarrativeRevenue');
+        if (nRevenue) nRevenue.textContent = briefing.revenue_churn_risk || 'VIP subscriber health is clean.';
+
+        // Render Recommendations
+        var recsGrid = $('cpoRecsGrid');
+        if (recsGrid) {
+            clear(recsGrid);
+            if (!recs.length) {
+                recsGrid.appendChild(el('p', { class: 'muted', text: 'Traffic is flowing smoothly with zero active recommendations.' }));
+            } else {
+                recs.forEach(function (rec) {
+                    var prioClass = (rec.priority || '').toLowerCase().indexOf('p0') !== -1 ? 'p0' : ((rec.priority || '').toLowerCase().indexOf('p1') !== -1 ? 'p1' : 'p2');
+                    recsGrid.appendChild(el('div', { class: 'cpo-rec-item' }, [
+                        el('div', { style: 'flex: 1; min-width: 0;' }, [
+                            el('div', { style: 'display: flex; align-items: center; gap: 8px; margin-bottom: 6px;' }, [
+                                el('span', { class: 'cpo-rec-prio ' + prioClass, text: rec.priority || 'P1' }),
+                                el('span', { class: 'chip', text: rec.category || 'Product UX' })
+                            ]),
+                            el('div', { class: 'cpo-rec-title', text: rec.title }),
+                            el('div', { class: 'cpo-rec-desc', text: rec.description })
+                        ]),
+                        rec.expected_impact ? el('div', { class: 'cpo-rec-impact', text: rec.expected_impact }) : null
+                    ]));
+                });
+            }
+        }
+
+        // Render VIP Radar in Intelligence tab
+        renderCpoVipRadar(u.vip_radar || [], o.sessions || []);
+
+        // Render Customer Directory
+        state.customerDirectory = u.customer_directory || [];
+        renderCustomerDirectory(o.sessions || []);
+    }
+
+    function renderCpoVipRadar(radar, sessions) {
+        var grid = $('cpoVipRadarGrid');
+        if (!grid) return;
+        clear(grid);
+        var meta = $('cpoVipRadarMeta');
+        if (!radar.length) {
+            if (meta) meta.textContent = 'Active monitoring of paying Pro & Enterprise accounts. 0 accounts experiencing friction.';
+            grid.appendChild(el('div', { class: 'vip-radar-item', style: 'border-left: 4px solid #10B981; background: #F0FDF4; grid-column: 1 / -1; padding: 16px 20px;' }, [
+                el('div', { style: 'display: flex; align-items: center; gap: 8px; font-weight: 700; color: #166534; font-size: 14px;' }, [
+                    icon('check'),
+                    document.createTextNode('VIP Customer Health: All Clear')
+                ]),
+                el('div', { style: 'font-size: 12.5px; color: #15803D; margin-top: 4px; line-height: 1.4;' }, [
+                    document.createTextNode('Zero high-value Pro or Enterprise subscribers are encountering JavaScript errors, rage clicks, dead clicks, or payment declines in this period.')
+                ])
+            ]));
+            return;
+        }
+
+        if (meta) meta.textContent = plural(radar.length, 'high-value customer', 'high-value customers') + ' encountered errors, payment issues, or rage clicks';
+        radar.forEach(function (item) {
+            var issuesList = el('div', { class: 'vip-radar-issues' });
+            (item.issues || []).forEach(function (iss) {
+                issuesList.appendChild(el('div', { class: 'vip-radar-issue' }, [icon('alert'), iss]));
+            });
+
+            var initials = String(item.label || 'V').replace(/[^A-Za-z0-9]/g, '').slice(0, 2).toUpperCase() || 'V';
+            var metaParts = [
+                item.role || null,
+                item.company || null,
+                plural(item.sessions || 1, 'session', 'sessions'),
+                item.last_seen ? agoFromTs(item.last_seen) : null
+            ].filter(Boolean).join(' · ');
+
+            var cardEl = el('div', { class: 'vip-radar-item' }, [
+                el('div', { class: 'vip-radar-head' }, [
+                    el('div', { class: 'vip-radar-user' }, [
+                        el('div', { class: 'u-av', style: 'width: 28px; height: 28px; font-size: 11px;', text: initials }),
+                        el('div', {
+                            style: 'cursor: pointer; text-decoration: underline;',
+                            text: item.label,
+                            title: 'View customer journey',
+                            onclick: function () {
+                                openUserProfileModal(item.distinct_id, sessions);
+                            }
+                        })
+                    ]),
+                    el('span', { class: 'chip plan', text: item.plan || 'PRO' })
+                ]),
+                el('div', { class: 'vip-radar-meta', text: metaParts }),
+                issuesList,
+                el('div', { style: 'margin-top: 6px; display: flex; justify-content: flex-end;' }, [
+                    item.sample_session_id ? el('button', {
+                        class: 'btn sm ghost',
+                        type: 'button',
+                        text: 'Watch Session Replay',
+                        onclick: function () {
+                            navTo('sessions');
+                            selectSession(item.sample_session_id);
+                        }
+                    }) : null
+                ])
+            ]);
+            grid.appendChild(cardEl);
+        });
+    }
+
+    function renderCustomerDirectory(sessions) {
+        var allCust = state.customerDirectory || [];
+        var filtered = allCust.filter(function (c) {
+            if (custFilter === 'vip' && !c.is_vip) return false;
+            if (custFilter === 'friction' && !c.has_friction) return false;
+            if (custFilter === 'registered' && !c.is_registered) return false;
+            if (custFilter === 'anon' && c.is_registered) return false;
+            if (custSearchTerm) {
+                var term = custSearchTerm.toLowerCase();
+                var label = (c.label || '').toLowerCase();
+                var email = (c.email || '').toLowerCase();
+                var hash = (c.user_hash || '').toLowerCase();
+                var comp = (c.company || '').toLowerCase();
+                var plan = (c.plan || '').toLowerCase();
+                if (label.indexOf(term) === -1 && email.indexOf(term) === -1 && hash.indexOf(term) === -1 && comp.indexOf(term) === -1 && plan.indexOf(term) === -1) {
+                    return false;
+                }
+            }
+            return true;
+        });
+
+        if ($('cntCustAll')) $('cntCustAll').textContent = fmtNum(allCust.length);
+        if ($('cntCustVip')) $('cntCustVip').textContent = fmtNum(allCust.filter(function (c) { return c.is_vip; }).length);
+        if ($('cntCustFriction')) $('cntCustFriction').textContent = fmtNum(allCust.filter(function (c) { return c.has_friction; }).length);
+        if ($('cntCustReg')) $('cntCustReg').textContent = fmtNum(allCust.filter(function (c) { return c.is_registered; }).length);
+        if ($('cntCustAnon')) $('cntCustAnon').textContent = fmtNum(allCust.filter(function (c) { return !c.is_registered; }).length);
+
+        var tbody = $('custTableBody');
+        if (!tbody) return;
+        clear(tbody);
+        if ($('custEmpty')) $('custEmpty').hidden = filtered.length > 0;
+        if ($('custTable')) $('custTable').hidden = filtered.length === 0;
+
+        filtered.forEach(function (c) {
+            var initials = String(c.label || 'V').replace(/[^A-Za-z0-9]/g, '').slice(0, 2).toUpperCase() || 'V';
+            var planClass = c.plan === 'ENTERPRISE' ? 'chip vip' : (c.is_vip ? 'chip plan' : 'chip');
+            var frictionCell = c.has_friction ? el('span', { class: 'chip danger', text: plural(c.friction_count, 'incident', 'incidents') }) : el('span', { class: 'chip' }, '0 friction');
+
+            var tr = el('tr', {}, [
+                el('td', {}, [
+                    el('div', { style: 'display: flex; align-items: center; gap: 10px;' }, [
+                        el('div', { class: 'u-av', style: 'width: 32px; height: 32px; font-size: 12px;', text: initials }),
+                        el('div', { style: 'min-width: 0;' }, [
+                            el('div', { style: 'font-weight: 600; color: var(--text); font-size: 13px;' }, c.label),
+                            el('div', { style: 'font-size: 11px; color: var(--text-2); display: flex; gap: 6px; align-items: center; flex-wrap: wrap;' }, [
+                                c.email ? el('span', { text: c.email }) : null,
+                                c.company ? el('span', { text: '· ' + c.company }) : null,
+                                c.user_hash ? el('span', { class: 'chip mono', style: 'font-size: 10px; padding: 1px 4px;', text: '#' + c.user_hash.slice(0, 8) }) : null
+                            ].filter(Boolean))
+                        ])
+                    ])
+                ]),
+                el('td', {}, [
+                    el('div', { style: 'display: flex; flex-direction: column; gap: 3px; align-items: flex-start;' }, [
+                        el('span', { class: planClass, text: c.plan }),
+                        c.role ? el('span', { style: 'font-size: 11px; color: var(--text-2);', text: c.role }) : null
+                    ])
+                ]),
+                el('td', {}, [
+                    el('div', { style: 'font-size: 12.5px; font-weight: 500;' }, plural(c.sessions_count, 'session', 'sessions')),
+                    el('div', { style: 'font-size: 11px; color: var(--text-2);' }, plural(c.pageviews_count, 'pageview', 'pageviews'))
+                ]),
+                el('td', {}, [frictionCell]),
+                el('td', {}, [
+                    el('div', { style: 'font-size: 12px; color: var(--text);' }, c.last_seen ? agoFromTs(c.last_seen) : '--'),
+                    el('div', { style: 'font-size: 11px; color: var(--text-2);' }, [c.country || 'Unknown', c.device_type ? ' · ' + c.device_type : ''].join(''))
+                ]),
+                el('td', { style: 'text-align: right;' }, [
+                    el('div', { style: 'display: inline-flex; gap: 6px;' }, [
+                        el('button', {
+                            class: 'btn sm ghost',
+                            type: 'button',
+                            text: 'Journey',
+                            'data-action': 'open-journey',
+                            'data-id': c.distinct_id,
+                            title: 'View customer profile & journey history'
+                        }),
+                        c.latest_session_id ? el('button', {
+                            class: 'btn sm',
+                            type: 'button',
+                            text: 'Replay',
+                            'data-action': 'watch-customer',
+                            'data-id': c.latest_session_id,
+                            title: 'Watch latest session'
+                        }) : null
+                    ].filter(Boolean))
+                ])
+            ]);
+            tbody.appendChild(tr);
+        });
+    }
+
+    function renderCpoTakeaway(s) {
+        var box = $('rsCpoTakeaway');
+        if (!box) return;
+        var t = (s && s.cpo_takeaway) || {};
+        var intentEl = $('cpoIntentVal');
+        if (intentEl) intentEl.textContent = t.intent || 'Evaluating site content and navigating corridors.';
+        var fricEl = $('cpoFrictionVal');
+        if (fricEl) fricEl.textContent = t.friction || 'Clean session: No errors, rage clicks, or dead clicks.';
+        var verdEl = $('cpoVerdictVal');
+        if (verdEl) verdEl.textContent = t.verdict || 'Standard exploration pattern.';
+        box.hidden = false;
+    }
+
     // ---------- Realtime ----------
 
     function renderRealtime(o) {
@@ -4465,6 +4937,7 @@
 
     function renderDetail(data) {
         renderReplayHead(data.session);
+        renderCpoTakeaway(data.session);
         $('detailEmpty').hidden = true;
         $('replayCard').hidden = false;
         setupReplay(data);
@@ -6781,6 +7254,7 @@
         if (state.overview) {
             if (tab === 'overview') { renderTrend(state.overview.trend); }
             if (tab === 'flow') { renderFlow(state.overview); }
+            if (tab === 'intelligence') { renderIntelligence(state.overview); }
         }
     }
 
@@ -6896,6 +7370,35 @@
             case 'clear-filters':
                 clearFilters();
                 break;
+            case 'cust-filter': {
+                var cBtn = trigger.closest('[data-cust-filter]');
+                if (cBtn) {
+                    custFilter = cBtn.getAttribute('data-cust-filter') || 'all';
+                    var seg = $('custFilterSeg');
+                    if (seg) {
+                        Array.prototype.forEach.call(seg.querySelectorAll('button'), function (b) {
+                            b.classList.toggle('active', b === cBtn);
+                        });
+                    }
+                    renderCustomerDirectory(state.overview ? state.overview.sessions : []);
+                }
+                break;
+            }
+            case 'open-journey': {
+                var jId = trigger.getAttribute('data-id');
+                if (jId) {
+                    openUserProfileModal(jId, state.overview ? state.overview.sessions : []);
+                }
+                break;
+            }
+            case 'watch-customer': {
+                var sId = trigger.getAttribute('data-id');
+                if (sId) {
+                    navTo('sessions');
+                    selectSession(sId);
+                }
+                break;
+            }
             case 'set-hours':
                 state.hours = Number(trigger.getAttribute('data-hours')) || 0;
                 store('hours', String(state.hours));
@@ -7123,6 +7626,9 @@
         } else if (target.id === 'breakageSearch') {
             breakageSearchQuery = target.value;
             renderBreakageExplorer();
+        } else if (target.id === 'custSearch') {
+            custSearchTerm = target.value.trim();
+            renderCustomerDirectory(state.overview ? state.overview.sessions : []);
         } else if (target.id === 'scrub') {
             scrubTo(Number(target.value) || 0);
         } else if (target.closest && target.closest('#funnelSteps')) {

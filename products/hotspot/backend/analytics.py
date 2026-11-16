@@ -178,6 +178,95 @@ def session_label(summary: Mapping[str, Any]) -> str:
     return f"Visitor {session_id[-6:]}" if session_id else "Visitor"
 
 
+def compute_session_cpo_takeaway(summary: Mapping[str, Any], now: float) -> dict[str, str]:
+    """Generates an executive CPO takeaway: Intent, Friction encountered, and Actionable Verdict."""
+    identity = summary.get("identity") or {}
+    plan = summary.get("plan") or identity.get("plan")
+    pages = list(summary.get("pages") or [])
+    entry_page = summary.get("entry_page") or "/"
+    exit_page = summary.get("exit_page") or entry_page
+    duration = int(summary.get("duration_seconds") or 0)
+    device = summary.get("device_type") or "desktop"
+    referrer = summary.get("referrer_host") or ""
+    is_ai = bool(summary.get("is_ai_referral"))
+    ai_source = summary.get("ai_source")
+    err_cnt = int(summary.get("error_count") or 0)
+    rage_cnt = int(summary.get("rage_click_count") or 0)
+    dead_cnt = int(summary.get("dead_click_count") or 0)
+    pay_failed = bool(summary.get("payment_failed"))
+    pay_code = summary.get("payment_error_code")
+    converted = bool(summary.get("converted"))
+    conv_evt = summary.get("conversion_event")
+    scroll = summary.get("max_scroll_depth")
+
+    # 1. Intent Synthesis
+    if is_ai:
+        intent = f"AI Referral ({ai_source or 'LLM'}) evaluating '{entry_page}' on {device}."
+    elif pay_failed:
+        intent = f"Commercial Intent: Attempted purchase/subscription checkout on '{exit_page}'."
+    elif converted:
+        intent = f"High-Value Conversion: Visited {len(pages)} page(s) and completed goal '{conv_evt or 'conversion'}'."
+    elif plan and str(plan).lower() not in ("free", "starter", "trial"):
+        intent = f"VIP Customer ({str(plan).upper()}): Active session navigating '{entry_page}'."
+    elif len(pages) > 2:
+        intent = f"Deep Exploration: Navigated {len(pages)} pages ({entry_page} → {exit_page}) over {max(1, duration // 60)}m."
+    elif duration < 8 and len(pages) <= 1:
+        intent = f"Immediate Bounce: Landed on '{entry_page}' from {referrer or 'direct'} and left in {duration}s."
+    elif "pricing" in entry_page or "pricing" in exit_page:
+        intent = f"Pricing Evaluation: Investigating plans and tiers on '{exit_page}'."
+    else:
+        intent = f"Standard Discovery: Browsing '{entry_page}' on {device}."
+
+    # 2. Friction Synthesis
+    if pay_failed:
+        friction = f"CRITICAL REVENUE BLOCK: Payment failed with code '{pay_code or 'card_declined'}'."
+        sentiment = "critical"
+    elif err_cnt > 0 and (rage_cnt > 0 or dead_cnt > 0):
+        friction = (
+            f"Severe UI Breakdown: {err_cnt} JS error(s) accompanied by {rage_cnt + dead_cnt} dead/rage click(s)."
+        )
+        sentiment = "critical"
+    elif rage_cnt > 0:
+        friction = f"Frustration Signals: {rage_cnt} rage click(s) detected on unresponsive elements."
+        sentiment = "warning"
+    elif dead_cnt > 0:
+        friction = f"Broken Affordance: {dead_cnt} dead click(s) on unclickable or unhandled elements."
+        sentiment = "warning"
+    elif err_cnt > 0:
+        friction = f"Client Error: {err_cnt} unhandled JavaScript runtime error(s) thrown."
+        sentiment = "warning"
+    elif scroll is not None and scroll < 25 and duration < 10:
+        friction = f"Low Engagement: Scrolled only {scroll}% before exiting page."
+        sentiment = "neutral"
+    elif converted:
+        friction = "Frictionless: User smoothly progressed through the conversion corridor."
+        sentiment = "positive"
+    else:
+        friction = "Clean Experience: No rage clicks, dead clicks, or runtime errors detected."
+        sentiment = "positive"
+
+    # 3. CPO Verdict & Action
+    if pay_failed:
+        verdict = f"P0 Revenue Leak: Check payment processor webhook and clarify decline messaging on '{exit_page}'."
+    elif dead_cnt > 0 or rage_cnt > 0:
+        verdict = f"UX Polish: Audit button click bindings and feedback state on '{exit_page or entry_page}'."
+    elif err_cnt > 0:
+        verdict = f"Bug Fix: Check client console logs for exception origin during '{exit_page}' interaction."
+    elif converted:
+        verdict = f"Golden Path: Replicate this {device} funnel journey across marketing campaigns."
+    elif duration < 8:
+        verdict = f"Landing Optimization: Clarify above-the-fold value prop on '{entry_page}' to reduce bounce."
+    else:
+        verdict = f"Monitor Flow: Healthy engagement pattern. Track progression to conversion funnel."
+
+    return {
+        "intent": intent,
+        "friction": friction,
+        "verdict": verdict,
+        "sentiment": sentiment,
+    }
+
+
 def format_session(summary: Mapping[str, Any], now: float) -> dict[str, Any]:
     identity = summary.get("identity") or {}
     plan = summary.get("plan") or identity.get("plan")
@@ -196,6 +285,7 @@ def format_session(summary: Mapping[str, Any], now: float) -> dict[str, Any]:
         "payment_failed": bool(summary.get("payment_failed")),
         "payment_error_code": summary.get("payment_error_code"),
         "hesitation_detected": bool(summary.get("hesitation_detected")),
+        "cpo_takeaway": compute_session_cpo_takeaway(summary, now),
         "status": session_status(summary, now),
         "first_seen": summary.get("first_seen"),
         "last_seen": summary.get("last_seen"),
@@ -1378,6 +1468,58 @@ def compute_users_overview(
 
     vip_radar.sort(key=lambda item: float(item.get("last_seen") or 0), reverse=True)
 
+    customer_directory: list[dict[str, Any]] = []
+    for visitor, data in by_visitor.items():
+        latest = data["latest"]
+        identity = latest.get("identity") or {}
+        is_reg = bool(latest.get("is_registered") or identity)
+        plan = latest.get("plan") or identity.get("plan")
+        is_vip = bool(plan and str(plan).lower() not in ("free", "starter", "trial"))
+        friction_count = (
+            int(data.get("errors") or 0)
+            + int(data.get("rage_clicks") or 0)
+            + int(data.get("dead_clicks") or 0)
+            + (1 if data.get("payment_failed") else 0)
+        )
+        customer_directory.append(
+            {
+                "distinct_id": visitor,
+                "user_hash": latest.get("user_hash"),
+                "label": session_label(latest),
+                "email": identity.get("email"),
+                "plan": str(plan).upper() if plan else "FREE",
+                "company": identity.get("company"),
+                "role": identity.get("role"),
+                "is_vip": is_vip,
+                "is_registered": is_reg,
+                "sessions_count": data["sessions"],
+                "pageviews_count": data["pageviews"],
+                "events_count": data["events"],
+                "friction_count": friction_count,
+                "has_friction": friction_count > 0,
+                "errors_count": int(data.get("errors") or 0),
+                "rage_clicks_count": int(data.get("rage_clicks") or 0),
+                "dead_clicks_count": int(data.get("dead_clicks") or 0),
+                "payment_failed": bool(data.get("payment_failed")),
+                "payment_error_code": data.get("payment_error_code"),
+                "last_seen": latest.get("last_seen"),
+                "country": latest.get("country"),
+                "device_type": latest.get("device_type"),
+                "browser": latest.get("browser"),
+                "latest_session_id": latest.get("session_id"),
+                "friction_session_id": data.get("friction_session_id"),
+            }
+        )
+
+    customer_directory.sort(
+        key=lambda item: (
+            1 if item["has_friction"] else 0,
+            1 if item["is_vip"] else 0,
+            float(item.get("last_seen") or 0),
+        ),
+        reverse=True,
+    )
+
     return {
         "live_users": len(live_distinct),
         "live_sessions": live_sessions,
@@ -1396,7 +1538,268 @@ def compute_users_overview(
         "anonymous_return_pct": _share(anon_returners, len(anon_visitors)),
         "by_plan": by_plan,
         "vip_radar": vip_radar[:25],
+        "customer_directory": customer_directory[:150],
         "top_visitor": top_visitor,
+    }
+
+
+def compute_cpo_intelligence(
+    summaries: Sequence[Mapping[str, Any]],
+    with_events: Sequence[tuple[Mapping[str, Any], Sequence[Mapping[str, Any]]]],
+    users_overview: Mapping[str, Any],
+    funnel: Mapping[str, Any],
+    friction: Mapping[str, Any],
+    now: float,
+) -> dict[str, Any]:
+    """CPO / Product Intelligence: Executive behavioral synthesis, health scores, friction root causes, and roadmap recommendations."""
+    total_sessions = len(summaries)
+    if not total_sessions:
+        return {
+            "pro_mode": True,
+            "health_radar": {
+                "activation_score": 0.0,
+                "friction_index": 0.0,
+                "retention_velocity": 0.0,
+                "funnel_health": 0.0,
+                "overall_verdict": "No traffic detected in the selected time range.",
+            },
+            "executive_briefing": {
+                "primary_intent": "Waiting for traffic to analyze visitor corridors.",
+                "top_friction_culprit": "No friction recorded.",
+                "persona_stickiness": "No visitor data available.",
+                "revenue_churn_risk": "All clear: zero revenue or checkout failures.",
+            },
+            "recommendations": [],
+            "customer_directory": [],
+            "vip_radar": [],
+        }
+
+    # 1. Health Radar Calculation (Scores 0-100)
+    active_sessions = sum(
+        1
+        for s in summaries
+        if (
+            int(s.get("duration_seconds") or 0) >= 15
+            or len(s.get("pages") or []) > 1
+            or int(s.get("event_count") or 0) >= 3
+        )
+    )
+    activation_score = round((active_sessions / total_sessions) * 100, 1)
+
+    total_dead = sum(int(s.get("dead_click_count") or 0) for s in summaries)
+    total_rage = sum(int(s.get("rage_click_count") or 0) for s in summaries)
+    total_err = sum(int(s.get("error_count") or 0) for s in summaries)
+    total_pay_fails = sum(1 for s in summaries if s.get("payment_failed"))
+    bounces = sum(1 for s in summaries if int(s.get("duration_seconds") or 0) < 6 and len(s.get("pages") or []) <= 1)
+
+    friction_points = (total_err * 3) + (total_rage * 2) + (total_dead * 1) + (total_pay_fails * 8)
+    friction_index = min(100.0, round((friction_points / total_sessions) * 10, 1))
+
+    returning_sessions = int(users_overview.get("returning_sessions") or 0)
+    retention_velocity = round((returning_sessions / total_sessions) * 100, 1)
+
+    conv_rate = float(funnel.get("conversion_rate") or 0.0)
+    funnel_health = round(min(100.0, conv_rate), 1)
+
+    # 2. Executive Synthesis
+    entry_counter = Counter(str(s.get("entry_page") or "/") for s in summaries)
+    top_entries = [p for p, _ in entry_counter.most_common(2)]
+    device_counter = Counter(str(s.get("device_type") or "desktop") for s in summaries)
+    top_device = device_counter.most_common(1)[0][0] if device_counter else "desktop"
+    ai_referrals = sum(1 for s in summaries if s.get("is_ai_referral"))
+
+    entries_str = " & ".join(top_entries) if top_entries else "/"
+    intent_parts = [
+        f"Primary landing corridor concentrated on '{entries_str}' with {top_device.capitalize()} dominating traffic ({_share(device_counter.get(top_device, 0), total_sessions)}%).",
+    ]
+    if ai_referrals > 0:
+        intent_parts.append(
+            f"{ai_referrals} session(s) originated from AI search / LLM referrals with high exploratory depth."
+        )
+    if activation_score >= 60:
+        intent_parts.append(
+            f"Strong exploration observed: {activation_score}% of visitors actively navigated multiple pages or spent >15s evaluating the product."
+        )
+    else:
+        intent_parts.append(
+            f"Low exploratory depth: {round(100 - activation_score, 1)}% bounced or left within initial entry."
+        )
+    primary_intent_narrative = " ".join(intent_parts)
+
+    friction_culprits = []
+    if total_pay_fails > 0:
+        friction_culprits.append(
+            (total_pay_fails * 10, f"{total_pay_fails} checkout payment failure(s) blocking revenue")
+        )
+    if total_dead > 0:
+        friction_culprits.append((total_dead, f"{total_dead} dead clicks on unclickable or unresponsive elements"))
+    if total_rage > 0:
+        friction_culprits.append(
+            (total_rage * 2, f"{total_rage} rage clicks where visitors repeatedly smashed buttons")
+        )
+    if total_err > 0:
+        friction_culprits.append((total_err * 2, f"{total_err} unhandled client-side JavaScript runtime errors"))
+    if bounces > total_sessions * 0.4:
+        friction_culprits.append((bounces, f"{bounces} immediate bounces under 6s indicating landing page mismatch"))
+
+    if friction_culprits:
+        friction_culprits.sort(key=lambda x: x[0], reverse=True)
+        top_friction_narrative = (
+            f"The #1 product friction culprit is {friction_culprits[0][1]}. "
+            f"Total friction impact: {total_dead} dead clicks, {total_rage} rage clicks, and {total_err} exceptions across {total_sessions} sessions."
+        )
+    else:
+        top_friction_narrative = "Zero major friction blockers detected: User sessions are progressing without runtime errors, dead clicks, or rage clicks."
+
+    reg_users = int(users_overview.get("registered_users") or 0)
+    anon_users = int(users_overview.get("anonymous_users") or 0)
+    reg_ret = float(users_overview.get("registered_return_pct") or 0.0)
+    anon_ret = float(users_overview.get("anonymous_return_pct") or 0.0)
+
+    if reg_users > 0:
+        persona_narrative = (
+            f"Registered user cohort represents {reg_users} customer(s) with a {reg_ret}% return rate, "
+            f"compared to {anon_users} anonymous visitors returning at {anon_ret}%. "
+            "Identified profiles demonstrate significantly higher engagement velocity."
+        )
+    else:
+        persona_narrative = (
+            f"All {anon_users or total_sessions} visitors are currently anonymous with {retention_velocity}% returning sessions. "
+            "Enabling CRM identity tracking via `hotspot('identify')` will unlock personalized customer journeys."
+        )
+
+    vip_radar = users_overview.get("vip_radar") or []
+    by_plan = users_overview.get("by_plan") or {}
+    paying_plans = [
+        f"{plan.upper()} ({data['users']} users)"
+        for plan, data in by_plan.items()
+        if plan not in ("free", "starter", "trial")
+    ]
+    paying_summary = ", ".join(paying_plans) if paying_plans else "Free tier / trial accounts"
+
+    if vip_radar:
+        revenue_narrative = (
+            f"ALERT: {len(vip_radar)} high-value subscriber(s) encountered severe friction (errors or payment blocks). "
+            "Immediate outreach recommended to prevent churn."
+        )
+    elif total_pay_fails > 0:
+        revenue_narrative = (
+            f"REVENUE LEAK: {total_pay_fails} payment decline(s) detected during checkout. Audit billing integration."
+        )
+    else:
+        revenue_narrative = (
+            f"VIP Health All Clear: 0 paying subscribers experiencing errors or payment roadblocks. "
+            f"Active subscriber coverage: {paying_summary}."
+        )
+
+    # 3. Actionable CPO Recommendations
+    recommendations: list[dict[str, Any]] = []
+
+    if total_pay_fails > 0:
+        recommendations.append(
+            {
+                "priority": "P0 - Critical",
+                "category": "Revenue & Checkout",
+                "title": "Resolve Checkout Payment Gateway Failures",
+                "description": f"Detected {total_pay_fails} failed checkout attempt(s). Review gateway logs for card decline reasons and surface clear inline retry prompts.",
+                "expected_impact": "+15% to +25% checkout recovery",
+            }
+        )
+
+    if total_dead > 0 or total_rage > 0:
+        recommendations.append(
+            {
+                "priority": "P0 - Critical" if (total_dead + total_rage) > 5 else "P1 - UX Polish",
+                "category": "Friction Elimination",
+                "title": "Fix Broken Element Affordances & Dead Clicks",
+                "description": f"Visitors logged {total_dead} dead clicks and {total_rage} rage clicks. Verify click event handlers on primary action buttons and eliminate misleading non-clickable styles.",
+                "expected_impact": "+8% to +14% engagement lift",
+            }
+        )
+
+    if total_err > 0:
+        recommendations.append(
+            {
+                "priority": "P1 - Reliability",
+                "category": "Client Stability",
+                "title": "Patch Client-Side JavaScript Runtime Exceptions",
+                "description": f"{total_err} unhandled exceptions were caught during user sessions. Check the Breakage tab to inspect call stacks and affected browser versions.",
+                "expected_impact": "Zero-crash stability for affected user segments",
+            }
+        )
+
+    if funnel.get("steps") and len(funnel.get("steps") or []) > 1:
+        steps = funnel.get("steps") or []
+        max_drop = 0.0
+        drop_step = ""
+        for i in range(len(steps) - 1):
+            s_curr = steps[i]
+            s_next = steps[i + 1]
+            c1 = s_curr.get("sessions") or 0
+            c2 = s_next.get("sessions") or 0
+            if c1 > 0:
+                drop = ((c1 - c2) / c1) * 100
+                if drop > max_drop:
+                    max_drop = drop
+                    drop_step = f"'{s_curr.get('name')}' → '{s_next.get('name')}'"
+        if max_drop > 20:
+            recommendations.append(
+                {
+                    "priority": "P1 - Funnel Optimization",
+                    "category": "Funnel Conversion",
+                    "title": f"Plug High-Dropoff Leak at {drop_step}",
+                    "description": f"Conversion drops by {round(max_drop, 1)}% between {drop_step}. Reduce form fields, add social proof, and eliminate friction points on this transition.",
+                    "expected_impact": f"+{round(max_drop * 0.2, 1)}% net funnel conversion lift",
+                }
+            )
+
+    if bounces > total_sessions * 0.35:
+        recommendations.append(
+            {
+                "priority": "P2 - Growth",
+                "category": "Landing Page UX",
+                "title": f"Optimize Above-The-Fold Value Proposition on '{top_entries[0] if top_entries else '/'}'",
+                "description": f"{bounces} visitors exited within 5 seconds without scrolling. Clarify the headline promise, accelerate LCP render speed, and make the primary CTA immediately visible.",
+                "expected_impact": "+10% to +18% visitor activation",
+            }
+        )
+
+    if not recommendations:
+        recommendations.append(
+            {
+                "priority": "P2 - Growth",
+                "category": "Optimization",
+                "title": "Establish Next Conversion Goal & Experiment",
+                "description": "User corridors are performing smoothly with healthy activation. Set up custom event tracking for secondary value moments.",
+                "expected_impact": "+5% continuous product lift",
+            }
+        )
+
+    if friction_index > 35 or total_pay_fails > 0:
+        overall_verdict = "Needs Attention: Significant friction or checkout hurdles are depressing product conversion."
+    elif activation_score > 65 and friction_index < 15:
+        overall_verdict = "High Performance: Solid product activation with smooth user flows and minimal friction."
+    else:
+        overall_verdict = "Moderate Health: Steady user exploration with specific UX polish opportunities."
+
+    return {
+        "pro_mode": True,
+        "health_radar": {
+            "activation_score": activation_score,
+            "friction_index": friction_index,
+            "retention_velocity": retention_velocity,
+            "funnel_health": funnel_health,
+            "overall_verdict": overall_verdict,
+        },
+        "executive_briefing": {
+            "primary_intent": primary_intent_narrative,
+            "top_friction_culprit": top_friction_narrative,
+            "persona_stickiness": persona_narrative,
+            "revenue_churn_risk": revenue_narrative,
+        },
+        "recommendations": recommendations,
+        "customer_directory": users_overview.get("customer_directory") or [],
+        "vip_radar": vip_radar,
     }
 
 
@@ -1759,6 +2162,16 @@ def build_overview(
     funnel["is_custom"] = bool(query.funnel)
     funnel["suggested_funnels"] = compute_suggested_funnels(paths_data, pages_data, config)
 
+    friction_data = compute_friction(with_events)
+    cpo_intel = compute_cpo_intelligence(
+        summaries=summaries,
+        with_events=with_events,
+        users_overview=users_overview,
+        funnel=funnel,
+        friction=friction_data,
+        now=now,
+    )
+
     return {
         "status": 1,
         "generated_at": now,
@@ -1785,6 +2198,7 @@ def build_overview(
         "metrics": metrics,
         "comparison": comparison,
         "users_overview": users_overview,
+        "cpo_intelligence": cpo_intel,
         "smart_events": smart_events,
         "quick_backs": quick_backs_data,
         "performance": performance,
@@ -1792,7 +2206,7 @@ def build_overview(
         "sessions": [format_session(summary, now) for summary in visible[: query.limit]],
         "funnel": funnel,
         "paths": paths_data,
-        "friction": compute_friction(with_events),
+        "friction": friction_data,
         "pages": pages_data,
         "web_vitals": vitals["site"],
         "referrers": compute_referrers(summaries),
