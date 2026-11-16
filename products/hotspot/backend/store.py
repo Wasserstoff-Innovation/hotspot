@@ -55,6 +55,7 @@ _SESSION_PROPERTY_FIELDS = {
     "$browser_version": "browser_version",
     "$os": "os",
     "$device_type": "device_type",
+    "$device_id": "device_id",
     "$country": "country",
     "$viewport_width": "viewport_width",
     "$viewport_height": "viewport_height",
@@ -677,6 +678,7 @@ def new_session_summary(session_id: str, distinct_id: str, project_id: str, time
     return {
         "session_id": session_id,
         "distinct_id": distinct_id,
+        "device_id": None,
         "project_id": project_id,
         "host": None,
         "first_seen": timestamp,
@@ -715,6 +717,8 @@ def new_session_summary(session_id: str, distinct_id: str, project_id: str, time
         "timezone": None,
         "identity": {},
         "is_registered": False,
+        "is_multi_account": False,
+        "linked_identities": [],
         "user_hash": None,
         "plan": None,
         "payment_failed": False,
@@ -807,6 +811,17 @@ def apply_event(summary: dict[str, Any], event: CapturedEvent, config: HotspotCo
             summary["is_registered"] = True
             site_key = str(summary.get("project_id") or "")
             summary["user_hash"] = compute_user_hash(site_key, identified)
+        known = props.get("$device_known_identities")
+        if isinstance(known, list):
+            existing_linked = set(summary.get("linked_identities") or [])
+            for k in known:
+                if isinstance(k, str) and k.strip():
+                    existing_linked.add(k.strip()[:200])
+            summary["linked_identities"] = sorted(existing_linked)
+            if len(summary["linked_identities"]) > 1:
+                summary["is_multi_account"] = True
+        if props.get("$is_multi_identity"):
+            summary["is_multi_account"] = True
         if summary.get("identity"):
             summary["is_registered"] = True
             plan = summary["identity"].get("plan")

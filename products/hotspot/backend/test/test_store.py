@@ -209,3 +209,42 @@ def test_compute_user_hash_and_crm_traits() -> None:
     fail_summary = next(s for s in store.sessions() if s["session_id"] == "fail-sess")
     assert fail_summary["payment_failed"] is True
     assert fail_summary["payment_error_code"] == "insufficient_funds"
+
+
+@pytest.mark.parametrize(("name", "store"), _stores(), ids=lambda value: value if isinstance(value, str) else "")
+def test_device_id_and_multi_identity_folding(name: str, store: SessionStore) -> None:
+    config = make_config()
+    items = [
+        event_item(
+            "$pageview",
+            "device-sess-1",
+            NOW,
+            **{"$pathname": "/", "$device_id": "dev-cookie-uuid-1"},
+        ),
+        event_item(
+            "$identify",
+            "device-sess-1",
+            NOW + 5,
+            **{
+                "$identified_id": "alice@example.com",
+                "$device_id": "dev-cookie-uuid-1",
+                "$device_known_identities": ["alice@example.com", "bob@example.com"],
+                "$is_multi_identity": True,
+                "$set": {"email": "alice@example.com", "plan": "pro"},
+            },
+        ),
+    ]
+    store.record(capture_events(config, items, NOW), now=NOW)
+
+    summary = store.summary("device-sess-1")
+    assert summary is not None
+    assert summary["device_id"] == "dev-cookie-uuid-1"
+    assert summary["distinct_id"] == "alice@example.com"
+    assert summary["is_multi_account"] is True
+    assert "bob@example.com" in summary["linked_identities"]
+    assert "alice@example.com" in summary["linked_identities"]
+
+    formatted = format_session(summary, NOW + 10)
+    assert formatted["device_id"] == "dev-cookie-uuid-1"
+    assert formatted["is_multi_account"] is True
+    assert "bob@example.com" in formatted["linked_identities"]

@@ -274,10 +274,13 @@ def format_session(summary: Mapping[str, Any], now: float) -> dict[str, Any]:
     return {
         "session_id": summary.get("session_id"),
         "distinct_id": summary.get("distinct_id"),
+        "device_id": summary.get("device_id"),
         "user_hash": summary.get("user_hash") or identity.get("user_hash"),
         "label": session_label(summary),
         "identity": identity or None,
         "is_registered": bool(summary.get("is_registered") or identity),
+        "is_multi_account": bool(summary.get("is_multi_account")),
+        "linked_identities": list(summary.get("linked_identities") or []),
         "plan": plan,
         "role": identity.get("role"),
         "company": identity.get("company"),
@@ -1315,6 +1318,10 @@ def compute_users_overview(
     returning_visitors: set[str] = set()
     by_visitor: dict[str, dict[str, Any]] = {}
 
+    device_to_visitors: dict[str, set[str]] = defaultdict(set)
+    visitor_to_devices: dict[str, set[str]] = defaultdict(set)
+    registered_visitors_set: set[str] = set()
+
     for summary in summaries:
         sid = str(summary.get("session_id") or "")
         visitor = str(summary.get("distinct_id") or sid)
@@ -1329,6 +1336,17 @@ def compute_users_overview(
         else:
             new_sessions += 1
             new_visitors.add(visitor)
+
+        dev_id = str(summary.get("device_id") or "").strip()
+        if dev_id:
+            device_to_visitors[dev_id].add(visitor)
+            visitor_to_devices[visitor].add(dev_id)
+        if summary.get("is_registered") or summary.get("identity"):
+            registered_visitors_set.add(visitor)
+        for l_id in summary.get("linked_identities") or []:
+            if isinstance(l_id, str) and l_id.strip():
+                if dev_id:
+                    device_to_visitors[dev_id].add(l_id.strip())
 
         entry = by_visitor.get(visitor)
         if entry is None:
@@ -1468,6 +1486,7 @@ def compute_users_overview(
 
     vip_radar.sort(key=lambda item: float(item.get("last_seen") or 0), reverse=True)
 
+    multi_account_visitors: set[str] = set()
     customer_directory: list[dict[str, Any]] = []
     for visitor, data in by_visitor.items():
         latest = data["latest"]
@@ -1481,6 +1500,26 @@ def compute_users_overview(
             + int(data.get("dead_clicks") or 0)
             + (1 if data.get("payment_failed") else 0)
         )
+
+        devs = visitor_to_devices.get(visitor, set())
+        linked_set: set[str] = set()
+        for d in devs:
+            for other in device_to_visitors.get(d, set()):
+                if other != visitor:
+                    linked_set.add(other)
+
+        other_registered = [u for u in linked_set if u in registered_visitors_set]
+        is_multi_account = (
+            bool(latest.get("is_multi_account"))
+            or len(other_registered) > 0
+            or (len(linked_set) > 0 and (is_reg or visitor in registered_visitors_set))
+        )
+        if is_multi_account:
+            multi_account_visitors.add(visitor)
+        is_shared_device = len(linked_set) > 0
+        linked_identities = sorted(linked_set)
+        device_count = max(1, len(devs))
+
         customer_directory.append(
             {
                 "distinct_id": visitor,
@@ -1492,6 +1531,11 @@ def compute_users_overview(
                 "role": identity.get("role"),
                 "is_vip": is_vip,
                 "is_registered": is_reg,
+                "is_multi_account": is_multi_account,
+                "is_shared_device": is_shared_device,
+                "linked_identities": linked_identities,
+                "device_count": device_count,
+                "primary_device_id": latest.get("device_id"),
                 "sessions_count": data["sessions"],
                 "pageviews_count": data["pageviews"],
                 "events_count": data["events"],
@@ -1532,6 +1576,8 @@ def compute_users_overview(
         "returning_visitors": len(returning_visitors),
         "registered_users": len(registered_visitors),
         "anonymous_users": len(anon_visitors),
+        "multi_account_users": len(multi_account_visitors),
+        "shared_devices_count": len([d for d, vs in device_to_visitors.items() if len(vs) > 1]),
         "registered_sessions": registered_sessions,
         "anonymous_sessions": anon_sessions,
         "registered_return_pct": _share(registered_returners, len(registered_visitors)),
@@ -1668,6 +1714,14 @@ def compute_cpo_intelligence(
             "Enabling CRM identity tracking via `hotspot('identify')` will unlock personalized customer journeys."
         )
 
+    multi_users = int(users_overview.get("multi_account_users") or 0)
+    shared_devs = int(users_overview.get("shared_devices_count") or 0)
+    if multi_users > 0:
+        persona_narrative += (
+            f" Device & identity graph detected {multi_users} account profile(s) operating across "
+            f"{shared_devs} shared browser device(s) (cross-account usage / team device sharing)."
+        )
+
     vip_radar = users_overview.get("vip_radar") or []
     by_plan = users_overview.get("by_plan") or {}
     paying_plans = [
@@ -1761,6 +1815,17 @@ def compute_cpo_intelligence(
                 "title": f"Optimize Above-The-Fold Value Proposition on '{top_entries[0] if top_entries else '/'}'",
                 "description": f"{bounces} visitors exited within 5 seconds without scrolling. Clarify the headline promise, accelerate LCP render speed, and make the primary CTA immediately visible.",
                 "expected_impact": "+10% to +18% visitor activation",
+            }
+        )
+
+    if multi_users > 0:
+        recommendations.append(
+            {
+                "priority": "P2 - Account Governance",
+                "category": "Identity Graph",
+                "title": "Audit Shared Device & Multi-Account Activity",
+                "description": f"Identified {multi_users} customer account(s) sharing physical devices/browsers across {shared_devs} shared machine(s). Check Customer Directory for 'Shared Device' badges to evaluate account sharing vs team seating needs.",
+                "expected_impact": "Reduced credential sharing & improved seat monetization",
             }
         )
 

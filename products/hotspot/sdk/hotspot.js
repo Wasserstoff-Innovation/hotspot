@@ -31,12 +31,13 @@
 
     window.__hotspot_loaded = true
 
-    var VERSION = '3.1.0'
+    var VERSION = '3.2.0'
     var STORAGE_PREFIX = '__hotspot_'
     var DISTINCT_ID_KEY = STORAGE_PREFIX + 'distinct_id'
     var SESSION_ID_KEY = STORAGE_PREFIX + 'session_id'
     var SESSION_TIMESTAMP_KEY = STORAGE_PREFIX + 'session_ts'
     var DEVICE_ID_KEY = STORAGE_PREFIX + 'device_id'
+    var KNOWN_IDENTITIES_KEY = STORAGE_PREFIX + 'known_identities'
     var OPT_OUT_KEY = STORAGE_PREFIX + 'opt_out'
     var SUPER_PROPS_KEY = STORAGE_PREFIX + 'super_props'
     var IDENTITY_TRAITS_KEY = STORAGE_PREFIX + 'identity_traits'
@@ -142,35 +143,102 @@
         })
     }
 
-    var storage = {
-        get: function (name) {
-            try {
-                if (config.persistence === 'localStorage' && window.localStorage) {
-                    return window.localStorage.getItem(name)
-                }
-            } catch (e) {}
+    var cachedRootDomain = null
+    function getRootDomain() {
+        try {
+            var hostname = window.location.hostname
+            if (!hostname || hostname === 'localhost' || /^\d{1,3}(\.\d{1,3}){3}$/.test(hostname)) {
+                return ''
+            }
+            var parts = hostname.split('.')
+            if (parts.length <= 1) return ''
+            for (var i = parts.length - 2; i >= 0; i--) {
+                var candidate = '.' + parts.slice(i).join('.')
+                var testKey = '__hs_t_' + Math.random().toString(36).substring(2, 6)
+                try {
+                    document.cookie = testKey + '=1; domain=' + candidate + '; path=/'
+                    if (document.cookie.indexOf(testKey + '=1') !== -1) {
+                        document.cookie = testKey + '=; domain=' + candidate + '; max-age=0; path=/'
+                        return candidate
+                    }
+                } catch (e) {}
+            }
+        } catch (e) {}
+        return ''
+    }
+
+    function rootDomain() {
+        if (cachedRootDomain === null) {
+            cachedRootDomain = getRootDomain()
+        }
+        return cachedRootDomain
+    }
+
+    function cookieGet(name) {
+        try {
             var prefix = name + '='
             var parts = document.cookie.split(';')
             for (var i = 0; i < parts.length; i++) {
                 var part = parts[i].trim()
                 if (part.indexOf(prefix) === 0) return decodeURIComponent(part.substring(prefix.length))
             }
-            return null
-        },
-        set: function (name, value) {
+        } catch (e) {}
+        return null
+    }
+
+    function cookieSet(name, value, maxAgeSeconds) {
+        try {
+            var age = maxAgeSeconds !== undefined ? maxAgeSeconds : 63072000 // 2 years default
+            var dom = rootDomain()
+            var cookieStr = name + '=' + encodeURIComponent(value) + '; max-age=' + age + '; path=/; SameSite=Lax'
+            if (dom) {
+                cookieStr += '; domain=' + dom
+            }
+            document.cookie = cookieStr
+        } catch (e) {}
+    }
+
+    function cookieRemove(name) {
+        try {
+            var dom = rootDomain()
+            document.cookie = name + '=; max-age=0; path=/'
+            if (dom) {
+                document.cookie = name + '=; max-age=0; path=/; domain=' + dom
+            }
+        } catch (e) {}
+    }
+
+    var storage = {
+        get: function (name) {
+            var val = null
             try {
-                if (config.persistence === 'localStorage' && window.localStorage) {
-                    window.localStorage.setItem(name, value)
-                    return
+                if (window.localStorage) {
+                    val = window.localStorage.getItem(name)
                 }
             } catch (e) {}
-            document.cookie = name + '=' + encodeURIComponent(value) + '; max-age=31536000; path=/; SameSite=Lax'
+            if (val === null || val === undefined) {
+                val = cookieGet(name)
+                if (val !== null && window.localStorage) {
+                    try {
+                        window.localStorage.setItem(name, val)
+                    } catch (e) {}
+                }
+            }
+            return val
+        },
+        set: function (name, value, maxAge) {
+            try {
+                if (window.localStorage) {
+                    window.localStorage.setItem(name, value)
+                }
+            } catch (e) {}
+            cookieSet(name, value, maxAge)
         },
         remove: function (name) {
             try {
                 if (window.localStorage) window.localStorage.removeItem(name)
             } catch (e) {}
-            document.cookie = name + '=; max-age=0; path=/'
+            cookieRemove(name)
         },
     }
 
@@ -178,9 +246,35 @@
         var id = storage.get(name)
         if (!id) {
             id = uuidv4()
-            storage.set(name, id)
+            storage.set(name, id, 63072000)
         }
         return id
+    }
+
+    function getDeviceId() {
+        return persistentId(DEVICE_ID_KEY)
+    }
+
+    function getKnownIdentities() {
+        try {
+            var raw = storage.get(KNOWN_IDENTITIES_KEY)
+            return raw ? JSON.parse(raw) : []
+        } catch (e) {
+            return []
+        }
+    }
+
+    function addKnownIdentity(id) {
+        if (!id || typeof id !== 'string') return []
+        var list = getKnownIdentities()
+        if (list.indexOf(id) === -1) {
+            list.push(id)
+            if (list.length > 20) list = list.slice(-20)
+            try {
+                storage.set(KNOWN_IDENTITIES_KEY, JSON.stringify(list), 63072000)
+            } catch (e) {}
+        }
+        return list
     }
 
     function getDistinctId() {
@@ -198,16 +292,16 @@
                 var refMatch = window.location.search.match(/[?&]hs_ref=([a-zA-Z0-9_-]{8,64})/)
                 if (refMatch && refMatch[1]) {
                     sessionId = refMatch[1]
-                    storage.set(SESSION_ID_KEY, sessionId)
+                    storage.set(SESSION_ID_KEY, sessionId, 1800)
                 }
             } catch (e) {}
         }
 
         if (!sessionId || now - lastSeen > config.session_timeout_ms) {
             sessionId = uuidv4()
-            storage.set(SESSION_ID_KEY, sessionId)
+            storage.set(SESSION_ID_KEY, sessionId, 1800)
         }
-        storage.set(SESSION_TIMESTAMP_KEY, String(now))
+        storage.set(SESSION_TIMESTAMP_KEY, String(now), 1800)
         return sessionId
     }
 
@@ -1391,18 +1485,26 @@
             var currentId = String(distinctId)
             var props = properties && typeof properties === 'object' ? properties : {}
 
+            // Track multi-identity on this physical device
+            var knownOnDevice = addKnownIdentity(currentId)
+
             // Account switching defense: if user identity changed in same browser, rotate session immediately
             var storedId = storage.get(DISTINCT_ID_KEY)
-            if (storedId && storedId !== currentId && storedId !== previous) {
-                storage.set(SESSION_ID_KEY, uuidv4())
+            var isSwitch = Boolean(storedId && storedId !== currentId && storedId !== previous)
+            if (isSwitch) {
+                storage.set(SESSION_ID_KEY, uuidv4(), 1800)
             }
 
-            storage.set(DISTINCT_ID_KEY, currentId)
+            storage.set(DISTINCT_ID_KEY, currentId, 63072000)
             setStoredTraits(props)
 
             var payload = {
                 $anon_distinct_id: previous !== currentId ? previous : null,
                 $identified_id: currentId,
+                $device_id: persistentId(DEVICE_ID_KEY),
+                $previous_distinct_id: previous !== currentId ? previous : null,
+                $device_known_identities: knownOnDevice,
+                $is_multi_identity: knownOnDevice.length > 1,
                 $set: props,
             }
             if (options && options.hashIdentifier) {
@@ -1419,18 +1521,25 @@
         register: function (properties) {
             if (properties && typeof properties === 'object') setSuperProperties(properties)
         },
+        getDeviceId: function () {
+            return persistentId(DEVICE_ID_KEY)
+        },
+        getKnownIdentities: function () {
+            return getKnownIdentities()
+        },
         reset: function () {
             storage.remove(DISTINCT_ID_KEY)
             storage.remove(SESSION_ID_KEY)
             storage.remove(SESSION_TIMESTAMP_KEY)
             storage.remove(SUPER_PROPS_KEY)
             storage.remove(IDENTITY_TRAITS_KEY)
-            // Immediately start a clean anonymous session to prevent cross-account contamination
+            // Note: DEVICE_ID_KEY is intentionally preserved across reset()
+            // to maintain physical device continuity for fraud/multi-account detection.
             var newAnonId = uuidv4()
             var newSessionId = uuidv4()
-            storage.set(DISTINCT_ID_KEY, newAnonId)
-            storage.set(SESSION_ID_KEY, newSessionId)
-            storage.set(SESSION_TIMESTAMP_KEY, String(Date.now()))
+            storage.set(DISTINCT_ID_KEY, newAnonId, 63072000)
+            storage.set(SESSION_ID_KEY, newSessionId, 1800)
+            storage.set(SESSION_TIMESTAMP_KEY, String(Date.now()), 1800)
         },
         trackPurchase: function (details) {
             if (!details || typeof details !== 'object') return

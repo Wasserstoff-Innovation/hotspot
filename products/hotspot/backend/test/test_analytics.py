@@ -836,3 +836,89 @@ def test_cpo_intelligence_and_customer_directory():
     assert "friction" in takeaway
     assert "verdict" in takeaway
     assert takeaway["sentiment"] in ("warning", "critical")
+
+
+def test_device_graph_and_multi_account_intelligence() -> None:
+    config = make_config()
+    store = SessionStore(MemoryBackend(config), config)
+    t = NOW - 1000
+
+    # User 1 (Work account) on device A
+    store.record(
+        capture_events(
+            config,
+            [
+                event_item(
+                    "$pageview",
+                    "sess-dev-1",
+                    t,
+                    "alice@work.com",
+                    **{"$pathname": "/", "$device_id": "shared-browser-cookie-xyz"},
+                ),
+                event_item(
+                    "$identify",
+                    "sess-dev-1",
+                    t + 10,
+                    "alice@work.com",
+                    **{
+                        "$identified_id": "alice@work.com",
+                        "$device_id": "shared-browser-cookie-xyz",
+                        "$set": {"email": "alice@work.com", "plan": "team", "company": "Acme Inc"},
+                    },
+                ),
+            ],
+            NOW,
+        ),
+        now=NOW,
+    )
+
+    # User 2 (Personal account) on same device A
+    store.record(
+        capture_events(
+            config,
+            [
+                event_item(
+                    "$pageview",
+                    "sess-dev-2",
+                    t + 50,
+                    "alice@personal.org",
+                    **{"$pathname": "/dashboard", "$device_id": "shared-browser-cookie-xyz"},
+                ),
+                event_item(
+                    "$identify",
+                    "sess-dev-2",
+                    t + 60,
+                    "alice@personal.org",
+                    **{
+                        "$identified_id": "alice@personal.org",
+                        "$device_id": "shared-browser-cookie-xyz",
+                        "$set": {"email": "alice@personal.org", "plan": "pro"},
+                    },
+                ),
+            ],
+            NOW,
+        ),
+        now=NOW,
+    )
+
+    ov = build_overview(store, OverviewQuery(), config, NOW)
+    u_ov = ov["users_overview"]
+    assert u_ov["shared_devices_count"] == 1
+    assert u_ov["multi_account_users"] == 2
+
+    cust_dir = u_ov["customer_directory"]
+    u1 = next(c for c in cust_dir if c["distinct_id"] == "alice@work.com")
+    u2 = next(c for c in cust_dir if c["distinct_id"] == "alice@personal.org")
+
+    assert u1["is_multi_account"] is True
+    assert u1["is_shared_device"] is True
+    assert "alice@personal.org" in u1["linked_identities"]
+    assert u1["primary_device_id"] == "shared-browser-cookie-xyz"
+
+    assert u2["is_multi_account"] is True
+    assert u2["is_shared_device"] is True
+    assert "alice@work.com" in u2["linked_identities"]
+
+    cpo = ov["cpo_intelligence"]
+    assert "shared browser device" in cpo["executive_briefing"]["persona_stickiness"].lower()
+    assert any("Shared Device" in r["title"] for r in cpo["recommendations"])

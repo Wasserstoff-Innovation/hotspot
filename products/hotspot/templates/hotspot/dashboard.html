@@ -852,7 +852,7 @@
         .u-profile-av { width: 44px; height: 44px; border-radius: 50%; background: #EEF2FF; color: #4338CA; font-weight: 700; font-size: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .u-profile-name { font-size: 16px; font-weight: 700; color: var(--text); }
         .u-profile-badges { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
-        .u-profile-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 0; }
+        .u-profile-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 14px 0; }
         .u-profile-kpi { background: var(--subtle); border-radius: 8px; padding: 10px; text-align: center; }
         .u-profile-kpi-val { font-size: 16px; font-weight: 700; color: var(--text); }
         .u-profile-kpi-lbl { font-size: 11px; color: var(--text-2); margin-top: 2px; }
@@ -1934,6 +1934,7 @@
                                 <button type="button" data-action="cust-filter" data-cust-filter="vip">VIP (<span id="cntCustVip">0</span>)</button>
                                 <button type="button" data-action="cust-filter" data-cust-filter="friction">With Friction (<span id="cntCustFriction">0</span>)</button>
                                 <button type="button" data-action="cust-filter" data-cust-filter="registered">Registered (<span id="cntCustReg">0</span>)</button>
+                                <button type="button" data-action="cust-filter" data-cust-filter="multi">Shared Devices (<span id="cntCustMulti">0</span>)</button>
                                 <button type="button" data-action="cust-filter" data-cust-filter="anon">Anonymous (<span id="cntCustAnon">0</span>)</button>
                             </div>
                         </div>
@@ -2632,6 +2633,20 @@
                     <div class="u-profile-kpi-val" id="upKpiFriction">0</div>
                     <div class="u-profile-kpi-lbl">Friction Incidents</div>
                 </div>
+                <div class="u-profile-kpi">
+                    <div class="u-profile-kpi-val" id="upKpiDevices">1</div>
+                    <div class="u-profile-kpi-lbl">Devices Seen</div>
+                </div>
+            </div>
+            <div id="upLinkedSection" style="margin: 14px 0; background: #FEF3C7; border: 1px solid #F59E0B; border-radius: 8px; padding: 12px 14px;" hidden>
+                <div style="font-weight: 700; color: #92400E; font-size: 12px; display: flex; align-items: center; gap: 6px;">
+                    <span class="ico" data-icon="alert"></span>
+                    <span>Shared Physical Device / Multi-Identity Detected</span>
+                </div>
+                <div style="font-size: 11.5px; color: #B45309; margin-top: 3px;">
+                    This browser device cookie is shared with other distinct accounts:
+                </div>
+                <div id="upLinkedList" style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px;"></div>
             </div>
             <div class="u-profile-history-title">Session History</div>
             <div class="u-profile-sessions" id="upSessionsList"></div>
@@ -3576,6 +3591,14 @@
         var role = ident.role || 'Member';
         var company = ident.company || '';
 
+        var custMatch = (state.customerDirectory || []).find(function (c) {
+            return c.distinct_id === distinctId || (c.user_hash && c.user_hash === distinctId);
+        });
+        var isMulti = (custMatch && custMatch.is_multi_account) || sample.is_multi_account;
+        var linked = (custMatch && custMatch.linked_identities) || sample.linked_identities || [];
+        var devCount = (custMatch && custMatch.device_count) || sample.device_count || 1;
+        var devId = (custMatch && custMatch.primary_device_id) || sample.device_id || '';
+
         $('upAv').textContent = String(label).replace(/[^A-Za-z0-9]/g, '').slice(0, 2).toUpperCase() || 'U';
         $('upName').textContent = label;
         $('upEmail').textContent = email ? (email + (company ? ' · ' + company : '')) : (company || (sample.user_hash ? 'User #' + sample.user_hash.slice(0, 8) : ''));
@@ -3586,6 +3609,13 @@
         if (role) badges.appendChild(el('span', { class: 'chip', text: role }));
         if (sample.is_vip) badges.appendChild(el('span', { class: 'chip vip' }, 'VIP Customer'));
         if (sample.user_hash) badges.appendChild(el('span', { class: 'chip mono', text: '#' + sample.user_hash.slice(0, 8) }));
+        if (isMulti || (linked && linked.length > 0)) {
+            var totalLinked = (linked ? linked.length : 1) + 1;
+            badges.appendChild(el('span', { class: 'chip warning', text: 'Shared Device (' + totalLinked + ' accounts)' }));
+        }
+        if (devId) {
+            badges.appendChild(el('span', { class: 'chip mono', text: 'Device: ' + devId.slice(0, 8) }));
+        }
 
         $('upKpiSessions').textContent = fmtNum(userSessions.length);
         var totalActive = userSessions.reduce(function (acc, s) { return acc + (s.active_seconds || s.duration_seconds || 0); }, 0);
@@ -3594,6 +3624,29 @@
             return acc + (s.error_count || 0) + (s.rage_click_count || 0) + (s.dead_click_count || 0) + (s.payment_failed ? 1 : 0);
         }, 0);
         $('upKpiFriction').textContent = fmtNum(totalFriction);
+        if ($('upKpiDevices')) $('upKpiDevices').textContent = fmtNum(devCount);
+
+        var linkedSection = $('upLinkedSection');
+        var linkedList = $('upLinkedList');
+        if (linkedSection && linkedList) {
+            clear(linkedList);
+            if (linked && linked.length > 0) {
+                linked.forEach(function (lId) {
+                    var lBtn = el('button', {
+                        class: 'btn sm ghost',
+                        type: 'button',
+                        style: 'background: #FFF; border-color: #FCD34D; color: #92400E; font-weight: 600; padding: 2px 8px;',
+                        text: lId,
+                        'data-action': 'open-journey',
+                        'data-id': lId
+                    });
+                    linkedList.appendChild(lBtn);
+                });
+                linkedSection.hidden = false;
+            } else {
+                linkedSection.hidden = true;
+            }
+        }
 
         var list = $('upSessionsList');
         clear(list);
@@ -3615,6 +3668,8 @@
                         class: 'btn sm ghost',
                         type: 'button',
                         text: 'Watch Replay',
+                        'data-action': 'watch-customer',
+                        'data-id': s.session_id,
                         onclick: function () {
                             modal.hidden = true;
                             navTo('sessions');
@@ -4318,6 +4373,7 @@
             if (custFilter === 'vip' && !c.is_vip) return false;
             if (custFilter === 'friction' && !c.has_friction) return false;
             if (custFilter === 'registered' && !c.is_registered) return false;
+            if (custFilter === 'multi' && !c.is_multi_account && !c.is_shared_device) return false;
             if (custFilter === 'anon' && c.is_registered) return false;
             if (custSearchTerm) {
                 var term = custSearchTerm.toLowerCase();
@@ -4326,7 +4382,8 @@
                 var hash = (c.user_hash || '').toLowerCase();
                 var comp = (c.company || '').toLowerCase();
                 var plan = (c.plan || '').toLowerCase();
-                if (label.indexOf(term) === -1 && email.indexOf(term) === -1 && hash.indexOf(term) === -1 && comp.indexOf(term) === -1 && plan.indexOf(term) === -1) {
+                var linked = (c.linked_identities || []).join(' ').toLowerCase();
+                if (label.indexOf(term) === -1 && email.indexOf(term) === -1 && hash.indexOf(term) === -1 && comp.indexOf(term) === -1 && plan.indexOf(term) === -1 && linked.indexOf(term) === -1) {
                     return false;
                 }
             }
@@ -4337,6 +4394,7 @@
         if ($('cntCustVip')) $('cntCustVip').textContent = fmtNum(allCust.filter(function (c) { return c.is_vip; }).length);
         if ($('cntCustFriction')) $('cntCustFriction').textContent = fmtNum(allCust.filter(function (c) { return c.has_friction; }).length);
         if ($('cntCustReg')) $('cntCustReg').textContent = fmtNum(allCust.filter(function (c) { return c.is_registered; }).length);
+        if ($('cntCustMulti')) $('cntCustMulti').textContent = fmtNum(allCust.filter(function (c) { return c.is_multi_account || c.is_shared_device; }).length);
         if ($('cntCustAnon')) $('cntCustAnon').textContent = fmtNum(allCust.filter(function (c) { return !c.is_registered; }).length);
 
         var tbody = $('custTableBody');
@@ -4350,6 +4408,17 @@
             var planClass = c.plan === 'ENTERPRISE' ? 'chip vip' : (c.is_vip ? 'chip plan' : 'chip');
             var frictionCell = c.has_friction ? el('span', { class: 'chip danger', text: plural(c.friction_count, 'incident', 'incidents') }) : el('span', { class: 'chip' }, '0 friction');
 
+            var multiBadge = null;
+            if (c.is_multi_account || c.is_shared_device) {
+                var linkedCount = (c.linked_identities && c.linked_identities.length) ? c.linked_identities.length + 1 : 2;
+                multiBadge = el('span', {
+                    class: 'chip warning',
+                    style: 'font-size: 10px; cursor: pointer; padding: 1px 5px;',
+                    text: 'Shared Device (' + linkedCount + ')',
+                    title: 'Multiple identities on this device cookie: ' + (c.linked_identities || []).join(', ')
+                });
+            }
+
             var tr = el('tr', {}, [
                 el('td', {}, [
                     el('div', { style: 'display: flex; align-items: center; gap: 10px;' }, [
@@ -4359,7 +4428,8 @@
                             el('div', { style: 'font-size: 11px; color: var(--text-2); display: flex; gap: 6px; align-items: center; flex-wrap: wrap;' }, [
                                 c.email ? el('span', { text: c.email }) : null,
                                 c.company ? el('span', { text: '· ' + c.company }) : null,
-                                c.user_hash ? el('span', { class: 'chip mono', style: 'font-size: 10px; padding: 1px 4px;', text: '#' + c.user_hash.slice(0, 8) }) : null
+                                c.user_hash ? el('span', { class: 'chip mono', style: 'font-size: 10px; padding: 1px 4px;', text: '#' + c.user_hash.slice(0, 8) }) : null,
+                                multiBadge
                             ].filter(Boolean))
                         ])
                     ])
