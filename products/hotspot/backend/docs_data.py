@@ -187,8 +187,8 @@ DOCS_PAGES: dict[str, dict[str, Any]] = {
         <button class="doc-copy-btn" type="button" data-copy-target="code-snippet-embed">Copy Snippet</button>
     </div>
     <pre><code id="code-snippet-embed">&lt;script
-  src="https://hotspot.buxa.ai/hotspot.js"
-  data-api-host="https://hotspot.buxa.ai"
+  src="https://tryhotspot.online/hotspot.js"
+  data-api-host="https://tryhotspot.online"
   data-api-key="hs_live_YOUR_SITE_KEY"
   defer&gt;&lt;/script&gt;</code></pre>
 </div>
@@ -273,8 +273,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     &lt;html lang="en"&gt;
       &lt;head&gt;
         &lt;Script
-          src="https://hotspot.buxa.ai/hotspot.js"
-          data-api-host="https://hotspot.buxa.ai"
+          src="https://tryhotspot.online/hotspot.js"
+          data-api-host="https://tryhotspot.online"
           data-api-key="hs_live_YOUR_SITE_KEY"
           strategy="afterInteractive"
         /&gt;
@@ -299,8 +299,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     &lt;meta charset="UTF-8" /&gt;
     &lt;title&gt;My Application&lt;/title&gt;
     &lt;script
-      src="https://hotspot.buxa.ai/hotspot.js"
-      data-api-host="https://hotspot.buxa.ai"
+      src="https://tryhotspot.online/hotspot.js"
+      data-api-host="https://tryhotspot.online"
       data-api-key="hs_live_YOUR_SITE_KEY"
       defer&gt;&lt;/script&gt;
   &lt;/head&gt;
@@ -324,8 +324,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     head: {
       script: [
         {
-          src: 'https://hotspot.buxa.ai/hotspot.js',
-          'data-api-host': 'https://hotspot.buxa.ai',
+          src: 'https://tryhotspot.online/hotspot.js',
+          'data-api-host': 'https://tryhotspot.online',
           'data-api-key': 'hs_live_YOUR_SITE_KEY',
           defer: true
         }
@@ -784,9 +784,9 @@ hotspot.trackHesitation({
 
 <h2>MCP Endpoints</h2>
 <ul class="doc-list">
-    <li><strong>Streamable HTTP MCP:</strong> <code>https://hotspot.buxa.ai/mcp</code> (Modern standard)</li>
-    <li><strong>Legacy Server-Sent Events (SSE):</strong> <code>https://hotspot.buxa.ai/mcp/sse</code></li>
-    <li><strong>Downloadable Skill:</strong> <code>https://hotspot.buxa.ai/skill.md</code></li>
+    <li><strong>Streamable HTTP MCP:</strong> <code>https://tryhotspot.online/mcp</code> (Modern standard)</li>
+    <li><strong>Legacy Server-Sent Events (SSE):</strong> <code>https://tryhotspot.online/mcp/sse</code></li>
+    <li><strong>Downloadable Skill:</strong> <code>https://tryhotspot.online/skill.md</code></li>
 </ul>
 
 <h2>Claude Desktop & Claude Code Configuration</h2>
@@ -801,7 +801,7 @@ hotspot.trackHesitation({
   "mcpServers": {
     "hotspot": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-fetch", "https://hotspot.buxa.ai/mcp"],
+      "args": ["-y", "@modelcontextprotocol/server-fetch", "https://tryhotspot.online/mcp"],
       "headers": {
         "Authorization": "Bearer YOUR_HOTSPOT_SECRET_KEY"
       }
@@ -821,7 +821,7 @@ hotspot.trackHesitation({
     <pre><code id="code-cursor-mcp">{
   "mcpServers": {
     "hotspot": {
-      "url": "https://hotspot.buxa.ai/mcp",
+      "url": "https://tryhotspot.online/mcp",
       "headers": {
         "Authorization": "Bearer YOUR_HOTSPOT_SECRET_KEY"
       }
@@ -831,7 +831,7 @@ hotspot.trackHesitation({
 </div>
 
 <h2>Instant Browser Connect (Device Flow)</h2>
-<p>To authorize an AI tool without exposing raw passwords, visit <code>https://hotspot.buxa.ai/connect/</code>. Enter the 8-character device code displayed in your terminal, select which website to authorize, and approve access in one click.</p>
+<p>To authorize an AI tool without exposing raw passwords, visit <code>https://tryhotspot.online/connect/</code>. Enter the 8-character device code displayed in your terminal, select which website to authorize, and approve access in one click.</p>
 """,
     },
     "self-hosting": {
@@ -907,7 +907,7 @@ volumes:
             <tr>
                 <td><code>HOTSPOT_SITE_URL</code></td>
                 <td><span class="badge success">Yes</span></td>
-                <td>Public URL (e.g. <code>https://hotspot.buxa.ai</code>).</td>
+                <td>Public URL (e.g. <code>https://tryhotspot.online</code>).</td>
             </tr>
             <tr>
                 <td><code>HOTSPOT_DASHBOARD_PASSWORD</code></td>

@@ -220,7 +220,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         parser.add_argument(
             "--url",
-            default=os.environ.get("HOTSPOT_HOST", "https://hotspot.buxa.ai"),
+            default=os.environ.get("HOTSPOT_HOST", "https://tryhotspot.online"),
             help="Hotspot server origin URL.",
         )
         parser.add_argument(
@@ -249,7 +249,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         parser.add_argument(
             "--url",
-            default=os.environ.get("HOTSPOT_HOST", "https://hotspot.buxa.ai"),
+            default=os.environ.get("HOTSPOT_HOST", "https://tryhotspot.online"),
             help="Hotspot server origin URL.",
         )
         parser.add_argument("--out", default=".agents/skills/hotspot/SKILL.md", help="Destination SKILL.md path.")
